@@ -1,0 +1,89 @@
+{
+  "metadata": {
+    "task_id": "TS02",
+    "layout_id": 24,
+    "style_id": 24,
+    "seed": 0,
+    "description": "TS02 start route with first-cabinet-specific forward and turn branches derived from the user-calibrated turn displacement."
+  },
+  "default_start_index": 0,
+  "route_mode": "spatial_graph",
+  "station_targets": {
+    "cabinet_slot_0_station": {
+      "index": 2,
+      "routes": {
+        "0": [0, 1, 2]
+      }
+    },
+    "cabinet_slot_1_station": {
+      "index": 4,
+      "routes": {
+        "0": [0, 3, 4]
+      }
+    },
+    "cabinet_slot_2_station": {
+      "index": 6,
+      "routes": {
+        "0": [0, 5, 6]
+      }
+    },
+    "completion_button_station": 7,
+    "completion_button": 7,
+    "cabinet_slot_0": 2,
+    "cabinet_slot_1": 4,
+    "cabinet_slot_2": 6,
+    "left": 2,
+    "center": 4,
+    "right": 6
+  },
+  "samples": [
+    {
+      "index": 0,
+      "name": "navigation_start",
+      "xy": [3.170, -1.166],
+      "yaw": -0.048
+    },
+    {
+      "index": 1,
+      "name": "first_left_forward_before_turn",
+      "xy": [4.332, -1.171],
+      "yaw": -0.048
+    },
+    {
+      "index": 2,
+      "name": "cabinet_slot_0_station",
+      "xy": [4.124, -1.370],
+      "yaw": -1.5707963267948966
+    },
+    {
+      "index": 3,
+      "name": "first_center_forward_before_turn",
+      "xy": [4.808, -1.171],
+      "yaw": -0.048
+    },
+    {
+      "index": 4,
+      "name": "cabinet_slot_1_station",
+      "xy": [4.600, -1.370],
+      "yaw": -1.5707963267948966
+    },
+    {
+      "index": 5,
+      "name": "first_right_forward_before_turn",
+      "xy": [5.298, -1.171],
+      "yaw": -0.048
+    },
+    {
+      "index": 6,
+      "name": "cabinet_slot_2_station",
+      "xy": [5.090, -1.370],
+      "yaw": -1.5707963267948966
+    },
+    {
+      "index": 7,
+      "name": "completion_button_station",
+      "xy": [4.350, -1.370],
+      "yaw": -1.5707963267948966
+    }
+  ]
+}

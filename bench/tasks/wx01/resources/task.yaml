@@ -1,0 +1,209 @@
+# WX-01 six-stage production task. Dataset storage remains CLI-owned.
+schema_version: 1
+
+task:
+  id: WX-01
+  display_name: Return object to original place
+  description: Wipe the remembered dining-table spot and return its displaced cup.
+  success_conditions:
+    - remembered_area_wiped
+    - blocking_object_at_origin
+    - blocking_object_on_dining_table
+    - cleaning_tool_released
+    - blocking_object_released
+
+scene:
+  env_name: WX01ReturnObjectToOriginalPlace
+  fixed_scene: true
+  layout_id: 38
+  style_id: 38
+  scene_seed: 0
+  blocking_object_scale: 0.85
+  blocking_object_placement_size: [0.16, 0.20]
+  blocking_object_placement_pos: [1.0, 1.0]
+  blocking_object_rotation_deg: [0.0, 0.0]
+
+episode:
+  start_mode: short_preplaced_blocking_pregrasped_tool
+  max_horizon: 3200
+  temporary_targets:
+    blocking_center_offset_xy: [0.0, 0.18]
+    blocking_jitter_x: [-0.06, 0.06]
+    blocking_jitter_y: [-0.015, 0.015]
+    tool_center_offset_xy: [0.0, -0.38]
+    tool_jitter_x: [-0.08, 0.08]
+    tool_jitter_y: [-0.06, 0.04]
+    minimum_tool_to_blocking_distance: 0.32
+    minimum_tool_to_origin_distance: 0.30
+    maximum_sampling_attempts: 50
+  wipe_sampling:
+    seed_offset: 2000
+    half_length: 0.07
+    pass_count: 3
+    angle_offset_deg: 0.0
+
+initial_state:
+  robot_base:
+    mode: manual_path_sample
+    sample_index: 0
+  objects:
+    enabled: true
+    blocking_object:
+      center_xy: [2.53813812704237, -3.7191362093913964]
+      size_xy: [0.16, 0.20]
+      rotation_deg: [0.0, 0.0]
+      seed_offset: 0
+    cleaning_tool:
+      center_xy: [2.518925433999311, -4.959600068714154]
+      size_xy: [0.12, 0.12]
+      rotation_deg: [0.0, 0.0]
+      seed_offset: 100
+  short_start:
+    mode: short_preplaced_blocking_pregrasped_tool
+    setup_operation: physical_pick
+    cleaning_tool:
+      lift_height: 0.20
+      transport_probe_height: 0.03
+      max_end_effector_distance: 0.10
+      max_relative_offset_drift: 0.02
+      minimum_motion_ratio: 0.70
+
+sensors:
+  cameras: [robot0_agentview_left, robot0_agentview_right, robot0_eye_in_hand]
+  wrist_rgb_camera: robot0_eye_in_hand
+  width: 224
+  height: 224
+  depth: true
+  use_camera_observations: true
+  has_renderer: false
+  has_offscreen_renderer: true
+
+resources:
+  station_poses: station/stations.json
+  manual_base_path: navigation/manual_base_path_layout38_style38_seed0.json
+  planner_script: ../../../execution/planning/mplib_planner.py
+  cleaning_tool_grasp_pose: poses/cleaning_tool_grasp.json
+
+navigation:
+  kinematic_base_navigation: false
+  base_action_frame: world
+  base_translation_action_sign: 1.0
+  base_tolerance: 0.025
+  base_yaw_tolerance: 0.06
+  base_max_steps: 1500
+  manual_base_path_enabled: true
+  manual_base_path_start_index: 0
+  manual_base_path_xy_tolerance: 0.030
+  manual_base_path_yaw_tolerance: 0.06
+  base_single_axis_tracking: false
+  base_terminal_yaw_distance: 0.05
+  base_snap_to_target_after_success: false
+  base_profile_v_max: 0.75
+  base_profile_a_max: 1.30
+  base_profile_a_dec: 1.50
+  base_profile_v_min: 0.15
+  base_profile_w_max: 0.75
+  base_profile_alpha_max: 1.50
+  base_profile_alpha_dec: 1.30
+  base_profile_w_min: 0.08
+  use_station_astar_paths: false
+  station_nav_use_docking: false
+  station_nav_dock_standoff: 0.0
+  station_nav_require_footprint: false
+  use_station_base_poses: true
+
+manipulation:
+  pick_place:
+    orientation_mode: object-y-topdown
+    mug_orientation_mode: object-y-topdown
+    pregrasp_height: 0.20
+    grasp_clearance: -0.05
+    lift_height: 0.12
+    mug_lift_height: 0.08
+    grasp_yaw_offset_deg: 0.0
+    place_height: 0.16
+    retreat_height: 0.30
+    retreat_x: -0.10
+    retreat_y: -0.18
+    release_offset_x: 0.0
+    release_offset_y: 0.0
+    post_release_clearance_distance: 0.0
+    post_release_clearance_z_offset: 0.0
+  planner:
+    conda_env: membench
+    subprocess_timeout_s: 60.0
+    planning_time: 5.0
+    time_step: 0.1
+    qpos_step: 0.02
+    rrt_range: 0.1
+  runtime:
+    max_joint_step: 0.02
+    settle_steps: 10
+    position_threshold: 0.06
+    orientation_threshold_deg: 10.0
+    qpos_threshold: 0.08
+    open_steps: 10
+    close_steps: 50
+    release_steps: 20
+    release_settle_steps: 10
+  static_scene:
+    enabled: false
+    validate_collisions: false
+    fixture_keywords: counter,dining,sink,cabinet
+    exclude_keywords: floor,wall
+    spacing: 0.04
+    inflate: 0.05
+    point_radius: 0.01
+    faces: bottom
+    point_cloud_stages: lift,retreat
+    min_z: 1.0
+    max_points: 4000
+
+operations:
+  wipe:
+    plan_execute_wipe_sweep: true
+    contact_z_offset: 0.005
+    settle_steps: 15
+    allow_final_qpos_near_miss: true
+    max_final_qpos_error: 0.30
+  cleaning_tool_place:
+    place_height: 0.0
+    retreat_height: 0.10
+    retreat_x: -0.06
+    retreat_y: -0.06
+    post_release_clearance_z_offset: 0.12
+    target_max_base_x: 0.56
+  return_arm:
+    settle_steps: 10
+    gripper_action: -1.0
+  blocking_pick:
+    orientation_mode: object-y-topdown
+    grasp_clearance: -0.03
+    lift_height: 0.08
+    blocking_object_max_base_x: 0.66
+  blocking_origin_place:
+    place_height: 0.0
+    retreat_height: 0.08
+    retreat_x: -0.04
+    retreat_y: -0.04
+    target_max_base_x: 0.60
+  handlers:
+    dry_run_wipe_semantic_proxy: true
+    accessible_place_dry_run_only: true
+  pick_proxy:
+    dry_run_only: true
+    blocking_object_max_base_x: 0.66
+
+semantics:
+  origin_threshold: 0.02
+  wipe_radius: 0.20
+  contact_separation: 0.02
+  minimum_contact_count: 2
+  minimum_wipe_sweep: 0.07
+  release_distance: 0.15
+
+recording:
+  record_depth: true
+  depth_dtype: uint16
+  depth_scale: 0.001
+  action_schema: membench.pandaomron_hybrid13.v2

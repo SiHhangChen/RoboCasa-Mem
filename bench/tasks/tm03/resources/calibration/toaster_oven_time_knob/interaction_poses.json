@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "config_kind": "tm03_native_toaster_oven_time_knob_interaction",
+  "expected_asset": "ToasterOven059",
+  "target_knob": "time",
+  "calibrated": false,
+  "required_pose_roles": [
+    "pinch_off",
+    "pinch_on",
+    "pinch_on_for_off"
+  ],
+  "pose_config_kind": "anchor_pose",
+  "pose_files": {},
+  "rotation_waypoints_deg": {
+    "turn_on": [30.0, 60.0, 90.0],
+    "turn_off": [60.0, 30.0, 0.0]
+  },
+  "gripper": {
+    "open_steps": 25,
+    "close_steps": 30,
+    "release_steps": 25
+  },
+  "validation": {
+    "off_qpos_max_rad": 0.1,
+    "on_qpos_min_rad": 0.5
+  },
+  "notes": {
+    "status": "framework_ready_physical_pose_calibration_required",
+    "direct_toaster_oven_state_write": false
+  }
+}

@@ -1,0 +1,46 @@
+schema_version: 1
+
+dataset:
+  repo_id: wx01
+  root: lerobot_data/wx01
+  state_schema: membench.robot_state37.v2
+  state_feature: observation.state
+  action_feature: action
+  camera_features:
+    agentview_left: observation.images.robot0_agentview_left
+    agentview_right: observation.images.robot0_agentview_right
+    eye_in_hand: observation.images.robot0_eye_in_hand
+  image_size: [224, 224]
+
+policy:
+  type: act
+  chunk_size: 50
+  n_action_steps: 50
+  n_obs_steps: 1
+  vision_backbone: resnet18
+  pretrained_backbone_weights: ResNet18_Weights.IMAGENET1K_V1
+  dim_model: 512
+  n_heads: 8
+  dim_feedforward: 3200
+  n_encoder_layers: 4
+  n_decoder_layers: 1
+  use_vae: true
+  latent_dim: 32
+  n_vae_encoder_layers: 4
+  kl_weight: 10.0
+  dropout: 0.1
+  optimizer_lr: 1.0e-5
+  optimizer_weight_decay: 1.0e-4
+  optimizer_lr_backbone: 1.0e-5
+
+training:
+  output_dir: ckpts/act/act_wx01_v1
+  job_name: act_wx01_v1
+  seed: 1000
+  steps: 100000
+  batch_size: 16
+  num_workers: 8
+  log_freq: 100
+  save_freq: 10000
+  save_checkpoint: true
+  wandb_enable: false

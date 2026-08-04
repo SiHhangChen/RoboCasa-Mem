@@ -1,0 +1,13 @@
+{
+  "config_kind": "anchor_pose",
+  "schema_version": 1,
+  "task": "WA-02",
+  "pose_name": "faucet_switch_pose",
+  "anchor": {"selector": "geom:sink_island_group_handle_main", "source": "environment", "world": [2.360191886491499, -3.1164259605700915, 1.0171923805383458]},
+  "pose": {
+    "world": {
+      "p": [2.363191886491499, -3.102425960570093, 1.014192380538346],
+      "q_xyzw": [-0.012243692255616893, -0.7173899343228587, -0.6897210375646259, 0.09739950961360239]
+    }
+  }
+}

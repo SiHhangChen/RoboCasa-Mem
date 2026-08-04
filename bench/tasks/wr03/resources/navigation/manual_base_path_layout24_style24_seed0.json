@@ -1,0 +1,140 @@
+{
+  "metadata": {
+    "task_id": "WR-03",
+    "env_name": "WR03StoreAndRetrieveRememberedCan",
+    "layout_id": 24,
+    "style_id": 24,
+    "seed": 0,
+    "description": "WR-03 directed loop reusing WR-01 cabinet geometry without two-can aliases.",
+    "record_source": "WR-01/terminal_manual_capture",
+    "coordinate_precision": 0.001,
+    "physical_calibration_reused_from": "WR-01"
+  },
+  "default_start_index": 0,
+  "route_mode": "directed_loop",
+  "station_targets": {
+    "navigation_start": 0,
+    "item_station": {
+      "index": 0,
+      "routes": {
+        "5": [5, 7, 8, 9, 0],
+        "6": [6, 7, 8, 9, 0],
+        "10": [10, 7, 8, 9, 0],
+        "11": [11, 7, 8, 9, 0]
+      }
+    },
+    "red_can": 0,
+    "red_can:pick": 0,
+    "lower_storage_station": {
+      "index": 5,
+      "routes": {
+        "6": [6, 5],
+        "10": [10, 5]
+      }
+    },
+    "lower": 5,
+    "lower_storage": 5,
+    "upper_storage_station": {
+      "index": 11,
+      "routes": {
+        "0": [0, 1, 2, 3, 4, 11],
+        "6": [6, 11],
+        "10": [10, 11]
+      }
+    },
+    "upper": 11,
+    "upper_storage": 11,
+    "upper_door_station": {
+      "index": 6,
+      "routes": {
+        "10": [10, 6],
+        "11": [11, 6]
+      }
+    },
+    "lower_door_station": {
+      "index": 10,
+      "routes": {
+        "5": [5, 10],
+        "6": [6, 10]
+      }
+    },
+    "door_station": 6,
+    "storage_doors": 6,
+    "lower_door": 10,
+    "upper_door": 6
+  },
+  "samples": [
+    {
+      "index": 0,
+      "name": "item_grasp_station",
+      "xy": [5.216, -1.055],
+      "yaw": 1.571
+    },
+    {
+      "index": 1,
+      "name": "item_departure_retreat",
+      "xy": [5.221, -1.242],
+      "yaw": 1.570
+    },
+    {
+      "index": 2,
+      "name": "outbound_turn_left",
+      "xy": [5.013, -1.438],
+      "yaw": 3.052
+    },
+    {
+      "index": 3,
+      "name": "outbound_corridor",
+      "xy": [2.844, -1.434],
+      "yaw": 3.062
+    },
+    {
+      "index": 4,
+      "name": "storage_approach_turn_right",
+      "xy": [3.046, -1.241],
+      "yaw": 1.581
+    },
+    {
+      "index": 5,
+      "name": "lower_storage_operation_station",
+      "xy": [2.75, -1.32],
+      "yaw": 1.570
+    },
+    {
+      "index": 6,
+      "name": "door_operation_station",
+      "xy": [2.862, -1.243],
+      "yaw": 1.569
+    },
+    {
+      "index": 7,
+      "name": "return_departure_turn_right",
+      "xy": [3.258, -1.338],
+      "yaw": 0.048
+    },
+    {
+      "index": 8,
+      "name": "return_corridor",
+      "xy": [5.438, -1.337],
+      "yaw": 0.038
+    },
+    {
+      "index": 9,
+      "name": "item_approach_turn_left",
+      "xy": [5.236, -1.136],
+      "yaw": 1.560
+    },
+    {
+      "index": 10,
+      "name": "lower_door_operation_station",
+      "xy": [2.65, -1.420],
+      "yaw": 1.570
+    },
+    {
+      "index": 11,
+      "name": "upper_storage_operation_station",
+      "xy": [3.049, -1.233],
+      "yaw": 1.570
+    }
+  ]
+}

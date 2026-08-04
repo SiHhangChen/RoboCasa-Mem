@@ -1,0 +1,27 @@
+{
+  "config_kind": "water_button_positions",
+  "schema_version": 1,
+  "task": "TM02",
+  "scene": {
+    "env_name": "TM02FillPotAndRetrieveCan",
+    "layout_id": 15,
+    "style_id": 34,
+    "seed": 0
+  },
+  "geom_names": {
+    "hot": "bench_wa02_hot_water_button",
+    "cold": "bench_wa02_cold_water_button"
+  },
+  "positions": {
+    "hot": [
+      1.856,
+      -2.994,
+      0.93
+    ],
+    "cold": [
+      1.856,
+      -3.074,
+      0.93
+    ]
+  }
+}

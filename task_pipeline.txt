@@ -1,0 +1,86 @@
+具体流程如下：
+
+  1. 初始状态
+     机器人站在咖啡机前，有两杯已经做好的咖啡，还有一个盘子放了糖块，场景里有：
+     coffee_A、coffee_B 两个相同杯子，sugar_plate，sugar_cube，coffee machine，dining counter。
+
+  2. 拿起糖块
+     pick_sugar
+
+  3. 把糖放进 coffee_A
+     place_sugar，目标 receptacle 是 coffee_A
+
+  4. 应用 sugar proxy
+     apply_sugar_proxy
+     这里会把糖视为已经进入 coffee_A，然后隐藏糖块。状态变成：
+     sugared_coffee_id = "coffee_A"
+     unsugared_coffee_id = "coffee_B"
+     sugar_consumed = True
+
+  5. 随机选择一杯coffee送到 dining counter
+
+  6. 回去拿另一杯 coffee
+
+  7. 两杯必须在 dining counter 上且距离足够近
+     _cups_together_on_dining_counter() 要满足：
+     coffee_A_on_dining_counter == True
+     coffee_B_on_dining_counter == True
+     两杯 XY 距离 <= together_threshold，默认 0.22
+
+  8. 最后选择加糖的那杯
+     select_sugared_coffee，当前固定选择 coffee_A
+
+     以机器人站在放杯站位、面向水槽为视角，当前 Base yaw 接近 0°，因此世界坐标基本对应：
+
+                       前 / 水槽
+                         +X
+                          ↑
+                          |
+  左 / +Y   ←─────────────┼─────────────→   右 / -Y
+                          |
+                          ↓
+                         -X
+                       后 / 机器人
+
+  对应角度如下：
+
+    角度    你的方向            从上往下看
+  ━━━━━━━  ━━━━━━━━━━━━━━━━━━  ━━━━━━━━━━━━━━
+      0°    前方、水槽方向      基准方向
+  ───────  ──────────────────  ──────────────
+    +45°    左前方              逆时针转45°
+  ───────  ──────────────────  ──────────────
+    +90°    左方                逆时针转90°
+  ───────  ──────────────────  ──────────────
+    180°    后方、机器人方向    转半圈
+  ───────  ──────────────────  ──────────────
+   -135°    右后方              顺时针转135°
+
+
+请在仓库根目录执行以下命令，先把旧历史安全备份到仓库外：
+
+  mv .git ../membench.git.backup
+  git init -b main
+
+  然后确认现在确实是空仓库：
+
+  git log --oneline
+
+  预期会显示：
+
+  fatal: your current branch 'main' does not have any commits yet
+
+  接着暂存并检查：
+
+  git add .
+  git status --short
+
+  确认没有数据集、密钥或临时文件后提交：
+
+  git commit \
+    -m "Initialize unified MemBench benchmark architecture" \
+    -m "Unify dataset recording and evaluation workflows.
+
+  Clarify responsibilities across bench components.
+
+  Implement the server-client evaluation architecture."

@@ -1,0 +1,52 @@
+<mujoco model="tm01_single_tabletop_drawer">
+  <compiler angle="radian"/>
+
+  <asset>
+    <material name="cabinet_body" rgba="0.66 0.64 0.58 1"/>
+    <material name="drawer_front" rgba="0.78 0.76 0.70 1"/>
+    <material name="drawer_inside" rgba="0.56 0.57 0.54 1"/>
+    <material name="handle_dark" rgba="0.08 0.08 0.075 1"/>
+  </asset>
+
+  <default>
+    <default class="cabinet_collision">
+      <geom group="0" type="box" density="140" friction="1.0 0.08 0.01" condim="4" solref="0.006 1" solimp="0.95 0.99 0.001" margin="0.001"/>
+    </default>
+    <default class="region">
+      <geom group="1" type="box" contype="0" conaffinity="0" rgba="0 1 0 0"/>
+    </default>
+    <default class="visual_only">
+      <geom group="1" type="box" contype="0" conaffinity="0"/>
+    </default>
+  </default>
+
+  <worldbody>
+    <body>
+      <body name="object">
+        <camera name="drawer_sideview" mode="fixed" pos="0.30 -0.36 0.02" xyaxes="0.481918750 0.876215909 0 -0.089106964 0.049008830 0.994815603" fovy="50"/>
+        <geom name="bottom" class="cabinet_collision" material="cabinet_body" pos="0 0 -0.095" size="0.125 0.15 0.005" mass="0.10"/>
+        <geom name="top" class="cabinet_collision" material="cabinet_body" pos="0 0 0.045" size="0.125 0.15 0.005" mass="0.06"/>
+        <geom name="back" class="cabinet_collision" material="cabinet_body" pos="0 0.145 -0.025" size="0.120 0.005 0.070" mass="0.08"/>
+        <geom name="left" class="cabinet_collision" material="cabinet_body" pos="-0.120 0 -0.025" size="0.005 0.15 0.070" mass="0.08"/>
+        <geom name="right" class="cabinet_collision" material="cabinet_body" pos="0.120 0 -0.025" size="0.005 0.15 0.070" mass="0.08"/>
+
+        <body name="drawer" pos="0 0 0">
+          <joint name="drawer_slide" type="slide" axis="0 -1 0" limited="true" range="0 0.22" damping="0.20" armature="0.01"/>
+          <geom name="drawer_bottom" class="cabinet_collision" material="drawer_inside" pos="0 -0.017 -0.080" size="0.112 0.128 0.008" mass="0.07"/>
+          <geom name="drawer_catch_floor" class="cabinet_collision" pos="0 -0.017 -0.066" size="0.104 0.112 0.004" rgba="0 0 0 0" mass="0.01"/>
+          <geom name="drawer_back" class="cabinet_collision" material="drawer_inside" pos="0 0.105 -0.035" size="0.112 0.006 0.045" mass="0.05"/>
+          <geom name="drawer_left" class="cabinet_collision" material="drawer_inside" pos="-0.108 -0.017 -0.035" size="0.004 0.128 0.045" mass="0.03"/>
+          <geom name="drawer_right" class="cabinet_collision" material="drawer_inside" pos="0.108 -0.017 -0.035" size="0.004 0.128 0.045" mass="0.03"/>
+          <geom name="drawer_front" class="cabinet_collision" material="drawer_front" pos="0 -0.145 -0.025" size="0.112 0.012 0.062" mass="0.09"/>
+          <geom name="drawer_front_face" class="visual_only" material="drawer_front" pos="0 -0.1585 -0.025" size="0.117 0.0015 0.071"/>
+          <geom name="drawer_handle" class="cabinet_collision" material="handle_dark" pos="0 -0.208 -0.015" size="0.085 0.011 0.00703125" mass="0.024" friction="4.0 0.10 0.01"/>
+          <geom name="drawer_handle_mount_left" class="cabinet_collision" material="handle_dark" pos="-0.073 -0.182 -0.015" size="0.012 0.025 0.012" mass="0.008" friction="4.0 0.10 0.01"/>
+          <geom name="drawer_handle_mount_right" class="cabinet_collision" material="handle_dark" pos="0.073 -0.182 -0.015" size="0.012 0.025 0.012" mass="0.008" friction="4.0 0.10 0.01"/>
+          <geom class="region" name="reg_drawer" pos="0 -0.010 -0.016" size="0.094 0.085 0.056"/>
+        </body>
+
+        <geom class="region" name="reg_main" pos="0 0 -0.025" size="0.125 0.15 0.075"/>
+      </body>
+    </body>
+  </worldbody>
+</mujoco>

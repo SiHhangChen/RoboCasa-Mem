@@ -1,0 +1,45 @@
+{
+  "config_kind": "poses",
+  "description": "WA-01 dining placement parameters.",
+  "object": "cup_place",
+  "operations": {
+    "place_at_dining": {
+      "dining_regions": {
+        "coordinate_frame": "world",
+        "center_x": 1.566,
+        "centerline_y": -5.259,
+        "region_size_xy": [0.1, 0.1],
+        "lateral_center_offset": 0.16,
+        "sampling_inset": 0.025,
+        "target_separation_range": [0.24, 0.32]
+      },
+      "place_height": 0.0,
+      "placement_approach_angles_deg": [180.0],
+      "placement_approach_angles_by_mug_deg": {
+        "coffee_A": [180.0],
+        "coffee_B": [180.0]
+      },
+      "placement_yaw_offsets_by_mug_deg": {
+        "coffee_A": [0.0],
+        "coffee_B": [0.0]
+      },
+      "placement_entry_standoff": 0.1,
+      "placement_entry_z_offset": 0.06,
+      "placement_exit_standoff": 0.1,
+      "placement_exit_z_offset": 0.14,
+      "post_release_clearance_distance": 0.0,
+      "post_release_clearance_z_offset": 0.12,
+      "retreat_height": 0.08,
+      "retreat_x": 0.0,
+      "retreat_y": 0.0,
+      "placement_reference": "bbox_bottom_center",
+      "target_kind": "dining",
+      "allow_place_near_miss": true,
+      "allow_place_qpos_near_miss": true,
+      "place_near_miss_max_position_error": 0.08,
+      "place_near_miss_max_qpos_error": 0.22
+    }
+  },
+  "schema_version": 1,
+  "task": "WA-01"
+}

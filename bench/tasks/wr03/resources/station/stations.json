@@ -1,0 +1,87 @@
+{
+  "config_kind": "station",
+  "description": "WR-03 operation stations reused from the validated WR-01 cabinet geometry.",
+  "schema_version": 1,
+  "task": "WR-03",
+  "env_name": "WR03StoreAndRetrieveRememberedCan",
+  "layout_id": 24,
+  "style_id": 24,
+  "scene_seed": 0,
+  "samples_per_station": 1,
+  "split": "pretrain",
+  "physical_calibration_reused_from": "WR-01",
+  "stations": {
+    "item_station": {
+      "samples": [
+        {
+          "station_id": "item_station",
+          "sample_index": 0,
+          "base_xy": [5.216, -1.055],
+          "base_yaw": 1.571,
+          "torso_height": 0.20,
+          "record_source": "WR-01/manual_base_path_sample_0_item_grasp"
+        }
+      ]
+    },
+    "lower_storage_station": {
+      "samples": [
+        {
+          "station_id": "lower_storage_station",
+          "sample_index": 0,
+          "base_xy": [2.75, -1.32],
+          "base_yaw": 1.570,
+          "torso_height": 0.20,
+          "record_source": "WR-01/validated_lower_storage_operation"
+        }
+      ]
+    },
+    "upper_storage_station": {
+      "samples": [
+        {
+          "station_id": "upper_storage_station",
+          "sample_index": 0,
+          "base_xy": [3.049, -1.233],
+          "base_yaw": 1.570,
+          "torso_height": 0.20,
+          "record_source": "WR-01/validated_upper_storage_operation"
+        }
+      ]
+    },
+    "upper_door_station": {
+      "samples": [
+        {
+          "station_id": "upper_door_station",
+          "sample_index": 0,
+          "base_xy": [2.862, -1.243],
+          "base_yaw": 1.569,
+          "torso_height": 0.20,
+          "record_source": "WR-01/task_probe_tuned_upper_door_operation"
+        }
+      ]
+    },
+    "lower_door_station": {
+      "samples": [
+        {
+          "station_id": "lower_door_station",
+          "sample_index": 0,
+          "base_xy": [2.65, -1.42],
+          "base_yaw": 1.5700056054202471,
+          "torso_height": 0.20,
+          "record_source": "WR-01/terminal_manual_capture_lower_door_operation"
+        }
+      ]
+    },
+    "door_station": {
+      "samples": [
+        {
+          "station_id": "door_station",
+          "sample_index": 0,
+          "base_xy": [2.862, -1.243],
+          "base_yaw": 1.569,
+          "torso_height": 0.20,
+          "record_source": "upper_door_station_calibration"
+        }
+      ]
+    }
+  }
+}

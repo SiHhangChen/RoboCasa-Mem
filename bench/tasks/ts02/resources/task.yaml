@@ -1,0 +1,176 @@
+# TS02 production configuration. Output paths and dataset selection stay CLI-owned.
+schema_version: 1
+
+task:
+  id: TS02
+  display_name: Inspect Three Cabinets
+  description: Inspect each of three spatially separated cabinets exactly once, close them, and press the completion button.
+  success_conditions:
+    - all_fixtures_checked
+    - completion_count
+    - no_duplicate_completion
+    - no_active_fixture
+    - all_fixtures_closed
+    - no_invalid_open
+    - no_invalid_inspect
+    - no_invalid_close
+    - no_duplicate_check
+    - no_close_before_inspect
+    - completion_button_pressed
+    - no_invalid_completion_button_press
+
+scene:
+  env_name: TS02InspectThreeCabinets
+  fixed_scene: true
+  layout_id: 24
+  style_id: 24
+  scene_seed: 0
+  fixture_names: [cabinet_slot_0, cabinet_slot_1, cabinet_slot_2]
+  drawer_world_xyzs:
+    - [4.10, -2.37, 1.1363333333333332]
+    - [4.60, -2.37, 1.1363333333333332]
+    - [5.10, -2.37, 1.1363333333333332]
+  drawer_world_yaw_deg: 180.0
+  # WA02-style spring-loaded green button on the front edge of the tabletop,
+  # centered in the free gap between the left and center cabinets.
+  completion_button_world_xyz: [4.35, -2.06, 0.92]
+  open_threshold: 0.70
+  closed_threshold: 0.08
+
+episode:
+  # Leave demo_fixture_order unset so each dataset seed deterministically
+  # samples one permutation of the three cabinets. The sampled order is expert
+  # policy metadata, never a target-order success condition.
+  max_horizon: 2200
+
+initial_state:
+  robot_base:
+    mode: manual_path_sample
+    sample_index: 0
+  drawers:
+    enabled: true
+    closed_fraction: 0.0
+
+sensors:
+  cameras: [robot0_agentview_left, robot0_agentview_right, robot0_eye_in_hand]
+  wrist_rgb_camera: robot0_eye_in_hand
+  width: 224
+  height: 224
+  depth: true
+  use_camera_observations: true
+  has_renderer: false
+  has_offscreen_renderer: true
+
+resources:
+  station_poses: station/stations.json
+  manual_base_path: navigation/manual_base_path_layout24_style24_seed0.json
+  planner_script: ../../../execution/planning/mplib_planner.py
+  drawer_grasp_pose: poses/cabinet_slot_1_hook_pose.json
+
+navigation:
+  # The calibrated station poses are navigation goals. The shared Base driver
+  # reaches them with controller actions; it must never teleport during an
+  # episode.
+  kinematic_base_navigation: false
+  base_action_frame: world
+  base_translation_action_sign: 1.0
+  base_tolerance: 0.025
+  base_yaw_tolerance: 0.06
+  base_max_steps: 1500
+  # The first request follows the calibrated start/forward/turn route. Later
+  # cabinet-to-cabinet requests use direct physical translation edges.
+  manual_base_path_enabled: true
+  manual_base_path_start_index: 0
+  manual_base_path_xy_tolerance: 0.030
+  manual_base_path_yaw_tolerance: 0.06
+  base_single_axis_tracking: false
+  base_terminal_yaw_distance: 0.05
+  base_snap_to_target_after_success: false
+  base_velocity_profile_enabled: true
+  base_profile_v_max: 0.75
+  base_profile_a_max: 1.30
+  base_profile_a_dec: 1.50
+  base_profile_v_min: 0.15
+  base_profile_w_max: 0.75
+  base_profile_alpha_max: 1.50
+  base_profile_alpha_dec: 1.30
+  base_profile_w_min: 0.08
+  use_station_astar_paths: false
+  station_nav_use_docking: false
+  station_nav_require_footprint: false
+  use_station_base_poses: true
+
+manipulation:
+  pick_place: {}
+  planner:
+    conda_env: membench
+    subprocess_timeout_s: 60.0
+    planning_time: 5.0
+    time_step: 0.1
+    qpos_step: 0.02
+    rrt_range: 0.1
+  runtime:
+    max_joint_step: 0.015
+    settle_steps: 20
+    position_threshold: 0.10
+    orientation_threshold_deg: 20.0
+    qpos_threshold: 0.18
+    open_steps: 20
+    close_steps: 40
+    release_steps: 20
+    release_settle_steps: 40
+  static_scene:
+    enabled: false
+    validate_collisions: false
+    fixture_keywords: cabinet
+    exclude_keywords: floor,wall
+    spacing: 0.04
+    inflate: 0.05
+    point_radius: 0.01
+    faces: bottom
+    point_cloud_stages: prehook,hook,pull,push
+    min_z: 0.70
+    max_points: 4000
+
+operations:
+  drawer_open:
+    actuation_mode: contact
+    open_fraction: 1.0
+    enforce_proximity: true
+    max_base_distance: 1.05
+    hook_orientation_blend: 0.90
+    handle_side_offset: 0.0
+    handle_vertical_offset: 0.0
+    prehook_distance: 0.125
+    hook_offset: 0.005
+    pull_distance: 0.18
+    open_fraction_threshold: 0.70
+    gripper_steps: 25
+    grasp_pose_resource: drawer_grasp_pose
+    close_gripper_on_hook: true
+    close_gripper_action: 1.0
+    close_gripper_steps: 25
+  inspect:
+    dwell_steps: 0
+  drawer_close:
+    actuation_mode: contact
+    closed_fraction: 0.0
+    close_overshoot: 0.005
+    closed_fraction_threshold: 0.08
+    return_arm_after_close: false
+  completion_button:
+    # Same approach offsets and hold behavior as the proven WA02 button.
+    prepress_z_offset: 0.08
+    press_z_offset: -0.010
+    hold_steps: 12
+    gripper_action: 1.0
+    near_miss_position_tolerance: 0.09
+    # The plunger has 12 mm of travel; require at least 4 mm of measured motion.
+    press_depth_threshold: 0.004
+    require_physical_button_motion: true
+
+recording:
+  record_depth: true
+  depth_dtype: uint16
+  depth_scale: 0.001
+  action_schema: membench.pandaomron_hybrid13.v2

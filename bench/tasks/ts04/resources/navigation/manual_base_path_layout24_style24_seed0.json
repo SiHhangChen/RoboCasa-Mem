@@ -1,0 +1,29 @@
+{
+  "metadata": {
+    "task_id": "TS04",
+    "layout_id": 24,
+    "style_id": 24,
+    "seed": 0,
+    "description": "TS04 calibrated two-drawer navigation route."
+  },
+  "default_start_index": 0,
+  "route_mode": "spatial_graph",
+  "station_targets": {
+    "cabinet_slot_0_station": {"index": 2, "routes": {"0": [0, 1, 2]}},
+    "cabinet_slot_1_station": {"index": 4, "routes": {"0": [0, 3, 4]}},
+    "completion_button_station": 5,
+    "completion_button": 5,
+    "cabinet_slot_0": 2,
+    "cabinet_slot_1": 4,
+    "left": 2,
+    "right": 4
+  },
+  "samples": [
+    {"index": 0, "name": "navigation_start", "xy": [3.17, -1.166], "yaw": -0.048},
+    {"index": 1, "name": "first_left_forward_before_turn", "xy": [4.332, -1.171], "yaw": -0.048},
+    {"index": 2, "name": "cabinet_slot_0_station", "xy": [4.124, -1.37], "yaw": -1.5707963267948966},
+    {"index": 3, "name": "first_right_forward_before_turn", "xy": [4.808, -1.171], "yaw": -0.048},
+    {"index": 4, "name": "cabinet_slot_1_station", "xy": [4.6, -1.37], "yaw": -1.5707963267948966},
+    {"index": 5, "name": "completion_button_station", "xy": [4.35, -1.37], "yaw": -1.5707963267948966}
+  ]
+}

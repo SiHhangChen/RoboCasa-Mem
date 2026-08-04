@@ -1,0 +1,68 @@
+"""TM02 task-local RoboCasa runtime composition."""
+
+from __future__ import annotations
+
+from collections.abc import Mapping
+from dataclasses import asdict
+from typing import Any
+
+from bench.runtime import TaskRuntimeAdapter, default_close, default_diagnostics, default_success
+from bench.tasks.runtime_support import config_actions, manual_navigation, path_base_initialization, standard_plan, standard_scene, variant_prompt
+from bench.tasks.tm02.config import CALIBRATION_RESOURCE_NAMES, load_task_config, missing_calibration_resources, require_production_calibration, resolve_action_config, resolve_observer_config, resolve_task_options
+from bench.tasks.tm02.domain.episode import resolve_episode_plan, resolve_scene_config
+from bench.tasks.tm02.execution.navigation import build_navigation_config
+from bench.tasks.tm02.expert.operations import build_operation_handlers
+from bench.tasks.tm02.initialization import apply_manual_path_initial_base_pose
+from bench.tasks.tm02.prompts import resolve_prompt_spec
+
+
+def _environment(config: Any, scene: Any, plan: Any, resources: Mapping[str, Any]) -> Mapping[str, Any]:
+    del plan, resources
+    return {
+        "water_button_world_xyz": scene.water_button_world_xyz,
+        "completion_button_world_xyz": scene.completion_button_world_xyz,
+        "cabinet_world_xyz": scene.cabinet_world_xyz,
+        "cabinet_yaw_deg": scene.cabinet_yaw_deg,
+        "can_place_region_world_xyz": scene.can_place_region_world_xyz,
+        "can_place_region_size_xy": scene.can_place_region_size_xy,
+        "pot_name": scene.pot_name,
+        "pot_xml": scene.pot_xml,
+        "can_name": scene.can_name,
+        "can_xml": scene.can_xml,
+        "can_scale": scene.can_scale,
+        "observer_config": asdict(resolve_observer_config(config)),
+    }
+
+
+def _validate(config: Any, episode: Any, execute: bool) -> None:
+    if execute and not episode.allow_partial_calibration:
+        require_production_calibration(config)
+
+
+def _release_facts(config: Any, episode: Any, resources: Mapping[str, Any], options: Mapping[str, Any]) -> Mapping[str, Any]:
+    del resources, options
+    return {
+        "controller": {"max_joint_step": float(config.manipulation["runtime"]["max_joint_step"])},
+        "missing_physical_calibration": list(missing_calibration_resources(config)),
+        "allow_partial_calibration": bool(episode.allow_partial_calibration),
+    }
+
+
+_ADAPTER = TaskRuntimeAdapter(
+    task_id="TM02", load_task_config=load_task_config, resolve_task_options=resolve_task_options,
+    scene=standard_scene(resolve_scene_config, uses_seed=False), plan=standard_plan(resolve_episode_plan),
+    actions=config_actions(resolve_action_config), navigation=manual_navigation(build_navigation_config),
+    prompt=variant_prompt(resolve_prompt_spec), environment=_environment,
+    initialize=path_base_initialization(apply_manual_path_initial_base_pose),
+    diagnostics=default_diagnostics, success=default_success, close=default_close,
+    validate_descriptor=_validate, release_facts=_release_facts,
+    expert_runtime=build_operation_handlers,
+    task_validated_resource_names=tuple(CALIBRATION_RESOURCE_NAMES),
+)
+TASK_RUNTIME_API = _ADAPTER.api()
+build_descriptor = _ADAPTER.build_descriptor
+initialize_runtime = _ADAPTER.initialize_runtime
+check_success = _ADAPTER.check_success
+diagnostics = _ADAPTER.diagnostics
+close_runtime = _ADAPTER.close_runtime
+__all__ = ["TASK_RUNTIME_API", "build_descriptor", "check_success", "close_runtime", "diagnostics", "initialize_runtime"]

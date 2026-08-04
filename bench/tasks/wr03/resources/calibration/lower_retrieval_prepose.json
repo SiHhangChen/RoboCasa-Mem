@@ -1,0 +1,106 @@
+{
+  "anchor": {
+    "selector": "site:wr01_lower_storage_cabinet_item_preinsert_site",
+    "source": "environment",
+    "world": [
+      3.1349999,
+      -0.7800018,
+      1.0963333
+    ]
+  },
+  "calibrated_at_unix": 1785476079.0853603,
+  "config_kind": "anchor_pose",
+  "initial_base": {
+    "actual_base_pos": [
+      2.7499999999999996,
+      -1.3700000000000012,
+      0.7000045737912781
+    ],
+    "actual_base_quat_xyzw": [
+      0.0,
+      0.0,
+      0.7068251967430115,
+      0.7073882222175598
+    ],
+    "enabled": true,
+    "mode": "explicit_pose",
+    "reset_base_xy": [
+      5.250252946384129,
+      -0.8456895956206968
+    ],
+    "target_xy": [
+      2.75,
+      -1.37
+    ],
+    "target_yaw": 1.57
+  },
+  "initial_torso": {
+    "actual_height": 0.19817859012051908,
+    "applied": true,
+    "error": -0.0018214098794809286,
+    "initial_height": 4.573791278146169e-06,
+    "joint_range": [
+      0.0,
+      0.34
+    ],
+    "reason": "initial_torso_height_reached",
+    "requested_height": 0.2,
+    "steps": 30,
+    "tolerance": 0.002
+  },
+  "pose": {
+    "offset_from_anchor_world": [
+      0.006802280507568259,
+      -0.09339815502055315,
+      0.07498697086972239
+    ],
+    "world": {
+      "matrix": [
+        [
+          -0.9961601977880381,
+          -0.03334128733840286,
+          -0.08095195427853963,
+          3.141802180507568
+        ],
+        [
+          -0.08754642865352004,
+          0.3720136107382959,
+          0.9240895499114087,
+          -0.8733999550205531
+        ],
+        [
+          -0.0006951064025306708,
+          0.9276282833032171,
+          -0.3735040626860911,
+          1.1713202708697223
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "p": [
+        3.141802180507568,
+        -0.8733999550205531,
+        1.1713202708697223
+      ],
+      "q_xyzw": [
+        0.03650429481498384,
+        -0.8279006388469007,
+        -0.5591606487324665,
+        0.024235048298727798
+      ]
+    }
+  },
+  "pose_name": "wr01_lower_retrieval_prepose",
+  "schema_version": 1,
+  "task": {
+    "env_name": "WR01RetrieveRememberedCan",
+    "layout_id": 24,
+    "seed": 0,
+    "split": "pretrain",
+    "style_id": 24
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "metadata": {
+    "task_id": "TS01",
+    "layout_id": 39,
+    "style_id": 37,
+    "seed": 0,
+    "description": "Three-point manual route for the saucepan, sugar tray, and completion button left of the stove."
+  },
+  "default_start_index": 0,
+  "route_mode": "spatial_graph",
+  "station_targets": {
+    "navigation_start": 0,
+    "saucepan_station": 0,
+    "hot_chocolate": 0,
+    "saucepan": 0,
+    "sugar_station": 1,
+    "sugar_plate": 1,
+    "sugar0": 1,
+    "sugar1": 1,
+    "sugar2": 1,
+    "sugar3": 1,
+    "sugar4": 1,
+    "completion_button_station": 2,
+    "completion_button_station:finish": 2,
+    "completion_button": 2
+  },
+  "samples": [
+    {
+      "index": 0,
+      "name": "saucepan_place_station",
+      "xy": [3.621, -3.69],
+      "yaw": 1.57
+    },
+    {
+      "index": 1,
+      "name": "right_sugar_tray_pick_station",
+      "xy": [4.219, -3.69],
+      "yaw": 1.571
+    },
+    {
+      "index": 2,
+      "name": "left_completion_button_press_station",
+      "xy": [3.30, -3.69],
+      "yaw": 1.57
+    }
+  ]
+}

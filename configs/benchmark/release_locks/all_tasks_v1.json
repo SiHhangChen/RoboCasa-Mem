@@ -1,0 +1,1498 @@
+{
+  "entries": [
+    {
+      "action_schema": "membench.pandaomron_hybrid13.v2",
+      "allow_partial_calibration": false,
+      "config_hash": "sha256:6b03795922b4e13f6388631acc828bee9be257d0dabdd1494804e01d2585d091",
+      "control_frequency_hz": 20,
+      "env_split": "pretrain",
+      "episode_identity": "sha256:024d1348dbf57567b7314b7587fcab5997cbc64d2d38282c1cc1fbc4e5109c47",
+      "facts": {
+        "drawer_order": [
+          "drawer_left",
+          "drawer_right"
+        ],
+        "max_horizon": 3200,
+        "route": "L1",
+        "seed": 0
+      },
+      "initialization": {
+        "allow_partial_calibration": false,
+        "config_hash": "sha256:6b03795922b4e13f6388631acc828bee9be257d0dabdd1494804e01d2585d091",
+        "controller": {
+          "max_joint_step": 0.015
+        },
+        "missing_physical_calibration": [],
+        "resource_hash": "sha256:1d8b06d029d23b41b9dc6be337b0e0128ae8529a3a460e98c06ee3d77126137c",
+        "task_id": "TM01"
+      },
+      "max_horizon": 3200,
+      "observation": {
+        "camera_aliases": [
+          "agentview_left",
+          "agentview_right",
+          "eye_in_hand"
+        ],
+        "camera_names": [
+          "robot0_agentview_left",
+          "robot0_agentview_right",
+          "robot0_eye_in_hand"
+        ],
+        "depth": true,
+        "image_size": [
+          224,
+          224
+        ],
+        "profile_hash": "sha256:cc8904e3b3bae61c0138914fc5a200a548f34f582d5650bb5f534b07b720470a",
+        "profile_id": "rgbd_v3"
+      },
+      "observation_profile": "rgbd_v3",
+      "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
+      "options": {},
+      "prompt": {
+        "initial": "First, use the stove's own control knob to turn on the burner under the pot. While the water heats, inspect each of the two drawers once: open it, look inside, and close it. After completing one drawer, you may either turn off the burner with the same stove knob before inspecting the other drawer, or inspect the other drawer before turning off the burner. When the burner is off and both drawers have been inspected and closed, press either green completion button.",
+        "policy": "First, use the stove's own control knob to turn on the burner under the pot. While the water heats, inspect each of the two drawers once: open it, look inside, and close it. After completing one drawer, you may either turn off the burner with the same stove knob before inspecting the other drawer, or inspect the other drawer before turning off the burner. When the burner is off and both drawers have been inspected and closed, press either green completion button."
+      },
+      "public": {
+        "env_name": "TM01BoilWaterAndInspectTwoDrawers",
+        "layout_id": 39,
+        "prompt": "First, use the stove's own control knob to turn on the burner under the pot. While the water heats, inspect each of the two drawers once: open it, look inside, and close it. After completing one drawer, you may either turn off the burner with the same stove knob before inspecting the other drawer, or inspect the other drawer before turning off the burner. When the burner is off and both drawers have been inspected and closed, press either green completion button.",
+        "scene_seed": 0,
+        "style_id": 24
+      },
+      "release_facts": {
+        "allow_partial_calibration": false,
+        "config_hash": "sha256:6b03795922b4e13f6388631acc828bee9be257d0dabdd1494804e01d2585d091",
+        "controller": {
+          "max_joint_step": 0.015
+        },
+        "missing_physical_calibration": [],
+        "resource_hash": "sha256:1d8b06d029d23b41b9dc6be337b0e0128ae8529a3a460e98c06ee3d77126137c",
+        "task_id": "TM01"
+      },
+      "resource_hash": "sha256:1d8b06d029d23b41b9dc6be337b0e0128ae8529a3a460e98c06ee3d77126137c",
+      "resources": {
+        "drawer_grasp_pose": "bench/tasks/tm01/resources/calibration/cabinet_slot_1_hook_pose.json",
+        "manual_base_path": "bench/tasks/tm01/resources/navigation/manual_base_path_layout39_style24_seed0.json",
+        "planner_script": "bench/execution/planning/mplib_planner.py",
+        "stove_knob_interaction_poses": "bench/tasks/tm01/resources/calibration/stove_knob/interaction_poses.json",
+        "stove_knob_pinch_off_pose": "bench/tasks/tm01/resources/calibration/stove_knob/pinch_off.json",
+        "stove_knob_pinch_on_pose": "bench/tasks/tm01/resources/calibration/stove_knob/pinch_on.json"
+      },
+      "scene": {
+        "env_name": "TM01BoilWaterAndInspectTwoDrawers",
+        "env_split": "pretrain",
+        "layout_id": 39,
+        "scene_seed": 0,
+        "style_id": 24
+      },
+      "schema_version": "membench.release_lock/v2",
+      "seed": 0,
+      "split": "evaluation",
+      "task_config_file": "bench/tasks/tm01/resources/task.yaml",
+      "task_id": "TM01",
+      "task_version": "1.0.0",
+      "variant": "memory"
+    },
+    {
+      "action_schema": "membench.pandaomron_hybrid13.v2",
+      "allow_partial_calibration": false,
+      "config_hash": "sha256:8773d494379fd0a6a92f2cf91903554035efe56959fac61b6113d0013d87c570",
+      "control_frequency_hz": 20,
+      "env_split": "pretrain",
+      "episode_identity": "sha256:3c2d2eaa680288696f05459586265bcaae14037b7cc2d229e19f4b0931406b2a",
+      "facts": {
+        "max_horizon": 3200,
+        "route": "L1",
+        "seed": 0
+      },
+      "initialization": {
+        "allow_partial_calibration": false,
+        "config_hash": "sha256:8773d494379fd0a6a92f2cf91903554035efe56959fac61b6113d0013d87c570",
+        "controller": {
+          "max_joint_step": 0.025
+        },
+        "missing_physical_calibration": [],
+        "resource_hash": "sha256:b7d86b358a8e9433a1a207841f4e5091636156bd5e0328adece5eedcbd4e6381",
+        "task_id": "TM02"
+      },
+      "max_horizon": 3200,
+      "observation": {
+        "camera_aliases": [
+          "agentview_left",
+          "agentview_right",
+          "eye_in_hand"
+        ],
+        "camera_names": [
+          "robot0_agentview_left",
+          "robot0_agentview_right",
+          "robot0_eye_in_hand"
+        ],
+        "depth": true,
+        "image_size": [
+          224,
+          224
+        ],
+        "profile_hash": "sha256:cc8904e3b3bae61c0138914fc5a200a548f34f582d5650bb5f534b07b720470a",
+        "profile_id": "rgbd_v3"
+      },
+      "observation_profile": "rgbd_v3",
+      "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
+      "options": {},
+      "prompt": {
+        "initial": "First, press the blue water button beside the sink to turn on the faucet and fill the pot already in the sink. While the pot fills, retrieve the can from the cabinet: open the sliding door, take out the can, and place it in the marked area. After placing the can, you may either return to the sink and press the same blue button to turn off the faucet before closing the cabinet door, or close the cabinet door before returning to turn off the faucet. When the faucet is off, the can is in the marked area, and the cabinet door is closed, press the red completion button beside the sink to finish the task.",
+        "policy": "First, press the blue water button beside the sink to turn on the faucet and fill the pot already in the sink. While the pot fills, retrieve the can from the cabinet: open the sliding door, take out the can, and place it in the marked area. After placing the can, you may either return to the sink and press the same blue button to turn off the faucet before closing the cabinet door, or close the cabinet door before returning to turn off the faucet. When the faucet is off, the can is in the marked area, and the cabinet door is closed, press the red completion button beside the sink to finish the task."
+      },
+      "public": {
+        "env_name": "TM02FillPotAndRetrieveCan",
+        "layout_id": 15,
+        "prompt": "First, press the blue water button beside the sink to turn on the faucet and fill the pot already in the sink. While the pot fills, retrieve the can from the cabinet: open the sliding door, take out the can, and place it in the marked area. After placing the can, you may either return to the sink and press the same blue button to turn off the faucet before closing the cabinet door, or close the cabinet door before returning to turn off the faucet. When the faucet is off, the can is in the marked area, and the cabinet door is closed, press the red completion button beside the sink to finish the task.",
+        "scene_seed": 0,
+        "style_id": 34
+      },
+      "release_facts": {
+        "allow_partial_calibration": false,
+        "config_hash": "sha256:8773d494379fd0a6a92f2cf91903554035efe56959fac61b6113d0013d87c570",
+        "controller": {
+          "max_joint_step": 0.025
+        },
+        "missing_physical_calibration": [],
+        "resource_hash": "sha256:b7d86b358a8e9433a1a207841f4e5091636156bd5e0328adece5eedcbd4e6381",
+        "task_id": "TM02"
+      },
+      "resource_hash": "sha256:b7d86b358a8e9433a1a207841f4e5091636156bd5e0328adece5eedcbd4e6381",
+      "resources": {
+        "cabinet_door_pose": "bench/tasks/tm02/resources/calibration/wr01_relative_lower_door_grasp.json",
+        "cabinet_station_poses": "bench/tasks/tm02/resources/calibration/wr01_relative_cabinet_stations.json",
+        "can_grasp_pose": "bench/tasks/tm02/resources/calibration/can_side_grasp.json",
+        "can_place_pose": "bench/tasks/tm02/resources/calibration/can_place_region_release.json",
+        "can_retrieval_prepose": "bench/tasks/tm02/resources/calibration/wr01_relative_lower_retrieval_prepose.json",
+        "manual_base_path": "bench/tasks/tm02/resources/navigation/manual_base_path_layout15_style34_seed0.json",
+        "planner_script": "bench/execution/planning/mplib_planner.py",
+        "water_button_positions": "bench/tasks/tm02/resources/calibration/water_button_positions_layout15_style34_seed0.json",
+        "water_station_poses": "bench/tasks/tm02/resources/calibration/water_stations.json"
+      },
+      "scene": {
+        "env_name": "TM02FillPotAndRetrieveCan",
+        "env_split": "pretrain",
+        "layout_id": 15,
+        "scene_seed": 0,
+        "style_id": 34
+      },
+      "schema_version": "membench.release_lock/v2",
+      "seed": 0,
+      "split": "evaluation",
+      "task_config_file": "bench/tasks/tm02/resources/task.yaml",
+      "task_id": "TM02",
+      "task_version": "1.0.0",
+      "variant": "memory"
+    },
+    {
+      "action_schema": "membench.pandaomron_hybrid13.v2",
+      "allow_partial_calibration": false,
+      "config_hash": "sha256:85cb45601910f4d94cc90b356787b2b98e5831029825c545d3d730716e50fef1",
+      "control_frequency_hz": 20,
+      "env_split": "pretrain",
+      "episode_identity": "sha256:839d6d3c58c2ba25c8ea38951d5f9d4adc9400c74ea22a1064097d8f3fb54d79",
+      "facts": {
+        "drawer_order": [
+          "drawer_left",
+          "drawer_right"
+        ],
+        "max_horizon": 4800,
+        "prefix": "CB",
+        "seed": 0,
+        "tail": "ABC"
+      },
+      "initialization": {
+        "allow_partial_calibration": false,
+        "config_hash": "sha256:85cb45601910f4d94cc90b356787b2b98e5831029825c545d3d730716e50fef1",
+        "controller": {
+          "max_joint_step": 0.015
+        },
+        "missing_physical_calibration": [
+          "manual_base_path",
+          "toaster_oven_interaction_poses",
+          "toaster_oven_time_pinch_off_pose",
+          "toaster_oven_time_pinch_on_pose",
+          "toaster_oven_time_pinch_on_for_off_pose"
+        ],
+        "resource_hash": "sha256:a3c308b71fd19b48ac0dc14f62a21552010969fad76c61dfdafa7c6ca0d31234",
+        "task_id": "TM03"
+      },
+      "max_horizon": 4800,
+      "observation": {
+        "camera_aliases": [
+          "agentview_left",
+          "agentview_right",
+          "eye_in_hand"
+        ],
+        "camera_names": [
+          "robot0_agentview_left",
+          "robot0_agentview_right",
+          "robot0_eye_in_hand"
+        ],
+        "depth": true,
+        "image_size": [
+          224,
+          224
+        ],
+        "profile_hash": "sha256:cc8904e3b3bae61c0138914fc5a200a548f34f582d5650bb5f534b07b720470a",
+        "profile_id": "rgbd_v3"
+      },
+      "observation_profile": "rgbd_v3",
+      "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
+      "options": {},
+      "prompt": {
+        "initial": "First, use the stove's own control knob to turn on the burner under the pot. The toaster oven already contains food and its door must remain closed. Next, start the toaster oven by turning its own timer knob and inspect one of the two drawers, in either order; inspect a drawer by opening it, looking inside, and closing it. After the toaster oven has been started and one drawer has been inspected, complete the three remaining steps in any order: turn off the burner with the same stove knob, stop the toaster oven by returning the same timer knob to zero, and inspect the other drawer. When the burner and toaster oven are off and both drawers have been inspected and closed, press either green completion button.",
+        "policy": "First, use the stove's own control knob to turn on the burner under the pot. The toaster oven already contains food and its door must remain closed. Next, start the toaster oven by turning its own timer knob and inspect one of the two drawers, in either order; inspect a drawer by opening it, looking inside, and closing it. After the toaster oven has been started and one drawer has been inspected, complete the three remaining steps in any order: turn off the burner with the same stove knob, stop the toaster oven by returning the same timer knob to zero, and inspect the other drawer. When the burner and toaster oven are off and both drawers have been inspected and closed, press either green completion button."
+      },
+      "public": {
+        "env_name": "TM03BoilWaterInspectDrawersAndRunToasterOven",
+        "layout_id": 39,
+        "prompt": "First, use the stove's own control knob to turn on the burner under the pot. The toaster oven already contains food and its door must remain closed. Next, start the toaster oven by turning its own timer knob and inspect one of the two drawers, in either order; inspect a drawer by opening it, looking inside, and closing it. After the toaster oven has been started and one drawer has been inspected, complete the three remaining steps in any order: turn off the burner with the same stove knob, stop the toaster oven by returning the same timer knob to zero, and inspect the other drawer. When the burner and toaster oven are off and both drawers have been inspected and closed, press either green completion button.",
+        "scene_seed": 0,
+        "style_id": 24
+      },
+      "release_facts": {
+        "allow_partial_calibration": false,
+        "config_hash": "sha256:85cb45601910f4d94cc90b356787b2b98e5831029825c545d3d730716e50fef1",
+        "controller": {
+          "max_joint_step": 0.015
+        },
+        "missing_physical_calibration": [
+          "manual_base_path",
+          "toaster_oven_interaction_poses",
+          "toaster_oven_time_pinch_off_pose",
+          "toaster_oven_time_pinch_on_pose",
+          "toaster_oven_time_pinch_on_for_off_pose"
+        ],
+        "resource_hash": "sha256:a3c308b71fd19b48ac0dc14f62a21552010969fad76c61dfdafa7c6ca0d31234",
+        "task_id": "TM03"
+      },
+      "resource_hash": "sha256:a3c308b71fd19b48ac0dc14f62a21552010969fad76c61dfdafa7c6ca0d31234",
+      "resources": {
+        "drawer_grasp_pose": "bench/tasks/tm03/resources/calibration/cabinet_slot_1_hook_pose.json",
+        "manual_base_path": "bench/tasks/tm03/resources/navigation/manual_base_path_layout39_style24_seed0.json",
+        "planner_script": "bench/execution/planning/mplib_planner.py",
+        "stove_knob_interaction_poses": "bench/tasks/tm03/resources/calibration/stove_knob/interaction_poses.json",
+        "stove_knob_pinch_off_pose": "bench/tasks/tm03/resources/calibration/stove_knob/pinch_off.json",
+        "stove_knob_pinch_on_pose": "bench/tasks/tm03/resources/calibration/stove_knob/pinch_on.json",
+        "toaster_oven_interaction_poses": "bench/tasks/tm03/resources/calibration/toaster_oven_time_knob/interaction_poses.json",
+        "toaster_oven_time_pinch_off_pose": "bench/tasks/tm03/resources/calibration/toaster_oven_time_knob/pinch_off.json",
+        "toaster_oven_time_pinch_on_for_off_pose": "bench/tasks/tm03/resources/calibration/toaster_oven_time_knob/pinch_on_for_off.json",
+        "toaster_oven_time_pinch_on_pose": "bench/tasks/tm03/resources/calibration/toaster_oven_time_knob/pinch_on.json"
+      },
+      "scene": {
+        "env_name": "TM03BoilWaterInspectDrawersAndRunToasterOven",
+        "env_split": "pretrain",
+        "layout_id": 39,
+        "scene_seed": 0,
+        "style_id": 24
+      },
+      "schema_version": "membench.release_lock/v2",
+      "seed": 0,
+      "split": "evaluation",
+      "task_config_file": "bench/tasks/tm03/resources/task.yaml",
+      "task_id": "TM03",
+      "task_version": "1.0.0",
+      "variant": "memory"
+    },
+    {
+      "action_schema": "membench.pandaomron_hybrid13.v2",
+      "allow_partial_calibration": false,
+      "config_hash": "sha256:8d2afc6db9ef033c2422b2449fa56ea13c8e370843c1b56650951263b71506af",
+      "control_frequency_hz": 20,
+      "env_split": "pretrain",
+      "episode_identity": "sha256:7044a474ed36a42a7620f3c0c7d1c0e5098b4719c5ef455cb3c8905950056104",
+      "facts": {
+        "distractor_sugar_names": [
+          "sugar0",
+          "sugar1",
+          "sugar3",
+          "sugar4"
+        ],
+        "max_horizon": 2800,
+        "seed": 0,
+        "sugar_names": [
+          "sugar0",
+          "sugar1",
+          "sugar2",
+          "sugar3",
+          "sugar4"
+        ],
+        "sugar_plate_layout_seed": 1860102653,
+        "sugar_release_region_orders": [
+          [
+            "B",
+            "A",
+            "C"
+          ]
+        ],
+        "target_sugar_count": 1,
+        "target_sugar_names": [
+          "sugar2"
+        ],
+        "total_sugar_count": 5
+      },
+      "initialization": {
+        "config_hash": "sha256:8d2afc6db9ef033c2422b2449fa56ea13c8e370843c1b56650951263b71506af",
+        "controller": {
+          "max_joint_step": 0.025
+        },
+        "resource_hash": "sha256:833e8b46ce2a15198558d527878d49ed03e991254476f7c3d4faf2ed05392983",
+        "task_id": "TS01"
+      },
+      "max_horizon": 2800,
+      "observation": {
+        "camera_aliases": [
+          "agentview_left",
+          "agentview_right",
+          "eye_in_hand"
+        ],
+        "camera_names": [
+          "robot0_agentview_left",
+          "robot0_agentview_right",
+          "robot0_eye_in_hand"
+        ],
+        "depth": true,
+        "image_size": [
+          224,
+          224
+        ],
+        "profile_hash": "sha256:cc8904e3b3bae61c0138914fc5a200a548f34f582d5650bb5f534b07b720470a",
+        "profile_id": "rgbd_v3"
+      },
+      "observation_profile": "rgbd_v3",
+      "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
+      "options": {},
+      "prompt": {
+        "initial": "This hot chocolate needs exactly 1 sugar cube. Remember this count; it will not be repeated.",
+        "policy": "Add exactly 1 sugar cube to the hot chocolate, then press the completion button to finish."
+      },
+      "public": {
+        "env_name": "TS01AddKSugarToHotChocolate",
+        "layout_id": 39,
+        "prompt": "Add exactly 1 sugar cube to the hot chocolate, then press the completion button to finish.",
+        "scene_seed": 0,
+        "style_id": 37
+      },
+      "release_facts": {
+        "config_hash": "sha256:8d2afc6db9ef033c2422b2449fa56ea13c8e370843c1b56650951263b71506af",
+        "controller": {
+          "max_joint_step": 0.025
+        },
+        "resource_hash": "sha256:833e8b46ce2a15198558d527878d49ed03e991254476f7c3d4faf2ed05392983",
+        "task_id": "TS01"
+      },
+      "resource_hash": "sha256:833e8b46ce2a15198558d527878d49ed03e991254476f7c3d4faf2ed05392983",
+      "resources": {
+        "completion_button_position": "bench/tasks/ts01/resources/poses/completion_button_position_layout39_style37_seed0.json",
+        "manual_base_path": "bench/tasks/ts01/resources/navigation/manual_base_path_layout39_style37_seed0.json",
+        "planner_script": "bench/execution/planning/mplib_planner.py"
+      },
+      "scene": {
+        "env_name": "TS01AddKSugarToHotChocolate",
+        "env_split": "pretrain",
+        "layout_id": 39,
+        "scene_seed": 0,
+        "style_id": 37
+      },
+      "schema_version": "membench.release_lock/v2",
+      "seed": 0,
+      "split": "evaluation",
+      "task_config_file": "bench/tasks/ts01/resources/task.yaml",
+      "task_id": "TS01",
+      "task_version": "1.0.0",
+      "variant": "memory"
+    },
+    {
+      "action_schema": "membench.pandaomron_hybrid13.v2",
+      "allow_partial_calibration": false,
+      "config_hash": "sha256:edaa40cefce011c27bbdce1da258f3e9b22a48168031de86246656c7ed876bf1",
+      "control_frequency_hz": 20,
+      "env_split": "pretrain",
+      "episode_identity": "sha256:42cd7cf5efd26cb62c6a138d1a5281a85b5dee20658bf6cef5d28c780649082f",
+      "facts": {
+        "demo_fixture_order": [
+          "cabinet_slot_0",
+          "cabinet_slot_2",
+          "cabinet_slot_1"
+        ],
+        "max_horizon": 2200,
+        "seed": 0
+      },
+      "initialization": {
+        "config_hash": "sha256:edaa40cefce011c27bbdce1da258f3e9b22a48168031de86246656c7ed876bf1",
+        "controller": {
+          "max_joint_step": 0.015
+        },
+        "resource_hash": "sha256:0fa2ce42f7d1230fae3f2fdd01fb717eff7e306f96d3df0961497d8377de2191",
+        "task_id": "TS02"
+      },
+      "max_horizon": 2200,
+      "observation": {
+        "camera_aliases": [
+          "agentview_left",
+          "agentview_right",
+          "eye_in_hand"
+        ],
+        "camera_names": [
+          "robot0_agentview_left",
+          "robot0_agentview_right",
+          "robot0_eye_in_hand"
+        ],
+        "depth": true,
+        "image_size": [
+          224,
+          224
+        ],
+        "profile_hash": "sha256:cc8904e3b3bae61c0138914fc5a200a548f34f582d5650bb5f534b07b720470a",
+        "profile_id": "rgbd_v3"
+      },
+      "observation_profile": "rgbd_v3",
+      "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
+      "options": {},
+      "prompt": {
+        "initial": "Inspect each cabinet exactly once, close it after inspection, and remember which cabinets have already been checked. After all three are closed, press the completion button.",
+        "policy": "Please inspect the three cabinets, close each drawer, then press the completion button."
+      },
+      "public": {
+        "env_name": "TS02InspectThreeCabinets",
+        "layout_id": 24,
+        "prompt": "Please inspect the three cabinets, close each drawer, then press the completion button.",
+        "scene_seed": 0,
+        "style_id": 24
+      },
+      "release_facts": {
+        "config_hash": "sha256:edaa40cefce011c27bbdce1da258f3e9b22a48168031de86246656c7ed876bf1",
+        "controller": {
+          "max_joint_step": 0.015
+        },
+        "resource_hash": "sha256:0fa2ce42f7d1230fae3f2fdd01fb717eff7e306f96d3df0961497d8377de2191",
+        "task_id": "TS02"
+      },
+      "resource_hash": "sha256:0fa2ce42f7d1230fae3f2fdd01fb717eff7e306f96d3df0961497d8377de2191",
+      "resources": {
+        "drawer_grasp_pose": "bench/tasks/ts02/resources/poses/cabinet_slot_1_hook_pose.json",
+        "manual_base_path": "bench/tasks/ts02/resources/navigation/manual_base_path_layout24_style24_seed0.json",
+        "planner_script": "bench/execution/planning/mplib_planner.py",
+        "station_poses": "bench/tasks/ts02/resources/station/stations.json"
+      },
+      "scene": {
+        "env_name": "TS02InspectThreeCabinets",
+        "env_split": "pretrain",
+        "layout_id": 24,
+        "scene_seed": 0,
+        "style_id": 24
+      },
+      "schema_version": "membench.release_lock/v2",
+      "seed": 0,
+      "split": "evaluation",
+      "task_config_file": "bench/tasks/ts02/resources/task.yaml",
+      "task_id": "TS02",
+      "task_version": "1.0.0",
+      "variant": "memory"
+    },
+    {
+      "action_schema": "membench.pandaomron_hybrid13.v2",
+      "allow_partial_calibration": false,
+      "config_hash": "sha256:6fe2ed497751aa40f97450083d51715384d6f4401b8ec89a0e44529af6f0780a",
+      "control_frequency_hz": 20,
+      "env_split": "pretrain",
+      "episode_identity": "sha256:8b15755a33a917f4c339a383b794ec90e424381e9149f86fbac068e250780bbb",
+      "facts": {
+        "distractor_sugar_names": [
+          "sugar1"
+        ],
+        "max_horizon": 2800,
+        "seed": 0,
+        "sugar_names": [
+          "sugar0",
+          "sugar1"
+        ],
+        "sugar_plate_layout_seed": 0,
+        "sugar_release_region_orders": [
+          [
+            "center",
+            "left",
+            "right"
+          ]
+        ],
+        "target_sugar_count": 1,
+        "target_sugar_names": [
+          "sugar0"
+        ],
+        "total_sugar_count": 2
+      },
+      "initialization": {
+        "config_hash": "sha256:6fe2ed497751aa40f97450083d51715384d6f4401b8ec89a0e44529af6f0780a",
+        "controller": {
+          "max_joint_step": 0.025
+        },
+        "distractor_count": 1,
+        "hierarchy_branch": "foundation",
+        "hierarchy_schema_version": 1,
+        "hierarchy_tier": 1,
+        "is_add_all_control": false,
+        "is_core_memory_cell": false,
+        "profile_id": "k1_n2",
+        "profile_role": "weak_one_step_stop",
+        "resource_hash": "sha256:833e8b46ce2a15198558d527878d49ed03e991254476f7c3d4faf2ed05392983",
+        "target_sugar_count": 1,
+        "task_id": "TS03",
+        "task_revision": "TS03-v1",
+        "total_sugar_count": 2
+      },
+      "max_horizon": 2800,
+      "observation": {
+        "camera_aliases": [
+          "agentview_left",
+          "agentview_right",
+          "eye_in_hand"
+        ],
+        "camera_names": [
+          "robot0_agentview_left",
+          "robot0_agentview_right",
+          "robot0_eye_in_hand"
+        ],
+        "depth": true,
+        "image_size": [
+          224,
+          224
+        ],
+        "profile_hash": "sha256:cc8904e3b3bae61c0138914fc5a200a548f34f582d5650bb5f534b07b720470a",
+        "profile_id": "rgbd_v3"
+      },
+      "observation_profile": "rgbd_v3",
+      "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
+      "options": {},
+      "prompt": {
+        "initial": "This hot chocolate needs exactly 1 sugar cube. Remember this count; it will not be repeated.",
+        "policy": "Add exactly 1 sugar cube to the hot chocolate, then press the completion button to finish."
+      },
+      "public": {
+        "env_name": "TS03HierarchicalAddKSugarToHotChocolate",
+        "layout_id": 39,
+        "prompt": "Add exactly 1 sugar cube to the hot chocolate, then press the completion button to finish.",
+        "scene_seed": 0,
+        "style_id": 37
+      },
+      "release_facts": {
+        "config_hash": "sha256:6fe2ed497751aa40f97450083d51715384d6f4401b8ec89a0e44529af6f0780a",
+        "controller": {
+          "max_joint_step": 0.025
+        },
+        "distractor_count": 1,
+        "hierarchy_branch": "foundation",
+        "hierarchy_schema_version": 1,
+        "hierarchy_tier": 1,
+        "is_add_all_control": false,
+        "is_core_memory_cell": false,
+        "profile_id": "k1_n2",
+        "profile_role": "weak_one_step_stop",
+        "resource_hash": "sha256:833e8b46ce2a15198558d527878d49ed03e991254476f7c3d4faf2ed05392983",
+        "target_sugar_count": 1,
+        "task_id": "TS03",
+        "task_revision": "TS03-v1",
+        "total_sugar_count": 2
+      },
+      "resource_hash": "sha256:833e8b46ce2a15198558d527878d49ed03e991254476f7c3d4faf2ed05392983",
+      "resources": {
+        "completion_button_position": "bench/tasks/ts03/resources/poses/completion_button_position_layout39_style37_seed0.json",
+        "manual_base_path": "bench/tasks/ts03/resources/navigation/manual_base_path_layout39_style37_seed0.json",
+        "planner_script": "bench/execution/planning/mplib_planner.py"
+      },
+      "scene": {
+        "env_name": "TS03HierarchicalAddKSugarToHotChocolate",
+        "env_split": "pretrain",
+        "layout_id": 39,
+        "scene_seed": 0,
+        "style_id": 37
+      },
+      "schema_version": "membench.release_lock/v2",
+      "seed": 0,
+      "split": "evaluation",
+      "task_config_file": "bench/tasks/ts03/resources/task.yaml",
+      "task_id": "TS03",
+      "task_version": "1.0.0",
+      "variant": "memory"
+    },
+    {
+      "action_schema": "membench.pandaomron_hybrid13.v2",
+      "allow_partial_calibration": false,
+      "config_hash": "sha256:f8d1551995ee32bac1cbbc742f650d6028d672b2386d94f3e3bfac8bc60630f5",
+      "control_frequency_hz": 20,
+      "env_split": "pretrain",
+      "episode_identity": "sha256:d27dcd1eb74d258ed28a1054d3a6f9439ef3947f6a954bdcd405e431d2c8d5db",
+      "facts": {
+        "demo_fixture_order": [
+          "cabinet_slot_0",
+          "cabinet_slot_1"
+        ],
+        "max_horizon": 1800,
+        "seed": 0
+      },
+      "initialization": {
+        "config_hash": "sha256:f8d1551995ee32bac1cbbc742f650d6028d672b2386d94f3e3bfac8bc60630f5",
+        "controller": {
+          "max_joint_step": 0.015
+        },
+        "order_profile_id": "left_right",
+        "resource_hash": "sha256:4d60e5d3d02751a44d2565fc7018464bad876941b21633f17ab7699cad4efdce",
+        "task_id": "TS04",
+        "task_revision": "TS04-v1"
+      },
+      "max_horizon": 1800,
+      "observation": {
+        "camera_aliases": [
+          "agentview_left",
+          "agentview_right",
+          "eye_in_hand"
+        ],
+        "camera_names": [
+          "robot0_agentview_left",
+          "robot0_agentview_right",
+          "robot0_eye_in_hand"
+        ],
+        "depth": true,
+        "image_size": [
+          224,
+          224
+        ],
+        "profile_hash": "sha256:cc8904e3b3bae61c0138914fc5a200a548f34f582d5650bb5f534b07b720470a",
+        "profile_id": "rgbd_v3"
+      },
+      "observation_profile": "rgbd_v3",
+      "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
+      "options": {},
+      "prompt": {
+        "initial": "Inspect each of the two drawers exactly once, close it after inspection, remember which drawer has already been checked, then press the completion button.",
+        "policy": "Please inspect both drawers, close each one, then press the completion button."
+      },
+      "public": {
+        "env_name": "TS04InspectTwoDrawers",
+        "layout_id": 24,
+        "prompt": "Please inspect both drawers, close each one, then press the completion button.",
+        "scene_seed": 0,
+        "style_id": 24
+      },
+      "release_facts": {
+        "config_hash": "sha256:f8d1551995ee32bac1cbbc742f650d6028d672b2386d94f3e3bfac8bc60630f5",
+        "controller": {
+          "max_joint_step": 0.015
+        },
+        "order_profile_id": "left_right",
+        "resource_hash": "sha256:4d60e5d3d02751a44d2565fc7018464bad876941b21633f17ab7699cad4efdce",
+        "task_id": "TS04",
+        "task_revision": "TS04-v1"
+      },
+      "resource_hash": "sha256:4d60e5d3d02751a44d2565fc7018464bad876941b21633f17ab7699cad4efdce",
+      "resources": {
+        "drawer_grasp_pose": "bench/tasks/ts04/resources/poses/cabinet_slot_1_hook_pose.json",
+        "manual_base_path": "bench/tasks/ts04/resources/navigation/manual_base_path_layout24_style24_seed0.json",
+        "planner_script": "bench/execution/planning/mplib_planner.py",
+        "station_poses": "bench/tasks/ts04/resources/station/stations.json"
+      },
+      "scene": {
+        "env_name": "TS04InspectTwoDrawers",
+        "env_split": "pretrain",
+        "layout_id": 24,
+        "scene_seed": 0,
+        "style_id": 24
+      },
+      "schema_version": "membench.release_lock/v2",
+      "seed": 0,
+      "split": "evaluation",
+      "task_config_file": "bench/tasks/ts04/resources/task.yaml",
+      "task_id": "TS04",
+      "task_version": "1.0.0",
+      "variant": "memory"
+    },
+    {
+      "action_schema": "membench.pandaomron_hybrid13.v2",
+      "allow_partial_calibration": false,
+      "config_hash": "sha256:7d4c88753f9bd057c5007f546c935e748a37b2eab891fef26f3ef9eec74dd3b8",
+      "control_frequency_hz": 20,
+      "env_split": "pretrain",
+      "episode_identity": "sha256:d90165603377984c36851e7d69d39e6a642602ba5e5c9789ff17d920e8b28ffc",
+      "facts": {
+        "delivery_order": [
+          "coffee_B",
+          "coffee_A"
+        ],
+        "final_slot_assignment": {
+          "coffee_A": "left",
+          "coffee_B": "right"
+        },
+        "max_horizon": 5000,
+        "seed": 0,
+        "target_sugared_coffee_id": "coffee_A"
+      },
+      "initialization": {
+        "config_hash": "sha256:7d4c88753f9bd057c5007f546c935e748a37b2eab891fef26f3ef9eec74dd3b8",
+        "controller": {
+          "max_joint_step": 0.025
+        },
+        "resource_hash": "sha256:fe93bff4559f1e3e51b72aa4b37ded1c7b9eb66f476176f88879092d8c3c8893",
+        "task_id": "WA-01"
+      },
+      "max_horizon": 5000,
+      "observation": {
+        "camera_aliases": [
+          "agentview_left",
+          "agentview_right",
+          "eye_in_hand"
+        ],
+        "camera_names": [
+          "robot0_agentview_left",
+          "robot0_agentview_right",
+          "robot0_eye_in_hand"
+        ],
+        "depth": true,
+        "image_size": [
+          224,
+          224
+        ],
+        "profile_hash": "sha256:cc8904e3b3bae61c0138914fc5a200a548f34f582d5650bb5f534b07b720470a",
+        "profile_id": "rgbd_v3"
+      },
+      "observation_profile": "rgbd_v3",
+      "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
+      "options": {},
+      "prompt": {
+        "initial": "Two identical coffees are already prepared. Sugar the temporarily marked cup only, place both cups on the dining counter, then identify it.",
+        "policy": "Start at the coffee machine with two identical prepared coffees. Add one sugar cube to the temporarily marked coffee, carry both coffees to the dining counter, and identify the sugared coffee."
+      },
+      "public": {
+        "env_name": "WA01SortSugaredAndUnsugaredCoffee",
+        "layout_id": 29,
+        "prompt": "Start at the coffee machine with two identical prepared coffees. Add one sugar cube to the temporarily marked coffee, carry both coffees to the dining counter, and identify the sugared coffee.",
+        "scene_seed": 0,
+        "style_id": 29
+      },
+      "release_facts": {
+        "config_hash": "sha256:7d4c88753f9bd057c5007f546c935e748a37b2eab891fef26f3ef9eec74dd3b8",
+        "controller": {
+          "max_joint_step": 0.025
+        },
+        "resource_hash": "sha256:fe93bff4559f1e3e51b72aa4b37ded1c7b9eb66f476176f88879092d8c3c8893",
+        "task_id": "WA-01"
+      },
+      "resource_hash": "sha256:fe93bff4559f1e3e51b72aa4b37ded1c7b9eb66f476176f88879092d8c3c8893",
+      "resources": {
+        "cup_place_poses": "bench/tasks/wa01/resources/poses/cup_place.json",
+        "manual_base_path": "bench/tasks/wa01/resources/navigation/manual_base_path_layout29_style29_seed0.json",
+        "planner_script": "bench/execution/planning/mplib_planner.py",
+        "station_poses": "bench/tasks/wa01/resources/station/stations.json",
+        "sugar_cube_poses": "bench/tasks/wa01/resources/poses/sugar_cube.json"
+      },
+      "scene": {
+        "env_name": "WA01SortSugaredAndUnsugaredCoffee",
+        "env_split": "pretrain",
+        "layout_id": 29,
+        "scene_seed": 0,
+        "style_id": 29
+      },
+      "schema_version": "membench.release_lock/v2",
+      "seed": 0,
+      "split": "evaluation",
+      "task_config_file": "bench/tasks/wa01/resources/task.yaml",
+      "task_id": "WA-01",
+      "task_version": "1.0.0",
+      "variant": "memory"
+    },
+    {
+      "action_schema": "membench.pandaomron_hybrid13.v2",
+      "allow_partial_calibration": false,
+      "config_hash": "sha256:53cf8ce5a154e5a6fffb248d57e4d68e5ec093dab286ab5f22fe4d1010d42c15",
+      "control_frequency_hz": 20,
+      "env_split": "pretrain",
+      "episode_identity": "sha256:13a847b0827ff41049f9b178a989a9488b55e9a364f20ed2f09f6e27448f721f",
+      "facts": {
+        "cold_cup_id": "cup_B",
+        "fill_temperature_order": [
+          "hot",
+          "cold"
+        ],
+        "hot_cup_id": "cup_A",
+        "max_horizon": 6000,
+        "requested_cup_id": "cup_A",
+        "requested_temperature": "hot",
+        "seed": 0,
+        "service_slot_by_cup": {
+          "cup_A": "slot_1",
+          "cup_B": "slot_2"
+        }
+      },
+      "initialization": {
+        "config_hash": "sha256:53cf8ce5a154e5a6fffb248d57e4d68e5ec093dab286ab5f22fe4d1010d42c15",
+        "controller": {
+          "max_joint_step": 0.025
+        },
+        "resource_hash": "sha256:8d54034ebcdbfdbdaa13571092f2a28890750372a0269ab39053a2a25676f6bf",
+        "task_id": "WA-02"
+      },
+      "max_horizon": 6000,
+      "observation": {
+        "camera_aliases": [
+          "agentview_left",
+          "agentview_right",
+          "eye_in_hand"
+        ],
+        "camera_names": [
+          "robot0_agentview_left",
+          "robot0_agentview_right",
+          "robot0_eye_in_hand"
+        ],
+        "depth": true,
+        "image_size": [
+          224,
+          224
+        ],
+        "profile_hash": "sha256:cc8904e3b3bae61c0138914fc5a200a548f34f582d5650bb5f534b07b720470a",
+        "profile_id": "rgbd_v3"
+      },
+      "observation_profile": "rgbd_v3",
+      "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
+      "options": {},
+      "prompt": {
+        "initial": "Remember the temperature bound to each identical cup. After staging, the final view does not reveal which cup contains hot water.",
+        "policy": "Fill two identical cups with hot and cold water, stage both cups, then take the hot-water cup."
+      },
+      "public": {
+        "env_name": "WA02ServeHotColdWaterCups",
+        "layout_id": 15,
+        "prompt": "Fill two identical cups with hot and cold water, stage both cups, then take the hot-water cup.",
+        "scene_seed": 0,
+        "style_id": 34
+      },
+      "release_facts": {
+        "config_hash": "sha256:53cf8ce5a154e5a6fffb248d57e4d68e5ec093dab286ab5f22fe4d1010d42c15",
+        "controller": {
+          "max_joint_step": 0.025
+        },
+        "resource_hash": "sha256:8d54034ebcdbfdbdaa13571092f2a28890750372a0269ab39053a2a25676f6bf",
+        "task_id": "WA-02"
+      },
+      "resource_hash": "sha256:8d54034ebcdbfdbdaa13571092f2a28890750372a0269ab39053a2a25676f6bf",
+      "resources": {
+        "cup_grasp_candidates": "bench/tasks/wa02/resources/poses/water_cup_grasp_candidates.json",
+        "faucet_switch_pose": "bench/tasks/wa02/resources/poses/faucet_switch_pose_layout15_style34_seed0.json",
+        "manual_base_path": "bench/tasks/wa02/resources/navigation/manual_base_path_layout15_style34_seed0.json",
+        "planner_script": "bench/execution/planning/mplib_planner.py",
+        "sink_fill_pose": "bench/tasks/wa02/resources/poses/sink_cup_place_pose_layout15_style34_seed0.json",
+        "station_poses": "bench/tasks/wa02/resources/station/stations.json",
+        "water_button_positions": "bench/tasks/wa02/resources/poses/water_button_positions_layout15_style34_seed0.json"
+      },
+      "scene": {
+        "env_name": "WA02ServeHotColdWaterCups",
+        "env_split": "pretrain",
+        "layout_id": 15,
+        "scene_seed": 0,
+        "style_id": 34
+      },
+      "schema_version": "membench.release_lock/v2",
+      "seed": 0,
+      "split": "evaluation",
+      "task_config_file": "bench/tasks/wa02/resources/task.yaml",
+      "task_id": "WA-02",
+      "task_version": "1.0.0",
+      "variant": "memory"
+    },
+    {
+      "action_schema": "membench.pandaomron_hybrid13.v2",
+      "allow_partial_calibration": false,
+      "config_hash": "sha256:4bdb24ed500515710926a362f359aaad6d42670b883b93e952fae1a730bb986e",
+      "control_frequency_hz": 20,
+      "env_split": "pretrain",
+      "episode_identity": "sha256:69398af7eb0c8ed81bf5a28b6491cc481375749c1771e455b7db64811500d302",
+      "facts": {
+        "item_by_level": {
+          "lower": "blue_can",
+          "upper": "red_can"
+        },
+        "level_by_item": {
+          "blue_can": "lower",
+          "red_can": "upper"
+        },
+        "max_horizon": 15000,
+        "seed": 0,
+        "storage_order": [
+          "blue_can",
+          "red_can"
+        ],
+        "target_item_id": "blue_can",
+        "target_level": "lower"
+      },
+      "initialization": {
+        "config_hash": "sha256:4bdb24ed500515710926a362f359aaad6d42670b883b93e952fae1a730bb986e",
+        "controller": {
+          "max_joint_step": 0.03
+        },
+        "resource_hash": "sha256:36ec7cbf164d98a07129cce4c095b9173249f196ffbd65c6abc591a8c3a33f9e",
+        "task_id": "WR-01"
+      },
+      "max_horizon": 15000,
+      "observation": {
+        "camera_aliases": [
+          "agentview_left",
+          "agentview_right",
+          "eye_in_hand"
+        ],
+        "camera_names": [
+          "robot0_agentview_left",
+          "robot0_agentview_right",
+          "robot0_eye_in_hand"
+        ],
+        "depth": true,
+        "image_size": [
+          224,
+          224
+        ],
+        "profile_hash": "sha256:cc8904e3b3bae61c0138914fc5a200a548f34f582d5650bb5f534b07b720470a",
+        "profile_id": "rgbd_v3"
+      },
+      "observation_profile": "rgbd_v3",
+      "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
+      "options": {},
+      "prompt": {
+        "initial": "Store both colored cans and close both cabinet doors. Then retrieve the blue can.",
+        "policy": "Store the red and blue cans in the two open cabinets. After both doors are closed, retrieve the blue can."
+      },
+      "public": {
+        "env_name": "WR01RetrieveRememberedCan",
+        "layout_id": 24,
+        "prompt": "Store the red and blue cans in the two open cabinets. After both doors are closed, retrieve the blue can.",
+        "scene_seed": 0,
+        "style_id": 24
+      },
+      "release_facts": {
+        "config_hash": "sha256:4bdb24ed500515710926a362f359aaad6d42670b883b93e952fae1a730bb986e",
+        "controller": {
+          "max_joint_step": 0.03
+        },
+        "resource_hash": "sha256:36ec7cbf164d98a07129cce4c095b9173249f196ffbd65c6abc591a8c3a33f9e",
+        "task_id": "WR-01"
+      },
+      "resource_hash": "sha256:36ec7cbf164d98a07129cce4c095b9173249f196ffbd65c6abc591a8c3a33f9e",
+      "resources": {
+        "item_grasp_pose": "bench/tasks/wr01/resources/calibration/can_side_grasp.json",
+        "lower_door_grasp_pose": "bench/tasks/wr01/resources/calibration/lower_door_grasp.json",
+        "lower_preinsert_pose": "bench/tasks/wr01/resources/calibration/lower_preinsert.json",
+        "lower_release_pose": "bench/tasks/wr01/resources/calibration/lower_release.json",
+        "lower_retrieval_prepose": "bench/tasks/wr01/resources/calibration/lower_retrieval_prepose.json",
+        "manual_base_path": "bench/tasks/wr01/resources/navigation/manual_base_path_layout24_style24_seed0.json",
+        "planner_script": "bench/execution/planning/mplib_planner.py",
+        "stations": "bench/tasks/wr01/resources/calibration/stations.json",
+        "upper_door_grasp_pose": "bench/tasks/wr01/resources/calibration/upper_door_grasp.json"
+      },
+      "scene": {
+        "env_name": "WR01RetrieveRememberedCan",
+        "env_split": "pretrain",
+        "layout_id": 24,
+        "scene_seed": 0,
+        "style_id": 24
+      },
+      "schema_version": "membench.release_lock/v2",
+      "seed": 0,
+      "split": "evaluation",
+      "task_config_file": "bench/tasks/wr01/resources/task.yaml",
+      "task_id": "WR-01",
+      "task_version": "1.0.0",
+      "variant": "memory"
+    },
+    {
+      "action_schema": "membench.pandaomron_hybrid13.v2",
+      "allow_partial_calibration": false,
+      "config_hash": "sha256:ced55d080b448044196789633358306593c6b09af3d4736cab737c7fc0935a17",
+      "control_frequency_hz": 20,
+      "env_split": "pretrain",
+      "episode_identity": "sha256:084302d22af394b2a7e7f0398cdfa0f446b71f0d9f669afd2cbd53cd08969e75",
+      "facts": {
+        "case_id": 0,
+        "home_assignment": {
+          "ketchup": "shelf_upper",
+          "mustard": "shelf_lower"
+        },
+        "max_horizon": 5000,
+        "return_sampled_offsets_xy": {
+          "ketchup": [
+            -0.11096365856566437,
+            -0.004408571866747046
+          ],
+          "mustard": [
+            0.03470355311816614,
+            -0.008267563913257524
+          ]
+        },
+        "return_sampling_metadata": {
+          "attempt": 1,
+          "fallback_used": false,
+          "half_extents": [
+            0.2,
+            0.03
+          ],
+          "lower_condiment": "mustard",
+          "minimum_separation": 0.2,
+          "nominal_separation": 0.2966666666666667,
+          "sampling_shape": "rectangle",
+          "seed": 0,
+          "upper_condiment": "ketchup",
+          "vertical_separation": 0.2966666666666667
+        },
+        "seed": 0,
+        "transport_order": [
+          "ketchup",
+          "mustard"
+        ],
+        "use_assignment": {
+          "ketchup": "sink_left",
+          "mustard": "sink_right"
+        }
+      },
+      "initialization": {
+        "config_hash": "sha256:ced55d080b448044196789633358306593c6b09af3d4736cab737c7fc0935a17",
+        "controller": {
+          "max_joint_step": 0.03
+        },
+        "resource_hash": "sha256:f7b3179a9fe1f0ced325959be6c3800c2aca1c647f527f98d18eb0d3e3391afa",
+        "task_id": "WR-02"
+      },
+      "max_horizon": 5000,
+      "observation": {
+        "camera_aliases": [
+          "agentview_left",
+          "agentview_right",
+          "eye_in_hand"
+        ],
+        "camera_names": [
+          "robot0_agentview_left",
+          "robot0_agentview_right",
+          "robot0_eye_in_hand"
+        ],
+        "depth": true,
+        "image_size": [
+          224,
+          224
+        ],
+        "profile_hash": "sha256:cc8904e3b3bae61c0138914fc5a200a548f34f582d5650bb5f534b07b720470a",
+        "profile_id": "rgbd_v3"
+      },
+      "observation_profile": "rgbd_v3",
+      "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
+      "options": {},
+      "prompt": {
+        "initial": "Observe the open shelf and remember the sponge-to-soap level binding. The return phase will not reveal their original levels.",
+        "policy": "Return the sponge and soap to their original open-shelf levels."
+      },
+      "public": {
+        "env_name": "WR02ReturnCondimentPair",
+        "layout_id": 32,
+        "prompt": "Return the sponge and soap to their original open-shelf levels.",
+        "scene_seed": 0,
+        "style_id": 32
+      },
+      "release_facts": {
+        "config_hash": "sha256:ced55d080b448044196789633358306593c6b09af3d4736cab737c7fc0935a17",
+        "controller": {
+          "max_joint_step": 0.03
+        },
+        "resource_hash": "sha256:f7b3179a9fe1f0ced325959be6c3800c2aca1c647f527f98d18eb0d3e3391afa",
+        "task_id": "WR-02"
+      },
+      "resource_hash": "sha256:f7b3179a9fe1f0ced325959be6c3800c2aca1c647f527f98d18eb0d3e3391afa",
+      "resources": {
+        "ketchup_shelf_grasp": "bench/tasks/wr02/resources/calibration/shelf_ketchup_grasp.json",
+        "mustard_shelf_grasp": "bench/tasks/wr02/resources/calibration/shelf_mustard_grasp.json",
+        "planner_script": "bench/execution/planning/mplib_planner.py",
+        "sink_left_place": "bench/tasks/wr02/resources/calibration/sink_left_place_tcp.json",
+        "sink_right_place": "bench/tasks/wr02/resources/calibration/sink_right_place_tcp.json",
+        "stations": "bench/tasks/wr02/resources/calibration/stations.json"
+      },
+      "scene": {
+        "env_name": "WR02ReturnCondimentPair",
+        "env_split": "pretrain",
+        "layout_id": 32,
+        "scene_seed": 0,
+        "style_id": 32
+      },
+      "schema_version": "membench.release_lock/v2",
+      "seed": 0,
+      "split": "evaluation",
+      "task_config_file": "bench/tasks/wr02/resources/task.yaml",
+      "task_id": "WR-02",
+      "task_version": "1.0.0",
+      "variant": "memory"
+    },
+    {
+      "action_schema": "membench.pandaomron_hybrid13.v2",
+      "allow_partial_calibration": false,
+      "config_hash": "sha256:c03b2373d3a4867abdf2a8c788b3c7f35d94a6fcf02f196f7683c32573008e22",
+      "control_frequency_hz": 20,
+      "env_split": "pretrain",
+      "episode_identity": "sha256:c8e29d93f05d79dddb63ba1965300d52db39eebcf48d10d7d6d63c27a389cc87",
+      "facts": {
+        "demo_storage_level": "lower",
+        "max_horizon": 15000,
+        "placement_pair_seed": 0,
+        "seed": 0
+      },
+      "initialization": {
+        "config_hash": "sha256:c03b2373d3a4867abdf2a8c788b3c7f35d94a6fcf02f196f7683c32573008e22",
+        "controller": {
+          "max_joint_step": 0.03
+        },
+        "resource_hash": "sha256:deb6be4b4f43cb2a5964a5c478da8de0ea1a4f429025bfd86e668125e5c603a5",
+        "task_id": "WR-03",
+        "task_revision": "WR03-v1"
+      },
+      "max_horizon": 15000,
+      "observation": {
+        "camera_aliases": [
+          "agentview_left",
+          "agentview_right",
+          "eye_in_hand"
+        ],
+        "camera_names": [
+          "robot0_agentview_left",
+          "robot0_agentview_right",
+          "robot0_eye_in_hand"
+        ],
+        "depth": true,
+        "image_size": [
+          224,
+          224
+        ],
+        "profile_hash": "sha256:cc8904e3b3bae61c0138914fc5a200a548f34f582d5650bb5f534b07b720470a",
+        "profile_id": "rgbd_v3"
+      },
+      "observation_profile": "rgbd_v3",
+      "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
+      "options": {},
+      "prompt": {
+        "initial": "Place the can into one of the two cabinets. Close both cabinet doors, remember where the can was stored, then retrieve it.",
+        "policy": "Place the can into one of the two cabinets. Close both cabinet doors, remember where the can was stored, then retrieve it."
+      },
+      "public": {
+        "env_name": "WR03StoreAndRetrieveRememberedCan",
+        "layout_id": 24,
+        "prompt": "Place the can into one of the two cabinets. Close both cabinet doors, remember where the can was stored, then retrieve it.",
+        "scene_seed": 0,
+        "style_id": 24
+      },
+      "release_facts": {
+        "config_hash": "sha256:c03b2373d3a4867abdf2a8c788b3c7f35d94a6fcf02f196f7683c32573008e22",
+        "controller": {
+          "max_joint_step": 0.03
+        },
+        "resource_hash": "sha256:deb6be4b4f43cb2a5964a5c478da8de0ea1a4f429025bfd86e668125e5c603a5",
+        "task_id": "WR-03",
+        "task_revision": "WR03-v1"
+      },
+      "resource_hash": "sha256:deb6be4b4f43cb2a5964a5c478da8de0ea1a4f429025bfd86e668125e5c603a5",
+      "resources": {
+        "item_grasp_pose": "bench/tasks/wr03/resources/calibration/can_side_grasp.json",
+        "lower_door_grasp_pose": "bench/tasks/wr03/resources/calibration/lower_door_grasp.json",
+        "lower_preinsert_pose": "bench/tasks/wr03/resources/calibration/lower_preinsert.json",
+        "lower_release_pose": "bench/tasks/wr03/resources/calibration/lower_release.json",
+        "lower_retrieval_prepose": "bench/tasks/wr03/resources/calibration/lower_retrieval_prepose.json",
+        "manual_base_path": "bench/tasks/wr03/resources/navigation/manual_base_path_layout24_style24_seed0.json",
+        "planner_script": "bench/execution/planning/mplib_planner.py",
+        "stations": "bench/tasks/wr03/resources/station/stations.json",
+        "upper_door_grasp_pose": "bench/tasks/wr03/resources/calibration/upper_door_grasp.json"
+      },
+      "scene": {
+        "env_name": "WR03StoreAndRetrieveRememberedCan",
+        "env_split": "pretrain",
+        "layout_id": 24,
+        "scene_seed": 0,
+        "style_id": 24
+      },
+      "schema_version": "membench.release_lock/v2",
+      "seed": 0,
+      "split": "evaluation",
+      "task_config_file": "bench/tasks/wr03/resources/task.yaml",
+      "task_id": "WR-03",
+      "task_version": "1.0.0",
+      "variant": "memory"
+    },
+    {
+      "action_schema": "membench.pandaomron_hybrid13.v2",
+      "allow_partial_calibration": false,
+      "config_hash": "sha256:e8e88ec6d3c3bfdea7e8d7f8f402701a47434e14609f50e31149a7845f9b7e43",
+      "control_frequency_hz": 20,
+      "env_split": "pretrain",
+      "episode_identity": "sha256:d5ff17477a9d83342234acc17a0ab6fbdb26b977d0237ea8b1e0911212bd7cd2",
+      "facts": {
+        "demo_original_level": "shelf_lower",
+        "max_horizon": 3200,
+        "placement_pair_seed": 0,
+        "seed": 0
+      },
+      "initialization": {
+        "config_hash": "sha256:e8e88ec6d3c3bfdea7e8d7f8f402701a47434e14609f50e31149a7845f9b7e43",
+        "controller": {
+          "max_joint_step": 0.03
+        },
+        "resource_hash": "sha256:be89679454ade98190f9e1f0bc7812d4ffafb408f2abfa11cd5d6439351cd58f",
+        "task_id": "WR-04",
+        "task_revision": "WR04-v1"
+      },
+      "max_horizon": 3200,
+      "observation": {
+        "camera_aliases": [
+          "agentview_left",
+          "agentview_right",
+          "eye_in_hand"
+        ],
+        "camera_names": [
+          "robot0_agentview_left",
+          "robot0_agentview_right",
+          "robot0_eye_in_hand"
+        ],
+        "depth": true,
+        "image_size": [
+          224,
+          224
+        ],
+        "profile_hash": "sha256:cc8904e3b3bae61c0138914fc5a200a548f34f582d5650bb5f534b07b720470a",
+        "profile_id": "rgbd_v3"
+      },
+      "observation_profile": "rgbd_v3",
+      "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
+      "options": {},
+      "prompt": {
+        "initial": "Remember whether the sponge starts on the lower or upper shelf. Move it to the fixed sink staging spot, then return it to its original shelf level.",
+        "policy": "Return the sponge to its original shelf level."
+      },
+      "public": {
+        "env_name": "WR04ReturnSingleObjectToOriginalLevel",
+        "layout_id": 32,
+        "prompt": "Return the sponge to its original shelf level.",
+        "scene_seed": 0,
+        "style_id": 32
+      },
+      "release_facts": {
+        "config_hash": "sha256:e8e88ec6d3c3bfdea7e8d7f8f402701a47434e14609f50e31149a7845f9b7e43",
+        "controller": {
+          "max_joint_step": 0.03
+        },
+        "resource_hash": "sha256:be89679454ade98190f9e1f0bc7812d4ffafb408f2abfa11cd5d6439351cd58f",
+        "task_id": "WR-04",
+        "task_revision": "WR04-v1"
+      },
+      "resource_hash": "sha256:be89679454ade98190f9e1f0bc7812d4ffafb408f2abfa11cd5d6439351cd58f",
+      "resources": {
+        "item_shelf_grasp": "bench/tasks/wr04/resources/calibration/shelf_ketchup_grasp.json",
+        "planner_script": "bench/execution/planning/mplib_planner.py",
+        "sink_stage_place": "bench/tasks/wr04/resources/calibration/sink_left_place_tcp.json",
+        "stations": "bench/tasks/wr04/resources/station/stations.json"
+      },
+      "scene": {
+        "env_name": "WR04ReturnSingleObjectToOriginalLevel",
+        "env_split": "pretrain",
+        "layout_id": 32,
+        "scene_seed": 0,
+        "style_id": 32
+      },
+      "schema_version": "membench.release_lock/v2",
+      "seed": 0,
+      "split": "evaluation",
+      "task_config_file": "bench/tasks/wr04/resources/task.yaml",
+      "task_id": "WR-04",
+      "task_version": "1.0.0",
+      "variant": "memory"
+    },
+    {
+      "action_schema": "membench.pandaomron_hybrid13.v2",
+      "allow_partial_calibration": false,
+      "config_hash": "sha256:f8bd93907bf5879a345a882d0b10c16838b7d5bbcb5a314d02d6c6644e857dab",
+      "control_frequency_hz": 20,
+      "env_split": "pretrain",
+      "episode_identity": "sha256:9b7e2b25b9a69f4f8ec391968e0d71826f0895794b72806433261fee2e18880a",
+      "facts": {
+        "initial_object_poses": {
+          "blocking_object": {
+            "object_name": "blocking_object",
+            "region_center_xy": [
+              2.53813812704237,
+              -3.7191362093913964
+            ],
+            "region_size_xy": [
+              0.16,
+              0.2
+            ],
+            "seed": 0,
+            "xy": [
+              2.545948287670742,
+              -3.6760983361169126
+            ],
+            "yaw_deg": 0.0
+          },
+          "cleaning_tool": {
+            "object_name": "cleaning_tool",
+            "region_center_xy": [
+              2.518925433999311,
+              -4.959600068714154
+            ],
+            "region_size_xy": [
+              0.12,
+              0.12
+            ],
+            "seed": 100,
+            "xy": [
+              2.524134027014227,
+              -4.986195742502899
+            ],
+            "yaw_deg": 0.0
+          }
+        },
+        "max_horizon": 3200,
+        "seed": 0,
+        "temporary_blocking_offset_xy": [
+          0.005857620471278968,
+          0.18645568099117257
+        ],
+        "temporary_target_metadata": {
+          "blocking": {
+            "center_offset_xy": [
+              0.0,
+              0.18
+            ],
+            "jitter_xy": [
+              0.005857620471278968,
+              0.006455680991172583
+            ]
+          },
+          "minimum_tool_to_blocking_distance": 0.32,
+          "minimum_tool_to_origin_distance": 0.3,
+          "seed": 0,
+          "tool": {
+            "center_offset_xy": [
+              0.0,
+              -0.38
+            ],
+            "jitter_xy": [
+              0.024574333674337534,
+              -0.048499305687559426
+            ],
+            "sampling_attempt": 1
+          },
+          "tool_to_blocking_distance": 0.6152397508241524,
+          "tool_to_origin_distance": 0.4292033933349761
+        },
+        "temporary_tool_offset_xy": [
+          0.024574333674337534,
+          -0.42849930568755945
+        ],
+        "wipe_metadata": {
+          "angle_deg": 102.69311136812388,
+          "angle_rad": 1.7923329124909804,
+          "direction_xy": [
+            -0.21972891492180768,
+            0.9755609688519139
+          ],
+          "half_length": 0.07,
+          "offset_count": 4,
+          "pass_count": 3,
+          "seed": 2000,
+          "start_sign": 1.0,
+          "sweep_length": 0.14
+        },
+        "wipe_offsets_xy": [
+          [
+            -0.015381024044526539,
+            0.06828926781963399
+          ],
+          [
+            0.015381024044526539,
+            -0.06828926781963399
+          ],
+          [
+            -0.015381024044526539,
+            0.06828926781963399
+          ],
+          [
+            0.015381024044526539,
+            -0.06828926781963399
+          ]
+        ]
+      },
+      "initialization": {
+        "config_hash": "sha256:f8bd93907bf5879a345a882d0b10c16838b7d5bbcb5a314d02d6c6644e857dab",
+        "controller": {
+          "max_joint_step": 0.02
+        },
+        "resource_hash": "sha256:7ff2d5e6c9b643b4f05e6b0b2be3e418bd871c5247d0d6ff3a8275332e0958be",
+        "task_id": "WX-01"
+      },
+      "max_horizon": 3200,
+      "observation": {
+        "camera_aliases": [
+          "agentview_left",
+          "agentview_right",
+          "eye_in_hand"
+        ],
+        "camera_names": [
+          "robot0_agentview_left",
+          "robot0_agentview_right",
+          "robot0_eye_in_hand"
+        ],
+        "depth": true,
+        "image_size": [
+          224,
+          224
+        ],
+        "profile_hash": "sha256:cc8904e3b3bae61c0138914fc5a200a548f34f582d5650bb5f534b07b720470a",
+        "profile_id": "rgbd_v3"
+      },
+      "observation_profile": "rgbd_v3",
+      "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
+      "options": {},
+      "prompt": {
+        "initial": "The cup has been moved away from its remembered dining-table spot. Clean that spot and return the cup to it.",
+        "policy": "Start with the sponge already grasped and the cup displaced. Wipe the remembered cup spot, put down the sponge, then return the cup to that original spot."
+      },
+      "public": {
+        "env_name": "WX01ReturnObjectToOriginalPlace",
+        "layout_id": 38,
+        "prompt": "Start with the sponge already grasped and the cup displaced. Wipe the remembered cup spot, put down the sponge, then return the cup to that original spot.",
+        "scene_seed": 0,
+        "style_id": 38
+      },
+      "release_facts": {
+        "config_hash": "sha256:f8bd93907bf5879a345a882d0b10c16838b7d5bbcb5a314d02d6c6644e857dab",
+        "controller": {
+          "max_joint_step": 0.02
+        },
+        "resource_hash": "sha256:7ff2d5e6c9b643b4f05e6b0b2be3e418bd871c5247d0d6ff3a8275332e0958be",
+        "task_id": "WX-01"
+      },
+      "resource_hash": "sha256:7ff2d5e6c9b643b4f05e6b0b2be3e418bd871c5247d0d6ff3a8275332e0958be",
+      "resources": {
+        "cleaning_tool_grasp_pose": "bench/tasks/wx01/resources/poses/cleaning_tool_grasp.json",
+        "manual_base_path": "bench/tasks/wx01/resources/navigation/manual_base_path_layout38_style38_seed0.json",
+        "planner_script": "bench/execution/planning/mplib_planner.py",
+        "station_poses": "bench/tasks/wx01/resources/station/stations.json"
+      },
+      "scene": {
+        "env_name": "WX01ReturnObjectToOriginalPlace",
+        "env_split": "pretrain",
+        "layout_id": 38,
+        "scene_seed": 0,
+        "style_id": 38
+      },
+      "schema_version": "membench.release_lock/v2",
+      "seed": 0,
+      "split": "evaluation",
+      "task_config_file": "bench/tasks/wx01/resources/task.yaml",
+      "task_id": "WX-01",
+      "task_version": "1.0.0",
+      "variant": "memory"
+    }
+  ],
+  "lock_hash": "sha256:9f31484c966af39d0789da227690156d2225132deb683b51113916c2868e429c",
+  "release_id": "all_tasks_v1",
+  "schema_version": "membench.release_lock/v2"
+}

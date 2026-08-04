@@ -1,0 +1,185 @@
+"""Aggregation of independently committed episode results."""
+
+from __future__ import annotations
+
+import math
+from typing import Any, Iterable, Mapping
+
+
+def wilson_interval(
+    successes: int,
+    total: int,
+    *,
+    z: float = 1.959963984540054,
+) -> tuple[float, float]:
+    if total <= 0:
+        return (0.0, 0.0)
+    proportion = successes / total
+    denominator = 1 + z * z / total
+    center = (proportion + z * z / (2 * total)) / denominator
+    margin = (
+        z
+        * math.sqrt(
+            proportion * (1 - proportion) / total + z * z / (4 * total * total)
+        )
+        / denominator
+    )
+    return (max(0.0, center - margin), min(1.0, center + margin))
+
+
+def aggregate_episode_results(
+    results: Iterable[Mapping[str, Any]],
+    expected_seeds: Iterable[int] | None = None,
+) -> dict[str, Any]:
+    items = list(results)
+    duplicate_seeds: list[Any]
+    if expected_seeds is None:
+        aggregate_items = items
+        planned = len(items)
+        recorded = len(items)
+        pending = 0
+        unexpected = 0
+        duplicate_seeds = _duplicate_result_seeds(items)
+    else:
+        expected = _unique_expected_seeds(expected_seeds)
+        aggregate_items, unexpected, duplicate_seeds = _select_planned_results(
+            items,
+            expected,
+        )
+        planned = len(expected)
+        recorded = len(aggregate_items)
+        pending = planned - recorded
+
+    counts = {"success": 0, "failure": 0, "error": 0, "cancelled": 0}
+    failure_reasons: dict[str, int] = {}
+    success_steps: list[int] = []
+    latencies: list[float] = []
+    for result in aggregate_items:
+        status = str(result.get("status", "error"))
+        counts[status] = counts.get(status, 0) + 1
+        if status == "failure":
+            reason = str(result.get("failure_reason", "unknown"))
+            failure_reasons[reason] = failure_reasons.get(reason, 0) + 1
+        if status == "success" and result.get("success_step") is not None:
+            success_steps.append(int(result["success_step"]))
+        latencies.extend(float(item) for item in result.get("inference_latency_ms", []))
+    completed = counts["success"] + counts["failure"]
+    interval = wilson_interval(counts["success"], completed)
+    task_success_rate = counts["success"] / completed if completed else None
+    completion_rate = recorded / planned if planned else None
+    overall_success_rate = counts["success"] / planned if planned else None
+    publishable = bool(
+        expected_seeds is not None
+        and planned > 0
+        and pending == 0
+        and unexpected == 0
+        and not duplicate_seeds
+        and completed == recorded
+    )
+    return {
+        "episodes_total": len(aggregate_items),
+        "counts": counts,
+        "completed_task_episodes": completed,
+        "success_rate": task_success_rate,
+        "success_rate_ci95": list(interval) if completed else None,
+        "success_step_mean": (
+            sum(success_steps) / len(success_steps) if success_steps else None
+        ),
+        "inference_latency_ms_mean": (
+            sum(latencies) / len(latencies) if latencies else None
+        ),
+        "failure_reasons": dict(sorted(failure_reasons.items())),
+        "planned": planned,
+        "recorded": recorded,
+        "pending": pending,
+        "unexpected": unexpected,
+        "completion_rate": completion_rate,
+        "task_success_rate": task_success_rate,
+        "overall_success_rate": overall_success_rate,
+        "publishable": publishable,
+        "duplicate_seeds": duplicate_seeds,
+    }
+
+
+def _unique_expected_seeds(expected_seeds: Iterable[int]) -> tuple[int, ...]:
+    unique: list[int] = []
+    seen: set[tuple[type[Any], Any]] = set()
+    for seed in expected_seeds:
+        if isinstance(seed, bool) or not isinstance(seed, int):
+            raise ValueError(f"Expected seed must be an integer: {seed!r}")
+        identity = _seed_identity(seed)
+        if identity not in seen:
+            seen.add(identity)
+            unique.append(seed)
+    return tuple(unique)
+
+
+def _select_planned_results(
+    items: list[Mapping[str, Any]],
+    expected_seeds: tuple[int, ...],
+) -> tuple[list[Mapping[str, Any]], int, list[Any]]:
+    expected = {_seed_identity(seed) for seed in expected_seeds}
+    selected: list[Mapping[str, Any]] = []
+    seen: set[tuple[type[Any], Any]] = set()
+    unexpected: set[tuple[type[Any], Any]] = set()
+    malformed_seed_results = 0
+    duplicates: dict[tuple[type[Any], Any], Any] = {}
+    for result in items:
+        seed = result.get("seed", _MISSING)
+        identity = _hashable_seed_identity(seed)
+        if identity is None:
+            malformed_seed_results += 1
+            continue
+        if identity in seen:
+            duplicates.setdefault(identity, seed)
+            continue
+        seen.add(identity)
+        if identity in expected:
+            selected.append(result)
+        else:
+            unexpected.add(identity)
+    return (
+        selected,
+        len(unexpected) + malformed_seed_results,
+        _sorted_seed_values(duplicates.values()),
+    )
+
+
+def _duplicate_result_seeds(items: list[Mapping[str, Any]]) -> list[Any]:
+    seen: set[tuple[type[Any], Any]] = set()
+    duplicates: dict[tuple[type[Any], Any], Any] = {}
+    for result in items:
+        seed = result.get("seed", _MISSING)
+        identity = _hashable_seed_identity(seed)
+        if identity is None:
+            continue
+        if identity in seen:
+            duplicates.setdefault(identity, seed)
+        else:
+            seen.add(identity)
+    return _sorted_seed_values(duplicates.values())
+
+
+def _hashable_seed_identity(value: Any) -> tuple[type[Any], Any] | None:
+    if value is _MISSING:
+        return None
+    try:
+        hash(value)
+    except TypeError:
+        return None
+    return _seed_identity(value)
+
+
+def _seed_identity(value: Any) -> tuple[type[Any], Any]:
+    return (type(value), value)
+
+
+def _sorted_seed_values(values: Iterable[Any]) -> list[Any]:
+    items = list(values)
+    try:
+        return sorted(items)
+    except TypeError:
+        return sorted(items, key=lambda value: (type(value).__name__, repr(value)))
+
+
+_MISSING = object()

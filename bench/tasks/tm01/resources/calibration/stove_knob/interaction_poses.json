@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "config_kind": "tm01_native_stove_knob_interaction",
+  "target_knob": "front_right",
+  "target_burner": "rear_left",
+  "pose_files": {
+    "pinch_off": "pinch_off.json",
+    "pinch_on": "pinch_on.json",
+    "pinch_on_for_off": "pinch_on.json"
+  },
+  "rotation_waypoints_deg": {
+    "turn_on": [10.0, 40.0, 90.0],
+    "turn_off": [40.0, 10.0, 0.0, -30.0, -60.0]
+  },
+  "gripper": {
+    "open_steps": 30,
+    "close_steps": 30,
+    "release_steps": 30
+  },
+  "validation": {
+    "off_qpos_max_rad": 0.10,
+    "on_qpos_min_rad": 0.50
+  },
+  "notes": {
+    "pinch_on_role": [
+      "turn_on_end_pose",
+      "turn_off_start_pose"
+    ],
+    "actuation": "physical_gripper_contact_only",
+    "turn_off_overtravel_reason": "compensate_measured_gripper_slip_on_reverse_rotation",
+    "direct_knob_qpos_write": false,
+    "knob_actuator_command": false
+  }
+}

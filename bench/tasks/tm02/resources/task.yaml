@@ -1,0 +1,222 @@
+# TM02 scene/semantic configuration. Task-specific motion calibration is explicit.
+schema_version: 1
+
+task:
+  id: TM02
+  display_name: Fill Pot and Retrieve Can
+  description: Fill a sink-side pot while retrieving a can, then finish both threads.
+  canonical_prompt: >-
+    First, press the blue water button beside the sink to turn on the faucet
+    and fill the pot already in the sink. While the pot fills, retrieve the can
+    from the cabinet: open the sliding door, take out the can, and place it in
+    the marked area. After placing the can, you may either return to the sink
+    and press the same blue button to turn off the faucet before closing the
+    cabinet door, or close the cabinet door before returning to turn off the
+    faucet. When the faucet is off, the can is in the marked area, and the
+    cabinet door is closed, press the red completion button beside the sink
+    to finish the task.
+  canonical_prompt_sha256: 5690a5f6c1f68ad05a37a36d91c844643df53031f80ed9c8b2634e46e0a16f4a
+  success_conditions:
+    - legal_event_route
+    - faucet_on_once
+    - faucet_off_once
+    - faucet_off
+    - pot_filled_and_stable_in_sink
+    - can_retrieved_and_released_in_place_region
+    - cabinet_closed
+    - completion_button_pressed
+    - no_absorbing_failure
+    - fixed_prompt
+
+scene:
+  env_name: TM02FillPotAndRetrieveCan
+  fixed_scene: true
+  # Reuse WA02's validated sink workspace and water-button station.
+  layout_id: 15
+  style_id: 34
+  scene_seed: 0
+  water_control_source: WA02
+  task_added_button_names: [water_button, completion_button]
+  water_button_visual_role: blue
+  # Blue controls water; red is the independent success control.
+  water_button_world_xyz: [2.06, -2.56, 0.93]
+  # The button station faces +X, so +Y is visually left from the robot.
+  completion_button_position_source: water_button_left
+  completion_button_visual_role: red
+  completion_button_offset_from_water_xyz: [0.0, 0.14, 0.0]
+  completion_button_world_xyz: [2.06, -2.42, 0.93]
+  # Direct WR01 reuse on the free counter patch left of the wall-mounted stove.
+  cabinet_asset_source: WR01.WR01SlideStorageCabinet
+  cabinet_world_xyz: [0.32, -3.93, 1.12]
+  cabinet_yaw_deg: 90.0
+  # Free counter patch right of the stove, facing the calibrated place station.
+  can_place_region_world_xyz: [0.30, -2.42, 0.925]
+  can_place_region_size_xy: [0.22, 0.20]
+  pot_name: pot
+  pot_xml: objects/lightwheel/saucepan/Saucepan002/model.xml
+  pot_graspable: false
+  can_name: can
+  can_asset_source: WR01.RED_CAN_XML
+  can_xml: objects/objaverse/canned_food/canned_food_15/model.xml
+  can_scale: 0.90
+
+episode:
+  plan_balance: seed_parity
+  max_horizon: 3200
+
+initial_state:
+  robot_base_source: TM02.manual_base_path
+  robot_base_sample_index: 0
+  faucet_mode: off
+  water_temperature: cold
+  pot_in_sink_under_water_site: true
+  pot_graspable: false
+  cabinet_door_open_fraction: 0.0
+  can_inside_cabinet: true
+  settle_steps: 20
+
+semantics:
+  cabinet_open_threshold: 0.70
+  cabinet_closed_threshold: 0.08
+  button_pressed_threshold_m: 0.004
+  button_released_threshold_m: 0.001
+  button_release_dwell_steps: 3
+  can_place_xy_tolerance_m: 0.02
+  pot_water_xy_threshold_m: 0.12
+  pot_translation_guard_m: 0.04
+  pot_tilt_guard_deg: 8.0
+  # At the 20 Hz control rate, 200 active steps is about ten seconds.
+  pot_fill_required_steps: 200
+  pot_filled_threshold: 0.95
+  reject_simultaneous_semantic_events: true
+  absorbing_order_failures: true
+
+sensors:
+  cameras: [robot0_agentview_left, robot0_agentview_right, robot0_eye_in_hand]
+  wrist_rgb_camera: robot0_eye_in_hand
+  width: 224
+  height: 224
+  depth: true
+  use_camera_observations: true
+  has_renderer: false
+  has_offscreen_renderer: true
+
+resources:
+  # These two files are reused directly from WA02 and already calibrated for
+  # layout 15 / style 34.
+  water_button_positions: calibration/water_button_positions_layout15_style34_seed0.json
+  water_station_poses: calibration/water_stations.json
+  # The user-calibrated loop connects the water button, cabinet, and placement.
+  manual_base_path: navigation/manual_base_path_layout15_style34_seed0.json
+  # Cabinet-side resources preserve WR01's fixture-relative operation geometry.
+  cabinet_station_poses: calibration/wr01_relative_cabinet_stations.json
+  cabinet_door_pose: calibration/wr01_relative_lower_door_grasp.json
+  # The object-frame grasp is invariant to the cabinet's 90-degree world yaw.
+  can_grasp_pose: calibration/can_side_grasp.json
+  can_retrieval_prepose: calibration/wr01_relative_lower_retrieval_prepose.json
+  can_place_pose: calibration/can_place_region_release.json
+  planner_script: ../../../execution/planning/mplib_planner.py
+
+navigation:
+  manual_base_path_enabled: true
+  manual_base_path_start_index: 0
+  # The physical base stopped 0.1087 m from the rotated WR01 terminal on the
+  # first full probe; use the same 0.12 m tolerance as the long path segments.
+  manual_base_path_xy_tolerance: 0.12
+  manual_base_path_yaw_tolerance: 0.16
+  manual_base_path_segment_yaw_threshold: 0.25
+  use_station_base_poses: false
+  use_station_astar_paths: false
+
+manipulation:
+  planner:
+    conda_env: membench
+    subprocess_timeout_s: 60.0
+    planning_time: 5.0
+    time_step: 0.1
+    qpos_step: 0.02
+    rrt_range: 0.1
+  runtime:
+    max_joint_step: 0.025
+    settle_steps: 20
+    position_threshold: 0.12
+    orientation_threshold_deg: 15.0
+    qpos_threshold: 0.24
+    open_steps: 20
+    close_steps: 90
+    release_steps: 45
+    release_settle_steps: 20
+  static_scene:
+    enabled: false
+    validate_collisions: false
+
+operations:
+  water_button:
+    # Exact WA02 physical button-press settings for the shared button asset.
+    prepress_z_offset: 0.08
+    press_z_offset: -0.010
+    hold_steps: 12
+    gripper_action: 1.0
+    near_miss_position_tolerance: 0.09
+    require_physical_button_motion: true
+  completion_button:
+    prepress_z_offset: 0.08
+    press_z_offset: -0.010
+    hold_steps: 12
+    gripper_action: 1.0
+    near_miss_position_tolerance: 0.09
+    press_depth_threshold_m: 0.004
+    require_physical_button_motion: true
+  cabinet_open:
+    control_mode: physical_handle
+    opened_threshold: 0.70
+    pregrasp_distance: 0.14
+    retreat_distance: 0.10
+    open_distances: [0.03, 0.12, 0.21, 0.34]
+    close_deltas: [0.12, 0.27, 0.36, 0.44]
+    gripper_open_steps: 7
+    gripper_close_steps: 15
+    gripper_release_steps: 10
+    motion_settle_steps: 2
+    final_motion_settle_steps: 5
+    retreat_settle_steps: 5
+  can_pick:
+    mode: cabinet_front_corridor
+    require_physical_grasp: true
+    front_clearance_distance: 0.10
+    front_pregrasp_distance: 0.10
+    front_clearance_z_offset: 0.10
+    grasp_z_offset: 0.010
+    grasp_lateral_offset: -0.0067
+    grasp_inward_offset: 0.0042
+    close_gripper_steps: 6
+    post_close_hold_steps: 12
+    held_gripper_action: 1.0
+    disable_collisions_during_transport: false
+  can_place:
+    require_release: true
+    target_region: can_place_region
+  cabinet_close:
+    control_mode: physical_handle
+    closed_threshold: 0.08
+    # One long pull can leave the physical sliding door at roughly 0.25 open
+    # because of handle contact slip. Regrasp from that live state once.
+    max_physical_attempts: 2
+    pregrasp_distance: 0.14
+    retreat_distance: 0.10
+    open_distances: [0.03, 0.12, 0.21, 0.34]
+    close_deltas: [0.12, 0.27, 0.36, 0.44]
+    gripper_open_steps: 7
+    gripper_close_steps: 15
+    gripper_release_steps: 10
+    motion_settle_steps: 2
+    final_motion_settle_steps: 5
+    retreat_settle_steps: 5
+  return_arm:
+    settle_steps: 2
+
+recording:
+  record_depth: true
+  depth_dtype: uint16
+  depth_scale: 0.001
+  action_schema: membench.pandaomron_hybrid13.v2

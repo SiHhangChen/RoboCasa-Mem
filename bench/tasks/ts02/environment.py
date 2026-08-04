@@ -1,0 +1,498 @@
+"""TS02 RoboCasa scene and authoritative physical-observation boundary."""
+
+from __future__ import annotations
+
+import xml.etree.ElementTree as ET
+from typing import Any
+
+import numpy as np
+
+from robocasa.environments.kitchen.kitchen import FixtureType, Kitchen
+
+from bench.tasks.ts02.domain.contracts import (
+    AXIS,
+    FIXTURE_DISPLAY_NAMES,
+    FIXTURE_NAMES,
+)
+from bench.tasks.ts02.domain.geometry import (
+    DEFAULT_DRAWER_WORLD_XYZS,
+    DEFAULT_DRAWER_WORLD_YAW_DEG,
+    normalize_drawer_world_xyzs,
+)
+from bench.tasks.ts02.domain.semantics import (
+    PhysicalState,
+    SemanticState,
+    diagnostics,
+    evaluate_success,
+    record_close_attempt,
+    record_completion_button_attempt,
+    record_inspection_attempt,
+    record_open_attempt,
+)
+from bench.tasks.ts02.single_drawer import SingleTabletopDrawer
+
+
+DRAWER_FIXTURE_NAMES = {fixture: f"ts02_{fixture}_fixture" for fixture in FIXTURE_NAMES}
+COMPLETION_BUTTON_GEOM_NAME = "bench_ts02_completion_button"
+COMPLETION_BUTTON_JOINT_NAME = f"{COMPLETION_BUTTON_GEOM_NAME}_press_joint"
+COMPLETION_BUTTON_MAX_TRAVEL = 0.012
+DEFAULT_COMPLETION_BUTTON_WORLD_XYZ = (4.35, -2.06, 0.92)
+
+
+class TS02InspectThreeCabinets(Kitchen):
+    """Three independent drawers plus the one authoritative history state."""
+
+    EXCLUDE_LAYOUTS = Kitchen.DINING_COUNTER_EXCLUDED_LAYOUTS
+    EXPECTED_FIXTURE_NAMES = FIXTURE_NAMES
+    FIXTURE_DISPLAY_NAMES = FIXTURE_DISPLAY_NAMES
+    DRAWER_FIXTURE_PREFIX = "ts02"
+    COMPLETION_BUTTON_GEOM_NAME = COMPLETION_BUTTON_GEOM_NAME
+    COMPLETION_BUTTON_JOINT_NAME = COMPLETION_BUTTON_JOINT_NAME
+    TASK_LABEL = "TS02"
+    LANG = (
+        "Please inspect the three cabinets, close each drawer, then press "
+        "the completion button."
+    )
+    INITIAL_PROMPT = (
+        "Inspect each cabinet exactly once, close it after inspection, and "
+        "remember which cabinets have already been checked. After all three "
+        "are closed, press the completion button."
+    )
+
+    def __init__(
+        self,
+        *,
+        fixture_names: tuple[str, ...] = FIXTURE_NAMES,
+        drawer_world_xyzs: tuple[
+            tuple[float, float, float], ...
+        ] = DEFAULT_DRAWER_WORLD_XYZS,
+        drawer_world_yaw_deg: float = DEFAULT_DRAWER_WORLD_YAW_DEG,
+        completion_button_world_xyz: tuple[float, float, float] = (
+            DEFAULT_COMPLETION_BUTTON_WORLD_XYZ
+        ),
+        open_threshold: float = 0.70,
+        closed_threshold: float = 0.08,
+        **kwargs: Any,
+    ) -> None:
+        names = tuple(str(name) for name in fixture_names)
+        if names != tuple(self.EXPECTED_FIXTURE_NAMES):
+            raise ValueError(
+                f"{self.TASK_LABEL} fixture_names must equal "
+                f"{tuple(self.EXPECTED_FIXTURE_NAMES)}"
+            )
+        if not 0.0 <= float(closed_threshold) < float(open_threshold) <= 1.0:
+            raise ValueError("TS02 requires closed_threshold < open_threshold")
+        self.fixture_names = names
+        self.drawer_world_xyzs = normalize_drawer_world_xyzs(
+            drawer_world_xyzs, expected_count=len(names)
+        )
+        self.drawer_fixture_names = {
+            fixture: f"{self.DRAWER_FIXTURE_PREFIX}_{fixture}_fixture"
+            for fixture in names
+        }
+        self.drawer_world_yaw_deg = float(drawer_world_yaw_deg)
+        button_position = np.asarray(completion_button_world_xyz, dtype=float).reshape(-1)
+        if button_position.size != 3 or not np.all(np.isfinite(button_position)):
+            raise ValueError("TS02 completion_button_world_xyz must be a finite xyz value")
+        self.completion_button_world_xyz = tuple(
+            float(item) for item in button_position
+        )
+        self.open_threshold = float(open_threshold)
+        self.closed_threshold = float(closed_threshold)
+        self._semantic_state = SemanticState(names)
+        super().__init__(**kwargs)
+
+    # Scene construction -------------------------------------------------
+
+    def _setup_model(self) -> None:
+        super()._setup_model()
+        self.storage_cabinets = {
+            fixture: SingleTabletopDrawer(
+                name=self.drawer_fixture_names[fixture],
+                rng=self.rng,
+            )
+            for fixture in self.fixture_names
+        }
+        for fixture_name, fixture in self.storage_cabinets.items():
+            model_name = self.drawer_fixture_names[fixture_name]
+            self.fixtures[model_name] = fixture
+            self.fixture_cfgs.append(
+                {"name": model_name, "model": fixture, "type": "fixture"}
+            )
+        self.model.merge_objects(list(self.storage_cabinets.values()))
+
+    def edit_model_xml(self, xml_str: str) -> str:
+        """Install the WA02-style spring-loaded completion button."""
+
+        xml_str = super().edit_model_xml(xml_str)
+        root = ET.fromstring(xml_str)
+        worldbody = root.find("worldbody")
+        if worldbody is None:
+            return xml_str
+        existing = {
+            geom.get("name")
+            for geom in worldbody.iter("geom")
+            if geom.get("name")
+        }
+        if self.COMPLETION_BUTTON_GEOM_NAME not in existing:
+            _add_completion_button_asset(
+                worldbody,
+                pos=self.completion_button_world_xyz,
+                geom_name=self.COMPLETION_BUTTON_GEOM_NAME,
+                joint_name=self.COMPLETION_BUTTON_JOINT_NAME,
+            )
+        return ET.tostring(root, encoding="utf8").decode("utf8")
+
+    def _setup_kitchen_references(self) -> None:
+        super()._setup_kitchen_references()
+        self.tabletop_storage_cabinets = self.storage_cabinets
+        self.tabletop_storage_cabinet = self.storage_cabinets[self.fixture_names[1]]
+        self.storage_cabinet = self.tabletop_storage_cabinet
+        self.cabinet = self.storage_cabinet
+        self.fixture_refs["cabinet"] = (self.cabinet, False)
+        for fixture_name, fixture in self.storage_cabinets.items():
+            self.fixture_refs[fixture_name] = (fixture, False)
+        self.counter = self.register_fixture_ref(
+            "counter",
+            dict(id=FixtureType.COUNTER, size=(0.95, 0.55)),
+        )
+        yaw = float(np.deg2rad(self.drawer_world_yaw_deg))
+        for fixture_name, world_xyz in zip(
+            self.fixture_names,
+            self.drawer_world_xyzs,
+            strict=True,
+        ):
+            self.storage_cabinets[fixture_name].set_world_pose(
+                world_xyz=world_xyz,
+                yaw=yaw,
+            )
+        self.init_robot_base_ref = self.counter
+
+    def _get_obj_cfgs(self) -> list[dict[str, Any]]:
+        return []
+
+    def _setup_scene(self) -> None:
+        super()._setup_scene()
+        self.close_all_drawers()
+        self.reset_semantic_state()
+
+    # Semantic events ----------------------------------------------------
+
+    @property
+    def semantic_state(self) -> SemanticState:
+        return self._semantic_state
+
+    @property
+    def checked_fixture_set(self) -> set[str]:
+        return self._semantic_state.checked_fixture_set
+
+    @property
+    def completed_fixture_history(self) -> list[str]:
+        return self._semantic_state.completed_fixture_history
+
+    @property
+    def active_fixture(self) -> str | None:
+        return self._semantic_state.active_fixture
+
+    @property
+    def num_checked(self) -> int:
+        return self._semantic_state.num_checked
+
+    def reset_semantic_state(self) -> None:
+        self._semantic_state = SemanticState(self.fixture_names)
+
+    def record_open_event(
+        self,
+        fixture_name: str,
+        *,
+        drawer_open: bool,
+        failure_reason: str | None = None,
+    ) -> dict[str, Any]:
+        result = record_open_attempt(
+            self._semantic_state,
+            fixture_name,
+            drawer_open=drawer_open,
+            failure_reason=failure_reason,
+        ).as_dict()
+        result["diagnostics"] = self.inspection_diagnostics()
+        return result
+
+    def record_inspection_event(
+        self,
+        fixture_name: str,
+        *,
+        drawer_open: bool,
+    ) -> dict[str, Any]:
+        result = record_inspection_attempt(
+            self._semantic_state,
+            fixture_name,
+            drawer_open=drawer_open,
+        ).as_dict()
+        result["diagnostics"] = self.inspection_diagnostics()
+        return result
+
+    def record_close_event(
+        self,
+        fixture_name: str,
+        *,
+        drawer_closed: bool,
+        failure_reason: str | None = None,
+    ) -> dict[str, Any]:
+        result = record_close_attempt(
+            self._semantic_state,
+            fixture_name,
+            drawer_closed=drawer_closed,
+            failure_reason=failure_reason,
+        ).as_dict()
+        result["diagnostics"] = self.inspection_diagnostics()
+        return result
+
+    def record_completion_button_event(
+        self,
+        *,
+        button_physically_pressed: bool,
+        all_drawers_closed: bool | None = None,
+        failure_reason: str | None = None,
+    ) -> dict[str, Any]:
+        closed = (
+            self.all_drawers_closed()
+            if all_drawers_closed is None
+            else bool(all_drawers_closed)
+        )
+        result = record_completion_button_attempt(
+            self._semantic_state,
+            all_drawers_closed=closed,
+            button_physically_pressed=button_physically_pressed,
+            failure_reason=failure_reason,
+        ).as_dict()
+        result["diagnostics"] = self.inspection_diagnostics()
+        return result
+
+    # Physical drawer observations --------------------------------------
+
+    def cabinet_for_slot(self, fixture_name: str) -> SingleTabletopDrawer:
+        self._validate_fixture(fixture_name)
+        return self.storage_cabinets[str(fixture_name)]
+
+    def slot_open_fraction(self, fixture_name: str) -> float:
+        return float(self.cabinet_for_slot(fixture_name).open_fraction(self))
+
+    def _slot_open_fraction(self, fixture_name: str) -> float:
+        return self.slot_open_fraction(fixture_name)
+
+    def set_slot_open_fraction(self, fixture_name: str, fraction: float) -> None:
+        self._validate_fixture(fixture_name)
+        value = float(fraction)
+        if not 0.0 <= value <= 1.0:
+            raise ValueError("drawer open fraction must be in [0, 1]")
+        fixture = self.cabinet_for_slot(fixture_name)
+        if value <= self.closed_threshold:
+            fixture.close_drawer(env=self, min=value, max=value)
+        else:
+            fixture.open_drawer(env=self, min=value, max=value)
+        self.sim.forward()
+
+    def close_all_drawers(self, *, fraction: float = 0.0) -> None:
+        for fixture_name in self.fixture_names:
+            self.set_slot_open_fraction(fixture_name, fraction)
+
+    def physical_state(self) -> PhysicalState:
+        return PhysicalState(
+            {
+                fixture_name: self.slot_open_fraction(fixture_name)
+                for fixture_name in self.fixture_names
+            }
+        )
+
+    def all_drawers_closed(self) -> bool:
+        return all(
+            self.slot_open_fraction(fixture_name) <= self.closed_threshold
+            for fixture_name in self.fixture_names
+        )
+
+    def completion_button_position(self) -> np.ndarray:
+        """Return the live center of the movable green plunger geom."""
+
+        try:
+            geom_id = int(
+                self.sim.model.geom_name2id(self.COMPLETION_BUTTON_GEOM_NAME)
+            )
+            return np.asarray(self.sim.data.geom_xpos[geom_id], dtype=float)
+        except Exception:
+            return np.asarray(self.completion_button_world_xyz, dtype=float) + np.asarray(
+                [0.0, 0.0, 0.075], dtype=float
+            )
+
+    def completion_button_press_depth(self) -> float:
+        """Return positive plunger travel in metres (0.012 m at the limit)."""
+
+        try:
+            return min(
+                COMPLETION_BUTTON_MAX_TRAVEL,
+                max(
+                    0.0,
+                    -float(
+                        self.sim.data.get_joint_qpos(
+                            self.COMPLETION_BUTTON_JOINT_NAME
+                        )
+                    ),
+                ),
+            )
+        except Exception:
+            return 0.0
+
+    def slot_pose(self, fixture_name: str) -> np.ndarray:
+        fixture = self.cabinet_for_slot(fixture_name)
+        fixture.update_state(self)
+        return fixture.drawer_pose()
+
+    def slot_floor_pose(self, fixture_name: str) -> np.ndarray:
+        fixture = self.cabinet_for_slot(fixture_name)
+        fixture.update_state(self)
+        return fixture.drawer_floor_pose()
+
+    def robot_base_distance_to_slot(self, fixture_name: str) -> float:
+        obs = self._get_observations(force_update=True)
+        base_xy = np.asarray(obs["robot0_base_pos"], dtype=float).reshape(-1)[:2]
+        return float(np.linalg.norm(base_xy - self.slot_pose(fixture_name)[:2]))
+
+    # Task metadata and final result ------------------------------------
+
+    def get_ep_meta(self) -> dict[str, Any]:
+        metadata = super().get_ep_meta()
+        prompt = self.resolve_prompt_spec()
+        metadata["lang"] = prompt.policy_prompt
+        metadata["initial_prompt"] = prompt.initial_prompt
+        metadata.setdefault("refs", {}).update(
+            {
+                "axis": AXIS,
+                "fixture_names": list(self.fixture_names),
+                "fixture_display_names": dict(self.FIXTURE_DISPLAY_NAMES),
+                "memory_variables": [
+                    "checked_fixture_set",
+                    "active_fixture",
+                    "completed_fixture_history",
+                    "num_checked",
+                    "completion_button_pressed",
+                ],
+                "completion_button_geom": self.COMPLETION_BUTTON_GEOM_NAME,
+                "completion_button_joint": self.COMPLETION_BUTTON_JOINT_NAME,
+            }
+        )
+        return metadata
+
+    def resolve_prompt_spec(self):
+        from bench.tasks.ts02.prompts import resolve_prompt_spec
+
+        return resolve_prompt_spec(variant="memory")
+
+    def _check_success(self) -> bool:
+        return evaluate_success(
+            self._semantic_state,
+            self.physical_state(),
+            closed_threshold=self.closed_threshold,
+        ).success
+
+    def inspection_diagnostics(self) -> dict[str, Any]:
+        return diagnostics(
+            self._semantic_state,
+            self.physical_state(),
+            closed_threshold=self.closed_threshold,
+            fixture_display_names=self.FIXTURE_DISPLAY_NAMES,
+        )
+
+    def task_diagnostics(self) -> dict[str, Any]:
+        return self.inspection_diagnostics()
+
+    def _validate_fixture(self, fixture_name: str) -> None:
+        if str(fixture_name) not in self.fixture_names:
+            raise KeyError(f"unknown {self.TASK_LABEL} fixture {fixture_name!r}")
+
+
+def _add_completion_button_asset(
+    parent: ET.Element,
+    *,
+    pos: tuple[float, float, float],
+    geom_name: str = COMPLETION_BUTTON_GEOM_NAME,
+    joint_name: str = COMPLETION_BUTTON_JOINT_NAME,
+) -> None:
+    """Copy WA02's compact pressable primitive with a green completion cap."""
+
+    body = ET.SubElement(
+        parent,
+        "body",
+        {
+            "name": f"{geom_name}_body",
+            "pos": " ".join(f"{item:.6f}" for item in pos),
+        },
+    )
+    visual = {"contype": "0", "conaffinity": "0", "group": "1"}
+    ET.SubElement(
+        body,
+        "geom",
+        {
+            "name": f"{geom_name}_base",
+            "type": "box",
+            "pos": "0 0 0.020",
+            "size": "0.060 0.060 0.020",
+            "rgba": "0.10 0.11 0.12 1",
+            **visual,
+        },
+    )
+    plunger = ET.SubElement(
+        body,
+        "body",
+        {
+            "name": f"{geom_name}_plunger",
+            "pos": "0 0 0",
+            # WA02's visual design is retained, but gravity compensation keeps
+            # this vertical spring from resting at its lower joint limit.
+            "gravcomp": "1",
+        },
+    )
+    ET.SubElement(
+        plunger,
+        "inertial",
+        {
+            "pos": "0 0 0.074",
+            "mass": "0.020",
+            "diaginertia": "0.00002 0.00002 0.00002",
+        },
+    )
+    ET.SubElement(
+        plunger,
+        "joint",
+        {
+            "name": joint_name,
+            "type": "slide",
+            "axis": "0 0 1",
+            "limited": "true",
+            "range": "-0.012 0",
+            "springref": "0",
+            "stiffness": "18",
+            "damping": "2",
+        },
+    )
+    ET.SubElement(
+        plunger,
+        "geom",
+        {
+            "name": geom_name,
+            "type": "cylinder",
+            "pos": "0 0 0.075",
+            "size": "0.029 0.008",
+            "rgba": "0.22 0.72 0.32 1",
+            "contype": "1",
+            "conaffinity": "1",
+            "group": "1",
+            "friction": "0.8 0.005 0.0001",
+        },
+    )
+
+
+__all__ = [
+    "COMPLETION_BUTTON_GEOM_NAME",
+    "COMPLETION_BUTTON_JOINT_NAME",
+    "COMPLETION_BUTTON_MAX_TRAVEL",
+    "TS02InspectThreeCabinets",
+]

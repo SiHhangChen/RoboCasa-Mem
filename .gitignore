@@ -1,0 +1,41 @@
+# Python caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local environments and machine state
+.venv/
+venv/
+.env
+.codex
+.serena/
+.vscode/
+
+# Editor / OS noise
+.DS_Store
+
+# Large generated artifacts
+*.h5
+*.hdf5
+*.mp4
+*.avi
+*.mov
+*.npy
+*.npz
+
+# Generated outputs: recordings, trajectories, previews, and calibration runs.
+outputs/
+
+# External simulator and policy source trees are local dependencies, not bench code.
+robocasa/
+robosuite/
+policy/
+
+# Local tooling state and simulator logs.
+.playwright-mcp/
+MUJOCO_LOG.TXT
+
+# Formal recorded datasets are generated artifacts and are kept out of git.
+data/datasets/
