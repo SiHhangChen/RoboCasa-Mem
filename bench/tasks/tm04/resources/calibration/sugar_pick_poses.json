@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "config_kind": "tm04_sugar_pick_candidates",
+  "description": "Validated top-down sugar-cube grasp configuration for TM04's fixed K=2, N=3 tray.",
+  "task": {
+    "task_id": "TM04",
+    "layout_id": 15,
+    "style_id": 34,
+    "seed": 0
+  },
+  "source": {
+    "command": "scripts/planning/probe_tm04_scene.py --settle-steps 2 --run-expert",
+    "result": "31/31 stages; success=true"
+  },
+  "station": {
+    "station_id": "sugar_station",
+    "sample_index": 9,
+    "base_xy": [0.88, -2.518],
+    "base_yaw": -3.095
+  },
+  "objects": ["sugar0", "sugar1", "sugar2"],
+  "pick": {
+    "orientation_mode": "object-y-topdown",
+    "pregrasp_height": 0.15,
+    "grasp_clearance": -0.038,
+    "lift_height": 0.24,
+    "close_gripper_action": 1.0,
+    "held_gripper_action": 1.0
+  }
+}

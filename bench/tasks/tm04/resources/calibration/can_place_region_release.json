@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "config_kind": "tm02_can_place_region_release",
+  "description": "TM04 can release geometry for the dedicated marker on the counter to the right of the sink.",
+  "task": {
+    "task_id": "TM04",
+    "layout_id": 15,
+    "style_id": 34,
+    "seed": 0
+  },
+  "source": {
+    "command": "scripts/planning/probe_tm04_scene.py --settle-steps 2 --run-expert",
+    "result": "31/31 stages; can_in_place_region=true; success=true"
+  },
+  "anchor": {
+    "selector": "geom:bench_tm02_can_place_region",
+    "world_xyz": [2.15, -3.72, 0.925],
+    "size_xy": [0.22, 0.20]
+  },
+  "placement": {
+    "placement_reference": "bbox_bottom_center",
+    "placement_object_upright": true,
+    "placement_yaw_offsets_deg": [0.0, 90.0, 180.0, 270.0],
+    "place_height": 0.010,
+    "placement_approach_angles_deg": [0.0],
+    "placement_entry_standoff": 0.12,
+    "placement_entry_z_offset": 0.08,
+    "placement_exit_standoff": 0.24,
+    "placement_exit_z_offset": 0.24,
+    "post_release_clearance_distance": 0.12,
+    "post_release_clearance_z_offset": 0.16,
+    "post_release_clearance_direction_world": [-1.0, 0.0, 0.0],
+    "release_steps": 45,
+    "release_settle_steps": 30,
+    "place_settle_steps": 5
+  },
+  "station": {
+    "station_id": "can_place_station",
+    "base_xy": [1.54, -3.72],
+    "base_yaw": 0.0,
+    "torso_policy": "preserve_reset_height"
+  }
+}

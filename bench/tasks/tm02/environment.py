@@ -19,6 +19,7 @@ from robocasa.utils.object_utils import (
     get_pos_after_rel_offset,
 )
 
+from bench.tasks.wa02_button_asset import add_wa02_button_asset
 from bench.tasks.tm02.config import load_task_config, resolve_observer_config
 from bench.tasks.tm02.domain.contracts import (
     AXIS,
@@ -349,6 +350,10 @@ class TM02FillPotAndRetrieveCan(Kitchen):
             WATER_BUTTON: "0.24 0.54 0.90 1",
             COMPLETION_BUTTON: "0.88 0.31 0.24 1",
         }
+        glow_colors = {
+            WATER_BUTTON: "0.32 0.66 1.00 1",
+            COMPLETION_BUTTON: "1.00 0.36 0.24 1",
+        }
         for name in BUTTON_NAMES:
             if BUTTON_GEOM_NAMES[name] not in existing:
                 _add_pressable_button_asset(
@@ -356,6 +361,7 @@ class TM02FillPotAndRetrieveCan(Kitchen):
                     button_name=name,
                     pos=self.button_world_xyzs[name],
                     rgba=colors[name],
+                    glow_rgba=glow_colors[name],
                 )
         if CAN_PLACE_REGION_GEOM not in existing:
             center = np.asarray(self.can_place_region_world_xyz, dtype=float).copy()
@@ -1018,73 +1024,20 @@ def _add_pressable_button_asset(
     button_name: str,
     pos: tuple[float, float, float],
     rgba: str,
+    glow_rgba: str,
 ) -> None:
+    """Install the complete original layered housing around the live plunger."""
+
     name = _button_name(button_name)
     geom_name = BUTTON_GEOM_NAMES[name]
-    body = ET.SubElement(
+    add_wa02_button_asset(
         parent,
-        "body",
-        {
-            "name": f"{geom_name}_body",
-            "pos": " ".join(f"{item:.6f}" for item in pos),
-        },
-    )
-    ET.SubElement(
-        body,
-        "geom",
-        {
-            "name": f"{geom_name}_base",
-            "type": "box",
-            "pos": "0 0 0.020",
-            "size": "0.060 0.060 0.020",
-            "rgba": "0.10 0.11 0.12 1",
-            "contype": "0",
-            "conaffinity": "0",
-            "group": "1",
-        },
-    )
-    plunger = ET.SubElement(
-        body,
-        "body",
-        {"name": f"{geom_name}_plunger", "pos": "0 0 0", "gravcomp": "1"},
-    )
-    ET.SubElement(
-        plunger,
-        "inertial",
-        {
-            "pos": "0 0 0.074",
-            "mass": "0.020",
-            "diaginertia": "0.00002 0.00002 0.00002",
-        },
-    )
-    ET.SubElement(
-        plunger,
-        "joint",
-        {
-            "name": BUTTON_JOINT_NAMES[name],
-            "type": "slide",
-            "axis": "0 0 1",
-            "limited": "true",
-            "range": "-0.012 0",
-            "springref": "0",
-            "stiffness": "18",
-            "damping": "2",
-        },
-    )
-    ET.SubElement(
-        plunger,
-        "geom",
-        {
-            "name": geom_name,
-            "type": "cylinder",
-            "pos": "0 0 0.075",
-            "size": "0.029 0.008",
-            "rgba": rgba,
-            "contype": "1",
-            "conaffinity": "1",
-            "group": "1",
-            "friction": "0.8 0.005 0.0001",
-        },
+        geom_name=geom_name,
+        pos=pos,
+        color_rgba=rgba,
+        glow_rgba=glow_rgba,
+        joint_name=BUTTON_JOINT_NAMES[name],
+        gravity_compensation=True,
     )
 
 

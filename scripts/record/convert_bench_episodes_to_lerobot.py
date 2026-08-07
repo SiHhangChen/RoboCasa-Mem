@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import inspect
 import json
 import shutil
 import sys
@@ -646,11 +647,18 @@ def write_episodes(
     from lerobot.datasets.lerobot_dataset import LeRobotDataset
     from scripts.record.lerobot_seed_dataset import make_seed_record, write_seed_registry
 
+    if not hasattr(LeRobotDataset, "resume"):
+        raise RuntimeError(
+            "This converter requires the LeRobot v3 writer API (0.5.2 or newer). "
+            "LeRobot 0.3.3 in the robocasa environment is not compatible; run "
+            "the converter in the dedicated lerobot environment described in README.md."
+        )
+
     frame_count = 0
     for episode_dir in episode_dirs:
         episode_index = len(registry)
         if episode_index == 0:
-            dataset = LeRobotDataset.create(
+            create_kwargs = dict(
                 repo_id=repo_id,
                 root=root,
                 fps=int(fps),
@@ -659,9 +667,16 @@ def write_episodes(
                 use_videos=True,
                 image_writer_threads=4,
                 metadata_buffer_size=1,
-                data_files_size_in_mb=1,
-                video_files_size_in_mb=1,
             )
+            # These constructor options were added after LeRobot 0.5.2. The
+            # metadata values below provide the same chunking behavior when
+            # running against the README-pinned 0.5.2 commit.
+            create_parameters = inspect.signature(LeRobotDataset.create).parameters
+            if "data_files_size_in_mb" in create_parameters:
+                create_kwargs["data_files_size_in_mb"] = 1
+            if "video_files_size_in_mb" in create_parameters:
+                create_kwargs["video_files_size_in_mb"] = 1
+            dataset = LeRobotDataset.create(**create_kwargs)
         else:
             dataset = LeRobotDataset.resume(
                 repo_id=repo_id,
@@ -670,7 +685,10 @@ def write_episodes(
             )
         # Each episode is written through a fresh writer. Data and episode metadata
         # therefore advance to a new file; this threshold forces video to do the same.
-        dataset.meta.info.video_files_size_in_mb = 1e-9
+        if isinstance(dataset.meta.info, dict):
+            dataset.meta.info["video_files_size_in_mb"] = 1e-9
+        else:
+            dataset.meta.info.video_files_size_in_mb = 1e-9
         try:
             result = add_episode(dataset, episode_dir, cameras)
         finally:

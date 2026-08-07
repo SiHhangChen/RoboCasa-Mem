@@ -168,7 +168,13 @@ def sample_wipe_offsets(
 ) -> tuple[tuple[tuple[float, float], ...], dict[str, Any]]:
     """Create one deterministic bidirectional wipe sweep."""
 
-    allowed = {"seed_offset", "half_length", "pass_count", "angle_offset_deg"}
+    allowed = {
+        "seed_offset",
+        "half_length",
+        "pass_count",
+        "angle_range_deg",
+        "angle_offset_deg",
+    }
     unknown = set(settings) - allowed
     if unknown:
         raise ValueError(
@@ -177,11 +183,27 @@ def sample_wipe_offsets(
     seed = int(episode_seed) + int(settings.get("seed_offset", 2000))
     half_length = float(settings.get("half_length", 0.04))
     pass_count = int(settings.get("pass_count", 3))
+    angle_range = np.asarray(
+        settings.get("angle_range_deg", (0.0, 180.0)), dtype=float
+    ).reshape(-1)
     angle_offset_deg = float(settings.get("angle_offset_deg", 0.0))
     if half_length <= 0.0 or pass_count < 1:
         raise ValueError("WX-01 wipe half_length and pass_count must be positive")
+    if (
+        angle_range.size != 2
+        or not np.all(np.isfinite(angle_range))
+        or angle_range[0] < 0.0
+        or angle_range[1] > 180.0
+        or angle_range[0] >= angle_range[1]
+    ):
+        raise ValueError(
+            "WX-01 wipe angle_range_deg must be two increasing values within [0, 180]"
+        )
+    if not np.isfinite(angle_offset_deg):
+        raise ValueError("WX-01 wipe angle_offset_deg must be finite")
     rng = np.random.RandomState(seed)
-    angle_rad = float(rng.uniform(0.0, np.pi) + np.deg2rad(angle_offset_deg))
+    sampled_angle_deg = float(rng.uniform(angle_range[0], angle_range[1]))
+    angle_rad = float(np.deg2rad(sampled_angle_deg + angle_offset_deg))
     direction = np.asarray([np.cos(angle_rad), np.sin(angle_rad)], dtype=float)
     start_sign = -1.0 if rng.rand() < 0.5 else 1.0
     start = start_sign * half_length * direction
@@ -194,6 +216,8 @@ def sample_wipe_offsets(
         "pass_count": pass_count,
         "angle_rad": angle_rad,
         "angle_deg": float(np.rad2deg(angle_rad) % 180.0),
+        "angle_range_deg": angle_range.tolist(),
+        "angle_offset_deg": angle_offset_deg,
         "direction_xy": direction.tolist(),
         "start_sign": start_sign,
         "half_length": half_length,

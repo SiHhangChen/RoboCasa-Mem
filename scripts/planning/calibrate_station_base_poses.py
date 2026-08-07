@@ -28,22 +28,29 @@ TM03_DEFAULT_STATIONS = (
     "toaster_oven_turn_clear_candidate,toaster_oven_preapproach_candidate,"
     "toaster_oven_station_candidate"
 )
+TM04_DEFAULT_STATIONS = (
+    "water_button_station,cabinet_door_station,can_retrieval_station,"
+    "can_place_station,sugar_station,saucepan_station,completion_button_station"
+)
 DEFAULT_SUMMARY_FIXTURES = "counter,dining_table,sink,stool"
 TORSO_ACTION_DELTA_METERS = 0.05
 TASK_LAYOUT_STYLE_DEFAULTS = {
     "TM01": (39, 24),
     "TM02": (15, 34),
     "TM03": (39, 24),
+    "TM04": (15, 34),
     "WA-02": (15, 34),
     "WR-01": (24, 24),
 }
 TASK_ENV_DEFAULTS = {
     "TM01": "TM01BoilWaterAndInspectTwoDrawers",
     "TM03": "TM03BoilWaterInspectDrawersAndRunToasterOven",
+    "TM04": "TM04FillPotRetrieveCanAndAddTwoSugars",
     "WA-02": "WA02ServeHotColdWaterCups",
 }
 TASK_STATION_DEFAULTS = {
     "TM03": TM03_DEFAULT_STATIONS,
+    "TM04": TM04_DEFAULT_STATIONS,
     "WA-02": DEFAULT_STATIONS,
 }
 TASK_OUTPUT_DEFAULTS = {
@@ -53,6 +60,7 @@ TASK_OUTPUT_DEFAULTS = {
         / "tm03_calibration"
         / "toaster_oven_navigation_candidates.json"
     ),
+    "TM04": ROOT / "outputs" / "tm04_calibration" / "station_candidates.json",
     "WA-02": (
         ROOT
         / "bench"
@@ -229,6 +237,7 @@ def normalize_task_key(value: Any) -> str:
     aliases = {
         "TM-01": "TM01",
         "TM-03": "TM03",
+        "TM-04": "TM04",
         "WA02": "WA-02",
     }
     return aliases.get(raw, raw)
@@ -878,6 +887,68 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                     tm03_scene.toaster_oven_time_collision_geom
                 ),
                 "observer_config": asdict(resolve_observer_config(tm03_config)),
+            }
+        )
+    if (
+        str(args.task).strip().upper() == "TM04"
+        or str(args.env_name) == "TM04FillPotRetrieveCanAndAddTwoSugars"
+    ):
+        bootstrap_local_robocasa_sources()
+        from bench.tasks.tm04.config import (
+            load_task_config,
+            resolve_observer_config,
+        )
+        from bench.tasks.tm04.domain.episode import (
+            resolve_episode_plan,
+            resolve_scene_config,
+        )
+        from bench.tasks.tm04.environment import (
+            TM04FillPotRetrieveCanAndAddTwoSugars,
+        )
+
+        del TM04FillPotRetrieveCanAndAddTwoSugars
+        tm04_config = load_task_config()
+        tm04_scene = resolve_scene_config(
+            env_split=str(args.split),
+            **dict(tm04_config.scene),
+        )
+        tm04_plan = resolve_episode_plan(
+            seed=int(args.seed),
+            **dict(tm04_config.episode),
+        )
+        if int(args.layout_id) != int(tm04_scene.layout_id):
+            raise ValueError(
+                f"TM04 calibration requires layout {tm04_scene.layout_id}, "
+                f"got {args.layout_id}"
+            )
+        if int(args.style_id) != int(tm04_scene.style_id):
+            raise ValueError(
+                f"TM04 calibration requires style {tm04_scene.style_id}, "
+                f"got {args.style_id}"
+            )
+        env_kwargs.update(
+            {
+                "water_button_world_xyz": tm04_scene.water_button_world_xyz,
+                "completion_button_world_xyz": (
+                    tm04_scene.completion_button_world_xyz
+                ),
+                "cabinet_world_xyz": tm04_scene.cabinet_world_xyz,
+                "cabinet_yaw_deg": tm04_scene.cabinet_yaw_deg,
+                "can_place_region_world_xyz": (
+                    tm04_scene.can_place_region_world_xyz
+                ),
+                "can_place_region_size_xy": tm04_scene.can_place_region_size_xy,
+                "water_pot_name": tm04_scene.water_pot_name,
+                "can_name": tm04_scene.can_name,
+                "sugar_plate_name": tm04_scene.sugar_plate_name,
+                "hot_chocolate_name": tm04_scene.hot_chocolate_name,
+                "sugar_names": tm04_scene.sugar_names,
+                "sugar_plate_world_xyz": tm04_scene.sugar_plate_world_xyz,
+                "hot_chocolate_world_xyz": tm04_scene.hot_chocolate_world_xyz,
+                "target_sugar_count": tm04_plan.target_sugar_count,
+                "total_sugar_count": tm04_plan.total_sugar_count,
+                "selected_sugar_names": tm04_plan.selected_sugar_names,
+                "observer_config": asdict(resolve_observer_config(tm04_config)),
             }
         )
     wr02_setup = None

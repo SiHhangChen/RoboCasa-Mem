@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 from collections.abc import Sequence
+from math import isfinite
 
 
 WA02_BUTTON_FIXED_PARTS = (
@@ -41,6 +42,7 @@ def add_wa02_button_asset(
     glow_rgba: str,
     joint_name: str | None = None,
     gravity_compensation: bool = False,
+    scale: float = 1.0,
 ) -> None:
     """Add WA02's complete decorative and physical button assembly."""
 
@@ -48,6 +50,9 @@ def add_wa02_button_asset(
     position = tuple(float(item) for item in pos)
     if len(position) != 3:
         raise ValueError("WA02 button position must contain exactly three values")
+    resolved_scale = float(scale)
+    if not isfinite(resolved_scale) or resolved_scale <= 0.0:
+        raise ValueError("WA02 button scale must be positive and finite")
     resolved_joint_name = str(joint_name or f"{name}_press_joint")
     body = ET.SubElement(
         parent,
@@ -138,8 +143,8 @@ def add_wa02_button_asset(
             {
                 "name": f"{name}_{suffix}",
                 "type": geom_type,
-                "pos": local_pos,
-                "size": size,
+                "pos": _scaled_vector(local_pos, resolved_scale),
+                "size": _scaled_vector(size, resolved_scale),
                 "rgba": rgba,
                 **visual_only,
             },
@@ -160,9 +165,11 @@ def add_wa02_button_asset(
         plunger,
         "inertial",
         {
-            "pos": "0 0 0.074",
-            "mass": "0.020",
-            "diaginertia": "0.00002 0.00002 0.00002",
+            "pos": _scaled_vector("0 0 0.074", resolved_scale),
+            "mass": f"{0.020 * resolved_scale**3:.9g}",
+            "diaginertia": " ".join(
+                [f"{0.00002 * resolved_scale**5:.9g}"] * 3
+            ),
         },
     )
     ET.SubElement(
@@ -173,7 +180,7 @@ def add_wa02_button_asset(
             "type": "slide",
             "axis": "0 0 1",
             "limited": "true",
-            "range": "-0.012 0",
+            "range": _scaled_vector("-0.012 0", resolved_scale),
             "springref": "0",
             "stiffness": "18",
             "damping": "2",
@@ -185,8 +192,8 @@ def add_wa02_button_asset(
         {
             "name": f"{name}_plunger_stem",
             "type": "cylinder",
-            "pos": "0 0 0.068",
-            "size": "0.020 0.007",
+            "pos": _scaled_vector("0 0 0.068", resolved_scale),
+            "size": _scaled_vector("0.020 0.007", resolved_scale),
             "rgba": color_rgba,
             **visual_only,
         },
@@ -197,8 +204,8 @@ def add_wa02_button_asset(
         {
             "name": name,
             "type": "cylinder",
-            "pos": "0 0 0.075",
-            "size": "0.029 0.008",
+            "pos": _scaled_vector("0 0 0.075", resolved_scale),
+            "size": _scaled_vector("0.029 0.008", resolved_scale),
             "rgba": color_rgba,
             "contype": "1",
             "conaffinity": "1",
@@ -206,6 +213,12 @@ def add_wa02_button_asset(
             "friction": "0.8 0.005 0.0001",
         },
     )
+
+
+def _scaled_vector(value: str, scale: float) -> str:
+    """Scale one MJCF numeric vector while keeping stable compact text."""
+
+    return " ".join(f"{float(item) * float(scale):.9g}" for item in value.split())
 
 
 __all__ = [

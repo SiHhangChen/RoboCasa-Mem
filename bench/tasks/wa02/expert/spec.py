@@ -36,6 +36,7 @@ def build_expert_plan(inputs: ExpertPlanInputs) -> ExpertPlan:
                      metadata={
                          "xy_tolerance": float(actions.cup_pick_navigation_xy_tolerance),
                          "yaw_tolerance": float(actions.cup_pick_navigation_yaw_tolerance),
+                         "terminal_tolerance_only": True,
                      }),
             operate("pick_upright_cup", cup, name=f"pick_{label}_{cup}", metadata=actions.cup_pick_metadata),
             ret(cup, f"return_to_regular_after_pick_{label}_{cup}", 1.0),

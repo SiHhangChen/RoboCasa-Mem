@@ -185,14 +185,18 @@ class BaseDriverAdapter:
         )
         if manual_executor is not None:
             self.refresh_obs()
-            original_xy_tolerance = manual_executor.xy_tolerance
-            original_yaw_tolerance = manual_executor.yaw_tolerance
             xy_tolerance_override = move_overrides.get("xy_tolerance")
             yaw_tolerance_override = move_overrides.get("yaw_tolerance")
-            if xy_tolerance_override is not None:
-                manual_executor.xy_tolerance = float(xy_tolerance_override)
-            if yaw_tolerance_override is not None:
-                manual_executor.yaw_tolerance = float(yaw_tolerance_override)
+            terminal_tolerance_only = bool(
+                move_overrides.get("terminal_tolerance_only", False)
+            )
+            original_xy_tolerance = manual_executor.xy_tolerance
+            original_yaw_tolerance = manual_executor.yaw_tolerance
+            if not terminal_tolerance_only:
+                if xy_tolerance_override is not None:
+                    manual_executor.xy_tolerance = float(xy_tolerance_override)
+                if yaw_tolerance_override is not None:
+                    manual_executor.yaw_tolerance = float(yaw_tolerance_override)
             try:
                 self._obs, nav = manual_executor.move_to(
                     self._obs,
@@ -202,10 +206,23 @@ class BaseDriverAdapter:
                     force_terminal_settle=bool(
                         move_overrides.get("force_terminal_settle", False)
                     ),
+                    terminal_xy_tolerance=(
+                        float(xy_tolerance_override)
+                        if terminal_tolerance_only
+                        and xy_tolerance_override is not None
+                        else None
+                    ),
+                    terminal_yaw_tolerance=(
+                        float(yaw_tolerance_override)
+                        if terminal_tolerance_only
+                        and yaw_tolerance_override is not None
+                        else None
+                    ),
                 )
             finally:
                 manual_executor.xy_tolerance = original_xy_tolerance
                 manual_executor.yaw_tolerance = original_yaw_tolerance
+            nav["terminal_tolerance_only"] = terminal_tolerance_only
             if xy_tolerance_override is not None:
                 nav["xy_tolerance_override"] = float(xy_tolerance_override)
             if yaw_tolerance_override is not None:

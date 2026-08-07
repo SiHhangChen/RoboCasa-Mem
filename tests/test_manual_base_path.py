@@ -312,6 +312,40 @@ def test_settle_rejects_full_pose_when_post_translation_breaks_yaw(monkeypatch):
     assert result["pass"] is False
 
 
+def test_terminal_settle_scopes_strict_tolerances_and_restores_path_defaults():
+    executor = _executor()
+    executor.xy_tolerance = 0.12
+    executor.yaw_tolerance = 0.08
+    observed: list[tuple[float, float]] = []
+
+    def settle(obs, **kwargs):
+        del kwargs
+        observed.append((executor.xy_tolerance, executor.yaw_tolerance))
+        return obs, {"primitive": "settle_current_sample", "pass": True, "steps": 0}
+
+    executor._settle_at_sample = settle
+    obs = {
+        "robot0_base_pos": np.array([0.0, 0.0, 0.7], dtype=float),
+        "yaw": 0.0,
+    }
+    target = ManualBasePathSample(index=1, xy=np.array([0.0, 0.0]), yaw=0.0)
+
+    _, result = executor._settle_at_sample_with_tolerances(
+        obs,
+        target=target,
+        arm_qpos=np.zeros(7, dtype=float),
+        gripper_action=-1.0,
+        xy_tolerance=0.01,
+        yaw_tolerance=0.02,
+    )
+
+    assert observed == [(0.01, 0.02)]
+    assert executor.xy_tolerance == 0.12
+    assert executor.yaw_tolerance == 0.08
+    assert result["terminal_xy_tolerance"] == 0.01
+    assert result["terminal_yaw_tolerance"] == 0.02
+
+
 def test_spatial_graph_routes_directly_between_station_vertices():
     executor = _executor()
     executor.route_mode = "spatial_graph"

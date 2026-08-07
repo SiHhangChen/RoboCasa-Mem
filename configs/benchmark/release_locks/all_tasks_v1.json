@@ -500,7 +500,7 @@
       "config_hash": "sha256:6fe2ed497751aa40f97450083d51715384d6f4401b8ec89a0e44529af6f0780a",
       "control_frequency_hz": 20,
       "env_split": "pretrain",
-      "episode_identity": "sha256:8b15755a33a917f4c339a383b794ec90e424381e9149f86fbac068e250780bbb",
+      "episode_identity": "sha256:0f90145a2c461f2e17d621010f780231f7a0f0d6b45430879133370987334287",
       "facts": {
         "distractor_sugar_names": [
           "sugar1"
@@ -511,12 +511,12 @@
           "sugar0",
           "sugar1"
         ],
-        "sugar_plate_layout_seed": 0,
+        "sugar_plate_layout_seed": 1860102653,
         "sugar_release_region_orders": [
           [
-            "center",
-            "left",
-            "right"
+            "B",
+            "A",
+            "C"
           ]
         ],
         "target_sugar_count": 1,
@@ -805,10 +805,10 @@
     {
       "action_schema": "membench.pandaomron_hybrid13.v2",
       "allow_partial_calibration": false,
-      "config_hash": "sha256:53cf8ce5a154e5a6fffb248d57e4d68e5ec093dab286ab5f22fe4d1010d42c15",
+      "config_hash": "sha256:56592427c87c2b82f1b7343df741abdf0913dedd3e06945f9a66932d10246198",
       "control_frequency_hz": 20,
       "env_split": "pretrain",
-      "episode_identity": "sha256:13a847b0827ff41049f9b178a989a9488b55e9a364f20ed2f09f6e27448f721f",
+      "episode_identity": "sha256:8884925c0cd6abe929fbd5c3575d735539ad39ed910c5b0614b00274d73d544d",
       "facts": {
         "cold_cup_id": "cup_B",
         "fill_temperature_order": [
@@ -826,7 +826,7 @@
         }
       },
       "initialization": {
-        "config_hash": "sha256:53cf8ce5a154e5a6fffb248d57e4d68e5ec093dab286ab5f22fe4d1010d42c15",
+        "config_hash": "sha256:56592427c87c2b82f1b7343df741abdf0913dedd3e06945f9a66932d10246198",
         "controller": {
           "max_joint_step": 0.025
         },
@@ -868,7 +868,7 @@
         "style_id": 34
       },
       "release_facts": {
-        "config_hash": "sha256:53cf8ce5a154e5a6fffb248d57e4d68e5ec093dab286ab5f22fe4d1010d42c15",
+        "config_hash": "sha256:56592427c87c2b82f1b7343df741abdf0913dedd3e06945f9a66932d10246198",
         "controller": {
           "max_joint_step": 0.025
         },
@@ -897,6 +897,204 @@
       "split": "evaluation",
       "task_config_file": "bench/tasks/wa02/resources/task.yaml",
       "task_id": "WA-02",
+      "task_version": "1.0.0",
+      "variant": "memory"
+    },
+    {
+      "action_schema": "membench.pandaomron_hybrid13.v2",
+      "allow_partial_calibration": false,
+      "config_hash": "sha256:ddfaad0663db4fac988d0c95782ae4b8c3a101b70ce4a340fea234a6078e64a3",
+      "control_frequency_hz": 20,
+      "env_split": "pretrain",
+      "episode_identity": "sha256:d21ef71076c6438e383cff66c061b8fe5cea0d2f92e64daa609b960e39fddd49",
+      "facts": {
+        "delivery_order": [
+          "coffee_B",
+          "coffee_C",
+          "coffee_A"
+        ],
+        "final_slot_assignment": {
+          "coffee_A": "right",
+          "coffee_B": "left",
+          "coffee_C": "center"
+        },
+        "max_horizon": 6500,
+        "seed": 0,
+        "target_sugared_coffee_id": "coffee_B"
+      },
+      "initialization": {
+        "config_hash": "sha256:ddfaad0663db4fac988d0c95782ae4b8c3a101b70ce4a340fea234a6078e64a3",
+        "controller": {
+          "max_joint_step": 0.025
+        },
+        "resource_hash": "sha256:d91b73c4c84643ea71d193249da53514d799e435a6e055a12684130440e80cbd",
+        "task_id": "WA-03"
+      },
+      "max_horizon": 6500,
+      "observation": {
+        "camera_aliases": [
+          "agentview_left",
+          "agentview_right",
+          "eye_in_hand"
+        ],
+        "camera_names": [
+          "robot0_agentview_left",
+          "robot0_agentview_right",
+          "robot0_eye_in_hand"
+        ],
+        "depth": true,
+        "image_size": [
+          224,
+          224
+        ],
+        "profile_hash": "sha256:cc8904e3b3bae61c0138914fc5a200a548f34f582d5650bb5f534b07b720470a",
+        "profile_id": "rgbd_v3"
+      },
+      "observation_profile": "rgbd_v3",
+      "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
+      "options": {},
+      "prompt": {
+        "initial": "Three identical coffees are already prepared. Sugar the temporarily marked cup only, place all three cups on the dining counter, then identify it.",
+        "policy": "Start at the coffee machine with three identical prepared coffees. Add one sugar cube to the temporarily marked coffee, carry all three coffees to the dining counter, and identify the sugared coffee."
+      },
+      "public": {
+        "env_name": "WA03SortSugaredAndUnsugaredCoffee",
+        "layout_id": 29,
+        "prompt": "Start at the coffee machine with three identical prepared coffees. Add one sugar cube to the temporarily marked coffee, carry all three coffees to the dining counter, and identify the sugared coffee.",
+        "scene_seed": 0,
+        "style_id": 29
+      },
+      "release_facts": {
+        "config_hash": "sha256:ddfaad0663db4fac988d0c95782ae4b8c3a101b70ce4a340fea234a6078e64a3",
+        "controller": {
+          "max_joint_step": 0.025
+        },
+        "resource_hash": "sha256:d91b73c4c84643ea71d193249da53514d799e435a6e055a12684130440e80cbd",
+        "task_id": "WA-03"
+      },
+      "resource_hash": "sha256:d91b73c4c84643ea71d193249da53514d799e435a6e055a12684130440e80cbd",
+      "resources": {
+        "cup_place_poses": "bench/tasks/wa03/resources/poses/cup_place.json",
+        "manual_base_path": "bench/tasks/wa03/resources/navigation/manual_base_path_layout29_style29_seed0.json",
+        "planner_script": "bench/execution/planning/mplib_planner.py",
+        "station_poses": "bench/tasks/wa03/resources/station/stations.json",
+        "sugar_cube_poses": "bench/tasks/wa03/resources/poses/sugar_cube.json"
+      },
+      "scene": {
+        "env_name": "WA03SortSugaredAndUnsugaredCoffee",
+        "env_split": "pretrain",
+        "layout_id": 29,
+        "scene_seed": 0,
+        "style_id": 29
+      },
+      "schema_version": "membench.release_lock/v2",
+      "seed": 0,
+      "split": "evaluation",
+      "task_config_file": "bench/tasks/wa03/resources/task.yaml",
+      "task_id": "WA-03",
+      "task_version": "1.0.0",
+      "variant": "memory"
+    },
+    {
+      "action_schema": "membench.pandaomron_hybrid13.v2",
+      "allow_partial_calibration": false,
+      "config_hash": "sha256:c3e88194cb94ef06ea32ca58844d9cf1eb9e827df964c2273b0ce2c7894132f5",
+      "control_frequency_hz": 20,
+      "env_split": "pretrain",
+      "episode_identity": "sha256:6f65659717876422e261f61adeb024414942f618c8ac6d0a587c442840a50f3d",
+      "facts": {
+        "fill_cup_order": [
+          "cup_A",
+          "cup_B",
+          "cup_C"
+        ],
+        "max_horizon": 8500,
+        "requested_cup_id": "cup_A",
+        "requested_temperature": "hot",
+        "seed": 0,
+        "service_slot_by_cup": {
+          "cup_A": "slot_1",
+          "cup_B": "slot_2",
+          "cup_C": "slot_3"
+        },
+        "temperature_by_cup": {
+          "cup_A": "hot",
+          "cup_B": "cold",
+          "cup_C": "cold"
+        }
+      },
+      "initialization": {
+        "config_hash": "sha256:c3e88194cb94ef06ea32ca58844d9cf1eb9e827df964c2273b0ce2c7894132f5",
+        "controller": {
+          "max_joint_step": 0.025
+        },
+        "resource_hash": "sha256:d78a1dfcb9a59a4ee2b6f8d637e50f7ea926541776eca8799f0d7037c59ee569",
+        "task_id": "WA-04"
+      },
+      "max_horizon": 8500,
+      "observation": {
+        "camera_aliases": [
+          "agentview_left",
+          "agentview_right",
+          "eye_in_hand"
+        ],
+        "camera_names": [
+          "robot0_agentview_left",
+          "robot0_agentview_right",
+          "robot0_eye_in_hand"
+        ],
+        "depth": true,
+        "image_size": [
+          224,
+          224
+        ],
+        "profile_hash": "sha256:cc8904e3b3bae61c0138914fc5a200a548f34f582d5650bb5f534b07b720470a",
+        "profile_id": "rgbd_v3"
+      },
+      "observation_profile": "rgbd_v3",
+      "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
+      "options": {},
+      "prompt": {
+        "initial": "Remember the temperature bound to each of the three identical cups. Exactly one cup contains hot water, and the final view does not reveal which one.",
+        "policy": "Fill three identical cups so exactly one contains hot water and the other two contain cold water, stage all three cups, then take the hot-water cup."
+      },
+      "public": {
+        "env_name": "WA04ServeUniqueTemperatureCupAmongThree",
+        "layout_id": 15,
+        "prompt": "Fill three identical cups so exactly one contains hot water and the other two contain cold water, stage all three cups, then take the hot-water cup.",
+        "scene_seed": 0,
+        "style_id": 34
+      },
+      "release_facts": {
+        "config_hash": "sha256:c3e88194cb94ef06ea32ca58844d9cf1eb9e827df964c2273b0ce2c7894132f5",
+        "controller": {
+          "max_joint_step": 0.025
+        },
+        "resource_hash": "sha256:d78a1dfcb9a59a4ee2b6f8d637e50f7ea926541776eca8799f0d7037c59ee569",
+        "task_id": "WA-04"
+      },
+      "resource_hash": "sha256:d78a1dfcb9a59a4ee2b6f8d637e50f7ea926541776eca8799f0d7037c59ee569",
+      "resources": {
+        "cup_grasp_candidates": "bench/tasks/wa04/resources/poses/water_cup_grasp_candidates.json",
+        "faucet_switch_pose": "bench/tasks/wa04/resources/poses/faucet_switch_pose_layout15_style34_seed0.json",
+        "manual_base_path": "bench/tasks/wa04/resources/navigation/manual_base_path_layout15_style34_seed0.json",
+        "planner_script": "bench/execution/planning/mplib_planner.py",
+        "sink_fill_pose": "bench/tasks/wa04/resources/poses/sink_cup_place_pose_layout15_style34_seed0.json",
+        "station_poses": "bench/tasks/wa04/resources/station/stations.json",
+        "water_button_positions": "bench/tasks/wa04/resources/poses/water_button_positions_layout15_style34_seed0.json"
+      },
+      "scene": {
+        "env_name": "WA04ServeUniqueTemperatureCupAmongThree",
+        "env_split": "pretrain",
+        "layout_id": 15,
+        "scene_seed": 0,
+        "style_id": 34
+      },
+      "schema_version": "membench.release_lock/v2",
+      "seed": 0,
+      "split": "evaluation",
+      "task_config_file": "bench/tasks/wa04/resources/task.yaml",
+      "task_id": "WA-04",
       "task_version": "1.0.0",
       "variant": "memory"
     },
@@ -1307,10 +1505,10 @@
     {
       "action_schema": "membench.pandaomron_hybrid13.v2",
       "allow_partial_calibration": false,
-      "config_hash": "sha256:f8bd93907bf5879a345a882d0b10c16838b7d5bbcb5a314d02d6c6644e857dab",
+      "config_hash": "sha256:d6841882e3fdc4ee09b0c1191dcbda6dbff8c34b7abc22c8ce06a1e880bf9714",
       "control_frequency_hz": 20,
       "env_split": "pretrain",
-      "episode_identity": "sha256:9b7e2b25b9a69f4f8ec391968e0d71826f0895794b72806433261fee2e18880a",
+      "episode_identity": "sha256:2ea325bd798d421053a9ff070a86912a65e40b6e14183b5a86c8fc5c94e2731e",
       "facts": {
         "initial_object_poses": {
           "blocking_object": {
@@ -1387,11 +1585,16 @@
           -0.42849930568755945
         ],
         "wipe_metadata": {
-          "angle_deg": 102.69311136812388,
-          "angle_rad": 1.7923329124909804,
+          "angle_deg": 94.23103712270796,
+          "angle_offset_deg": 0.0,
+          "angle_rad": 1.6446418553602578,
+          "angle_range_deg": [
+            60.0,
+            120.0
+          ],
           "direction_xy": [
-            -0.21972891492180768,
-            0.9755609688519139
+            -0.07377843158970475,
+            0.9972746577709489
           ],
           "half_length": 0.07,
           "offset_count": 4,
@@ -1402,25 +1605,25 @@
         },
         "wipe_offsets_xy": [
           [
-            -0.015381024044526539,
-            0.06828926781963399
+            -0.005164490211279333,
+            0.06980922604396643
           ],
           [
-            0.015381024044526539,
-            -0.06828926781963399
+            0.005164490211279333,
+            -0.06980922604396643
           ],
           [
-            -0.015381024044526539,
-            0.06828926781963399
+            -0.005164490211279333,
+            0.06980922604396643
           ],
           [
-            0.015381024044526539,
-            -0.06828926781963399
+            0.005164490211279333,
+            -0.06980922604396643
           ]
         ]
       },
       "initialization": {
-        "config_hash": "sha256:f8bd93907bf5879a345a882d0b10c16838b7d5bbcb5a314d02d6c6644e857dab",
+        "config_hash": "sha256:d6841882e3fdc4ee09b0c1191dcbda6dbff8c34b7abc22c8ce06a1e880bf9714",
         "controller": {
           "max_joint_step": 0.02
         },
@@ -1462,7 +1665,7 @@
         "style_id": 38
       },
       "release_facts": {
-        "config_hash": "sha256:f8bd93907bf5879a345a882d0b10c16838b7d5bbcb5a314d02d6c6644e857dab",
+        "config_hash": "sha256:d6841882e3fdc4ee09b0c1191dcbda6dbff8c34b7abc22c8ce06a1e880bf9714",
         "controller": {
           "max_joint_step": 0.02
         },
@@ -1492,7 +1695,7 @@
       "variant": "memory"
     }
   ],
-  "lock_hash": "sha256:9f31484c966af39d0789da227690156d2225132deb683b51113916c2868e429c",
+  "lock_hash": "sha256:b11b8f14e54a7bf5615231beebcbdb175dc23bbd26241b45b571203cfa89387f",
   "release_id": "all_tasks_v1",
   "schema_version": "membench.release_lock/v2"
 }

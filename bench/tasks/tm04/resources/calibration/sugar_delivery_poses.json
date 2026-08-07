@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "config_kind": "tm04_sugar_delivery_candidates",
+  "description": "Validated live-saucepan release candidates for both TM04 sugar deliveries.",
+  "task": {
+    "task_id": "TM04",
+    "layout_id": 15,
+    "style_id": 34,
+    "seed": 0
+  },
+  "source": {
+    "command": "scripts/planning/probe_tm04_scene.py --settle-steps 2 --run-expert",
+    "result": "31/31 stages; success=true"
+  },
+  "anchor": {
+    "selector": "live_object:hot_chocolate_saucepan",
+    "reset_world_xyz": [0.3740112117, -3.3090519567, 1.0148054546]
+  },
+  "station": {
+    "station_id": "saucepan_station",
+    "sample_index": 11,
+    "base_xy": [0.88, -3.309],
+    "base_yaw": 3.141592653589793
+  },
+  "placement": {
+    "orientation_mode": "base_cardinal_topdown",
+    "placement_yaw_offsets_deg": [0.0, 90.0, 180.0, 270.0],
+    "release_offsets_xy": [
+      [-0.02, 0.0],
+      [0.02, 0.0],
+      [0.0, -0.02],
+      [0.0, 0.02],
+      [0.0, 0.0]
+    ],
+    "release_target_max_radius_m": 0.045,
+    "place_height": 0.07,
+    "retreat_height": 0.24,
+    "retreat_x": -0.10,
+    "retreat_y": -0.18
+  },
+  "stability": {
+    "translation_guard_m": 0.01,
+    "tilt_guard_deg": 5.0,
+    "unstable_dwell_steps": 20,
+    "max_consecutive_unstable_steps_observed": 5
+  }
+}

@@ -47,7 +47,7 @@ def _builtin_task_plugin(
     )
 
 
-# This is the single source of truth for the 14 task packages shipped by bench.
+# This is the single source of truth for the task packages shipped by bench.
 BUILTIN_TASK_PLUGINS: tuple[TaskPlugin, ...] = (
     _builtin_task_plugin(
         "TM01",
@@ -63,6 +63,11 @@ BUILTIN_TASK_PLUGINS: tuple[TaskPlugin, ...] = (
         "TM03",
         aliases=("TM-03", "TM_03"),
         env_name="TM03BoilWaterInspectDrawersAndRunToasterOven",
+    ),
+    _builtin_task_plugin(
+        "TM04",
+        aliases=("TM-04", "TM_04"),
+        env_name="TM04FillPotRetrieveCanAndAddTwoSugars",
     ),
     _builtin_task_plugin(
         "TS01",
@@ -93,6 +98,16 @@ BUILTIN_TASK_PLUGINS: tuple[TaskPlugin, ...] = (
         "WA-02",
         aliases=("WA02", "WA_02"),
         env_name="WA02ServeHotColdWaterCups",
+    ),
+    _builtin_task_plugin(
+        "WA-03",
+        aliases=("WA03", "WA_03"),
+        env_name="WA03SortSugaredAndUnsugaredCoffee",
+    ),
+    _builtin_task_plugin(
+        "WA-04",
+        aliases=("WA04", "WA_04"),
+        env_name="WA04ServeUniqueTemperatureCupAmongThree",
     ),
     _builtin_task_plugin(
         "WR-01",

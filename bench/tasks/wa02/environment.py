@@ -15,6 +15,7 @@ from robocasa.environments.kitchen.kitchen import FixtureType, Kitchen
 from robocasa.models import assets_root
 from robocasa.utils import object_utils as OU
 
+from bench.tasks.wa02_button_asset import add_wa02_button_asset
 from bench.tasks.wa02.domain.contracts import CUP_IDS, EpisodePlan, SERVICE_SLOTS
 from bench.tasks.wa02.domain.geometry import (
     CUP_PLACEMENT_SALTS,
@@ -42,10 +43,11 @@ WATER_BUTTON_GEOM_NAMES = {
     "hot": "bench_wa02_hot_water_button",
     "cold": "bench_wa02_cold_water_button",
 }
+WATER_BUTTON_ASSET_SCALE = 0.5
 WATER_BUTTON_DEFAULT_POSITIONS = {
-    # The two compact buttons sit side-by-side on the 3.5 cm-wide counter
-    # strip immediately in front of the sink.  Hot is on the robot's left
-    # (+world Y) and cold is on its right (-world Y).
+    # The calibrated plunger centers sit 8 cm apart on the counter strip. At
+    # half scale, the complete legacy housings retain a 2 cm visual gap; hot is
+    # on the robot's left (+world Y), cold on its right (-world Y).
     "hot": (1.856, -2.994, 0.93),
     "cold": (1.856, -3.074, 0.93),
 }
@@ -267,7 +269,7 @@ class WA02ServeHotColdWaterCups(Kitchen):
         return result
 
     def edit_model_xml(self, xml_str: str) -> str:
-        """Install the bench-owned hot/cold buttons without task-label visuals."""
+        """Install complete bench-owned hot/cold button assemblies."""
 
         xml_str = super().edit_model_xml(xml_str)
         root = ET.fromstring(xml_str)
@@ -283,6 +285,11 @@ class WA02ServeHotColdWaterCups(Kitchen):
                     geom_name=geom_name,
                     pos=positions[temperature],
                     rgba="0.88 0.31 0.24 1" if temperature == "hot" else "0.24 0.54 0.90 1",
+                    glow_rgba=(
+                        "1.00 0.36 0.24 1"
+                        if temperature == "hot"
+                        else "0.32 0.66 1.00 1"
+                    ),
                 )
         return ET.tostring(root, encoding="utf8").decode("utf8")
 
@@ -844,43 +851,23 @@ def _add_water_button_asset(
     geom_name: str,
     pos: tuple[float, float, float],
     rgba: str,
+    glow_rgba: str,
 ) -> None:
-    """Create a compact pressable visual/physical button primitive."""
+    """Install the complete legacy WA02 housing around the live plunger."""
 
-    body = ET.SubElement(
+    add_wa02_button_asset(
         parent,
-        "body",
-        {"name": f"{geom_name}_body", "pos": " ".join(f"{item:.6f}" for item in pos)},
-    )
-    visual = {"contype": "0", "conaffinity": "0", "group": "1"}
-    ET.SubElement(
-        body,
-        "geom",
-        {"name": f"{geom_name}_base", "type": "box", "pos": "0 0 0.020", "size": "0.016 0.025 0.020", "rgba": "0.10 0.11 0.12 1", **visual},
-    )
-    plunger = ET.SubElement(body, "body", {"name": f"{geom_name}_plunger", "pos": "0 0 0"})
-    # MuJoCo requires every body carrying a joint to have positive mass and
-    # inertia. RoboCasa's visual defaults may set geom density to zero, so do
-    # not rely on compiler inference for this task-owned moving plunger.
-    ET.SubElement(
-        plunger,
-        "inertial",
-        {
-            "pos": "0 0 0.074",
-            "mass": "0.020",
-            "diaginertia": "0.00002 0.00002 0.00002",
-        },
-    )
-    ET.SubElement(plunger, "joint", {"name": f"{geom_name}_press_joint", "type": "slide", "axis": "0 0 1", "limited": "true", "range": "-0.012 0", "springref": "0", "stiffness": "18", "damping": "2"})
-    ET.SubElement(
-        plunger,
-        "geom",
-        {"name": geom_name, "type": "cylinder", "pos": "0 0 0.075", "size": "0.012 0.008", "rgba": rgba, "contype": "1", "conaffinity": "1", "group": "1", "friction": "0.8 0.005 0.0001"},
+        geom_name=geom_name,
+        pos=pos,
+        color_rgba=rgba,
+        glow_rgba=glow_rgba,
+        scale=WATER_BUTTON_ASSET_SCALE,
     )
 
 
 __all__ = [
     "IDENTICAL_WATER_CUP_XML",
+    "WATER_BUTTON_ASSET_SCALE",
     "WATER_BUTTON_GEOM_NAMES",
     "WA02ServeHotColdWaterCups",
 ]

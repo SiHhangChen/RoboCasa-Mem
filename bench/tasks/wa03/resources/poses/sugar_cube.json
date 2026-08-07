@@ -1,0 +1,20 @@
+{
+  "config_kind": "poses",
+  "description": "WA-03 sugar-cube operation parameters.",
+  "object": "sugar_cube",
+  "operations": {
+    "deliver_to_coffee": {
+      "place_height": 0.08,
+      "retreat_height": 0.08,
+      "retreat_x": 0.0,
+      "retreat_y": 0.0
+    },
+    "pick": {
+      "strategy": "generic_object_pick",
+      "pregrasp_height": 0.15,
+      "grasp_clearance": -0.020
+    }
+  },
+  "schema_version": 1,
+  "task": "WA-03"
+}

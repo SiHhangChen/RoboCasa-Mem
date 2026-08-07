@@ -29,9 +29,10 @@ venv/
 outputs/
 
 # External simulator and policy source trees are local dependencies, not bench code.
+# Note: anchored to repo root so `bench/policy/` (first-party code) stays tracked.
 robocasa/
 robosuite/
-policy/
+/policy/
 
 # Local tooling state and simulator logs.
 .playwright-mcp/
@@ -39,3 +40,6 @@ MUJOCO_LOG.TXT
 
 # Formal recorded datasets are generated artifacts and are kept out of git.
 data/datasets/
+
+# Converted training datasets (97G) are generated artifacts, kept out of git.
+lerobot_data/

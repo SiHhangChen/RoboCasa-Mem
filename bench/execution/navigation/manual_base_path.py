@@ -183,7 +183,26 @@ class ManualBasePathExecutor:
         purpose: str | None = None,
         gripper_action: float | None = None,
         force_terminal_settle: bool = False,
+        terminal_xy_tolerance: float | None = None,
+        terminal_yaw_tolerance: float | None = None,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
+        resolved_terminal_xy_tolerance = (
+            self.xy_tolerance
+            if terminal_xy_tolerance is None
+            else float(terminal_xy_tolerance)
+        )
+        resolved_terminal_yaw_tolerance = (
+            self.yaw_tolerance
+            if terminal_yaw_tolerance is None
+            else float(terminal_yaw_tolerance)
+        )
+        if (
+            not np.isfinite(resolved_terminal_xy_tolerance)
+            or resolved_terminal_xy_tolerance <= 0.0
+            or not np.isfinite(resolved_terminal_yaw_tolerance)
+            or resolved_terminal_yaw_tolerance <= 0.0
+        ):
+            raise ValueError("manual path terminal tolerances must be positive and finite")
         target_index, target_resolution = self.target_index_for(
             station_name,
             purpose=purpose,
@@ -245,11 +264,13 @@ class ManualBasePathExecutor:
             failed_segment = segments[-1]
             failed_final_dist = float(failed_segment.get("final_dist", float("inf")))
             if failed_final_dist <= max(self.xy_tolerance, 0.12):
-                current_obs, terminal_settle = self._settle_at_sample(
+                current_obs, terminal_settle = self._settle_at_sample_with_tolerances(
                     current_obs,
                     target=self.samples[int(target_index)],
                     arm_qpos=arm_qpos,
                     gripper_action=resolved_gripper_action,
+                    xy_tolerance=resolved_terminal_xy_tolerance,
+                    yaw_tolerance=resolved_terminal_yaw_tolerance,
                 )
                 terminal_settle["forced_after_terminal_segment_miss"] = True
                 segments.append(terminal_settle)
@@ -258,11 +279,13 @@ class ManualBasePathExecutor:
                     failed_segment["pass"] = True
 
         if not segments or all(bool(item.get("pass", False)) for item in segments):
-            current_obs, settle = self._settle_at_sample(
+            current_obs, settle = self._settle_at_sample_with_tolerances(
                 current_obs,
                 target=self.samples[int(target_index)],
                 arm_qpos=arm_qpos,
                 gripper_action=resolved_gripper_action,
+                xy_tolerance=resolved_terminal_xy_tolerance,
+                yaw_tolerance=resolved_terminal_yaw_tolerance,
             )
             segments.append(settle)
 
@@ -275,8 +298,8 @@ class ManualBasePathExecutor:
         all_segments = bool(segments) and all(bool(item.get("pass", False)) for item in segments)
         checks = {
             "segments": all_segments,
-            "final_xy": final_dist <= self.xy_tolerance,
-            "final_yaw": final_yaw_error <= self.yaw_tolerance,
+            "final_xy": final_dist <= resolved_terminal_xy_tolerance,
+            "final_yaw": final_yaw_error <= resolved_terminal_yaw_tolerance,
             "holding_motion": not held_motion.get("enabled", False) or bool(held_motion.get("drop_ok", False)),
         }
         passed = bool(all(checks.values()))
@@ -307,10 +330,44 @@ class ManualBasePathExecutor:
             "target_yaw": float(final_sample.yaw),
             "final_dist": final_dist,
             "final_yaw_error": final_yaw_error,
+            "path_xy_tolerance": float(self.xy_tolerance),
+            "path_yaw_tolerance": float(self.yaw_tolerance),
+            "terminal_xy_tolerance": float(resolved_terminal_xy_tolerance),
+            "terminal_yaw_tolerance": float(resolved_terminal_yaw_tolerance),
             "holding_motion": held_motion,
             "checks": checks,
             "reason": None if passed else "manual_base_path_failed",
         }
+
+    def _settle_at_sample_with_tolerances(
+        self,
+        obs: dict[str, Any],
+        *,
+        target: ManualBasePathSample,
+        arm_qpos: np.ndarray,
+        gripper_action: float,
+        xy_tolerance: float,
+        yaw_tolerance: float,
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Apply strict precision only while settling the terminal sample."""
+
+        original_xy_tolerance = self.xy_tolerance
+        original_yaw_tolerance = self.yaw_tolerance
+        self.xy_tolerance = float(xy_tolerance)
+        self.yaw_tolerance = float(yaw_tolerance)
+        try:
+            settled_obs, result = self._settle_at_sample(
+                obs,
+                target=target,
+                arm_qpos=arm_qpos,
+                gripper_action=gripper_action,
+            )
+        finally:
+            self.xy_tolerance = original_xy_tolerance
+            self.yaw_tolerance = original_yaw_tolerance
+        result["terminal_xy_tolerance"] = float(xy_tolerance)
+        result["terminal_yaw_tolerance"] = float(yaw_tolerance)
+        return settled_obs, result
 
     def _explicit_route(
         self,

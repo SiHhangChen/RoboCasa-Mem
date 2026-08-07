@@ -257,6 +257,17 @@ def build_navigation_config(
         manual_base_path_segment_yaw_threshold=float(
             values.pop("manual_base_path_segment_yaw_threshold", 0.05)
         ),
+        base_velocity_profile_enabled=bool(
+            values.pop("base_velocity_profile_enabled", True)
+        ),
+        base_profile_v_max=float(values.pop("base_profile_v_max", 0.65)),
+        base_profile_a_max=float(values.pop("base_profile_a_max", 1.6)),
+        base_profile_a_dec=float(values.pop("base_profile_a_dec", 1.2)),
+        base_profile_v_min=float(values.pop("base_profile_v_min", 0.22)),
+        base_profile_w_max=float(values.pop("base_profile_w_max", 1.2)),
+        base_profile_alpha_max=float(values.pop("base_profile_alpha_max", 3.0)),
+        base_profile_alpha_dec=float(values.pop("base_profile_alpha_dec", 2.5)),
+        base_profile_w_min=float(values.pop("base_profile_w_min", 0.20)),
         base_single_axis_tracking=bool(values.pop("base_single_axis_tracking", False)),
         base_snap_to_target_after_success=bool(
             values.pop("base_snap_to_target_after_success", False)

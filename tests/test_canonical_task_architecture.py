@@ -75,6 +75,16 @@ def test_action_config_specific_metadata_survives_plan_assembly() -> None:
     )
 
     wa02_descriptor, wa02_plan = build("WA-02")
+    cup_pick_navigations = [
+        stage
+        for stage in wa02_plan.stages
+        if isinstance(stage, NavigateStage) and stage.target.purpose == "pick"
+    ]
+    assert cup_pick_navigations
+    assert all(
+        stage.metadata["terminal_tolerance_only"] is True
+        for stage in cup_pick_navigations
+    )
     slot_places = [
         stage
         for stage in wa02_plan.stages
