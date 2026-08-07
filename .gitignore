@@ -39,7 +39,10 @@ robosuite/
 MUJOCO_LOG.TXT
 
 # Formal recorded datasets are generated artifacts and are kept out of git.
-data/datasets/
+data/
+
+# Local tooling state (MCP spec-workflow).
+.spec-workflow/
 
 # Converted training datasets (97G) are generated artifacts, kept out of git.
 lerobot_data/
