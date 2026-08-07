@@ -35,10 +35,8 @@ def _initialize(descriptor: Any, env: Any, observation: Mapping[str, Any]):
     objects_obs, objects = apply_fixed_initial_object_regions(
         env,
         seed=descriptor.episode_plan.seed,
-        target_sugared_coffee_id=descriptor.episode_plan.target_sugared_coffee_id,
         **dict(descriptor.config.initial_state.objects),
     )
-    env.set_target_sugared_coffee_id(descriptor.episode_plan.target_sugared_coffee_id)
     env.configure_dining_placement_regions(
         region_config=dining_region_config_summary(descriptor.actions.dining_region_config),
         regions_by_slot=descriptor.actions.dining_regions_by_slot,

@@ -25,7 +25,6 @@ from bench.tasks.wa01.domain.semantics import (
     latch_cups_together,
     record_selection,
     record_sugar_delivery,
-    set_target,
 )
 
 
@@ -33,7 +32,6 @@ COFFEE_MUG_XML = f"{assets_root}/objects/objaverse/cup/cup_2/model.xml"
 SUGAR_PLATE_XML = f"{assets_root}/objects/objaverse/plate/plate_3/model.xml"
 SUGAR_CUBE_XML = f"{assets_root}/objects/lightwheel/sugar_cube/SugarCube003/model.xml"
 NORMAL_COFFEE_RGBA = (0.65, 0.45, 0.25, 0.8)
-TARGET_MARKER_RGBA = (0.20, 0.85, 0.25, 0.95)
 OVERHEAD_CABINET_FIXTURES = ("cab_1_left_group", "cab_2_left_group")
 MIN_FINAL_CUP_XY_SEPARATION = 0.20
 
@@ -52,7 +50,7 @@ class WA01SortSugaredAndUnsugaredCoffee(Kitchen):
 
         self.minimum_cup_xy_separation = float(minimum_cup_xy_separation)
         self.cup_upright_threshold_deg = float(cup_upright_threshold_deg)
-        self._semantic_state = SemanticState("coffee_A")
+        self._semantic_state = SemanticState()
         super().__init__(*args, **kwargs)
 
     # Scene construction -------------------------------------------------
@@ -122,17 +120,13 @@ class WA01SortSugaredAndUnsugaredCoffee(Kitchen):
             dict(id=FixtureType.DINING_COUNTER, ref=self.stool),
         )
         self.init_robot_base_ref = self.counter
-        refs = self._ep_meta.setdefault("refs", {})
-        self.set_target_sugared_coffee_id(
-            str(refs.get("target_sugared_coffee_id", "coffee_A"))
-        )
 
     def _setup_scene(self) -> None:
-        """重置语义状态、餐桌区域、物理缓存和目标视觉标记。"""
+        """重置语义状态、餐桌区域、物理缓存和咖啡视觉。"""
 
         super()._setup_scene()
         self.coffee_machine._turned_on = False
-        self._semantic_state = SemanticState(self.target_sugared_coffee_id)
+        self._semantic_state = SemanticState()
         default_regions = DiningPlacementRegionConfig()
         self.dining_region_config = dining_region_config_summary(default_regions)
         self.dining_regions_by_slot = compute_dining_regions(default_regions)
@@ -147,10 +141,8 @@ class WA01SortSugaredAndUnsugaredCoffee(Kitchen):
         self.coffee_B_upright = False
         self.dining_regions_occupied = False
         self.cups_together = False
-        self.target_marker_visible = True
         self._set_coffee_liquid_visual("coffee_A", visible=True)
         self._set_coffee_liquid_visual("coffee_B", visible=True)
-        self._set_target_coffee_marker_visibility(True)
 
     def _get_obj_cfgs(self) -> list[dict[str, Any]]:
         """定义两只同款杯子、糖碟和糖块的 RoboCasa 物品配置。"""
@@ -203,12 +195,6 @@ class WA01SortSugaredAndUnsugaredCoffee(Kitchen):
     # Semantic events ----------------------------------------------------
 
     @property
-    def target_sugared_coffee_id(self) -> str:
-        """返回本 episode 指定的加糖目标杯。"""
-
-        return self._semantic_state.target_sugared_coffee_id
-
-    @property
     def sugar_consumed(self) -> bool:
         """返回糖块是否已经被语义事件消费。"""
 
@@ -239,31 +225,16 @@ class WA01SortSugaredAndUnsugaredCoffee(Kitchen):
         return self._semantic_state.selected_sugared_coffee_id
 
     @property
-    def sugar_assignment_correct(self) -> bool:
-        """返回实际加糖杯是否与 episode 目标一致。"""
-
-        return evaluate_success(self._semantic_state).sugar_assignment_correct
-
-    @property
     def correct_sugared_selection(self) -> bool:
         """返回最终选择是否指向实际加糖杯。"""
 
         return evaluate_success(self._semantic_state).correct_sugared_selection
 
-    def set_target_sugared_coffee_id(self, coffee_id: str) -> None:
-        """设置加糖目标，并同步 episode metadata 与视觉标记。"""
-
-        set_target(self._semantic_state, coffee_id)
-        self._ep_meta.setdefault("refs", {})["target_sugared_coffee_id"] = coffee_id
-        if getattr(self, "sim", None) is not None:
-            self._set_target_coffee_marker_visibility(True)
-
     def record_sugar_delivery(self, coffee_id: str) -> None:
-        """记录糖投递事件，并隐藏糖块和目标提示颜色。"""
+        """记录糖投递到任意一杯咖啡的事件，并隐藏糖块。"""
 
         if record_sugar_delivery(self._semantic_state, coffee_id):
             self._hide_consumed_sugar_cube()
-            self._set_target_coffee_marker_visibility(False)
         self.update_state()
 
     def record_cups_together_before_selection(self) -> bool:
@@ -368,7 +339,7 @@ class WA01SortSugaredAndUnsugaredCoffee(Kitchen):
         )
 
     def get_ep_meta(self) -> dict[str, Any]:
-        """补充自然语言任务描述和目标杯 metadata。"""
+        """补充自然语言任务描述。"""
 
         from bench.tasks.wa01.prompts import resolve_prompt_spec
 
@@ -376,9 +347,6 @@ class WA01SortSugaredAndUnsugaredCoffee(Kitchen):
         prompt = resolve_prompt_spec(variant="memory")
         metadata["lang"] = prompt.policy_prompt
         metadata["initial_prompt"] = prompt.initial_prompt
-        metadata.setdefault("refs", {})["target_sugared_coffee_id"] = (
-            self.target_sugared_coffee_id
-        )
         return metadata
 
     # Authoritative task result -----------------------------------------
@@ -400,10 +368,8 @@ class WA01SortSugaredAndUnsugaredCoffee(Kitchen):
             "success_checks": report.checks(),
             "sugar": {
                 "consumed": self.sugar_consumed,
-                "target_coffee_id": self.target_sugared_coffee_id,
                 "sugared_coffee_id": self.sugared_coffee_id,
                 "unsugared_coffee_id": self.unsugared_coffee_id,
-                "assignment_correct": report.sugar_assignment_correct,
             },
             **{
                 coffee_id: {
@@ -513,18 +479,6 @@ class WA01SortSugaredAndUnsugaredCoffee(Kitchen):
         qpos[:3] = np.asarray([10.0, 10.0, -1.0], dtype=float)
         self.sim.data.set_joint_qpos(obj.joints[0], qpos)
         self.sim.forward()
-
-    def _set_target_coffee_marker_visibility(self, visible: bool) -> None:
-        """控制目标杯提示颜色，并为非目标杯恢复普通颜色。"""
-
-        self.target_marker_visible = bool(visible)
-        for coffee_id in COFFEE_IDS:
-            rgba = (
-                TARGET_MARKER_RGBA
-                if visible and coffee_id == self.target_sugared_coffee_id
-                else NORMAL_COFFEE_RGBA
-            )
-            self._set_coffee_liquid_visual(coffee_id, visible=True, rgba=rgba)
 
     def _set_coffee_liquid_visual(
         self,

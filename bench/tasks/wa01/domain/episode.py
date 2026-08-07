@@ -30,13 +30,6 @@ MIN_INITIAL_CUP_SEPARATION = 0.20
 MAX_INITIAL_CUP_SAMPLING_ATTEMPTS = 1024
 
 
-def target_sugared_coffee_for_seed(seed: int) -> str:
-    """根据 seed 确定性选择本 episode 需要加糖的杯子。"""
-
-    rng = np.random.default_rng(np.random.SeedSequence([int(seed), 0x57413033]))
-    return COFFEE_IDS[int(rng.integers(0, len(COFFEE_IDS)))]
-
-
 def validate_coffee_id(value: Any) -> str:
     """校验并规范化 WA-01 使用的杯子标识。"""
 
@@ -112,7 +105,6 @@ def resolve_task_definition(**values: Any) -> TaskDefinition:
                 "success_conditions",
                 (
                     "sugar_consumed",
-                    "sugar_assignment_correct",
                     "cups_together_before_selection",
                     "correct_sugared_selection",
                 ),
@@ -139,21 +131,14 @@ def resolve_scene_config(*, seed: int, env_split: str, **values: Any) -> SceneCo
 
 
 def resolve_episode_plan(*, seed: int, **values: Any) -> EpisodePlan:
-    """一次性解析本 seed 的加糖目标、运送顺序和最终槽位。"""
+    """一次性解析本 seed 的运送顺序和最终槽位。"""
 
-    configured_target = values.get("target_sugared_coffee_id")
-    target = (
-        target_sugared_coffee_for_seed(seed)
-        if configured_target is None
-        else validate_coffee_id(configured_target)
-    )
     seeded_order = delivery_order_for_seed(seed)
     configured_first = values.get("first_delivery_coffee")
     first = seeded_order[0] if configured_first is None else validate_coffee_id(configured_first)
     second = "coffee_B" if first == "coffee_A" else "coffee_A"
     return EpisodePlan(
         seed=int(seed),
-        target_sugared_coffee_id=target,
         delivery_order=(first, second),
         final_slot_assignment=final_slot_assignment_for_seed(seed),
         max_horizon=int(values.get("max_horizon", 5000)),
@@ -172,6 +157,5 @@ __all__ = [
     "resolve_episode_plan",
     "resolve_scene_config",
     "resolve_task_definition",
-    "target_sugared_coffee_for_seed",
     "validate_coffee_id",
 ]

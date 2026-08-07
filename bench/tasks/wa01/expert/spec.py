@@ -18,8 +18,10 @@ def build_expert_plan(inputs: ExpertPlanInputs) -> ExpertPlan:
         raise ValueError(f"WA-01 cannot build a plan for {episode.task_id!r}")
     facts = dict(episode.facts)
     actions = inputs.action_config
-    target = str(facts["target_sugared_coffee_id"])
     first, second = (str(v) for v in facts["delivery_order"])
+    # The task accepts either cup.  The expert deterministically sugars the
+    # first cup in its delivery order so demonstrations remain reproducible.
+    sugared = first
     slots = dict(facts["final_slot_assignment"])
     sugar = str(getattr(inputs.scene, "sugar_name", "sugar_cube"))
 
@@ -62,22 +64,23 @@ def build_expert_plan(inputs: ExpertPlanInputs) -> ExpertPlan:
                  fallback_if_unreachable=True),
         operate("pick", sugar, name="pick_sugar", metadata=actions.sugar_pick_metadata),
         return_arm(sugar, "return_picked_sugar_to_regular_pose", 1.0),
-        navigate(target, purpose="place", holding=sugar, name="navigate_place_sugar",
+        navigate(sugared, purpose="place", holding=sugar, name="navigate_place_sugar",
                  skip_if_reachable=True, fallback_if_unreachable=True,
                  metadata=actions.sugar_delivery_metadata),
         operate("place", sugar, name="place_sugar",
-                metadata={**dict(actions.sugar_delivery_metadata), "receptacle": target}),
-        operate("record_sugar_delivery", sugar, name="record_sugar_delivery"),
+                metadata={**dict(actions.sugar_delivery_metadata), "receptacle": sugared}),
+        operate("record_sugar_delivery", sugar, name="record_sugar_delivery",
+                metadata={"coffee_id": sugared}),
         return_arm(sugar, "return_after_place_sugar_to_regular_pose", -1.0),
         *deliver(first, "first"),
         *deliver(second, "second"),
-        operate("pick", target, name="pick_sugared_coffee_topdown",
+        operate("pick", sugared, name="pick_sugared_coffee_topdown",
                 metadata=actions.final_selection_pick_metadata),
-        operate("verify_transport_hold", target, name="verify_sugared_coffee_held_after_topdown_pick"),
-        operate("select", target, name="select_sugared_coffee"),
+        operate("verify_transport_hold", sugared, name="verify_sugared_coffee_held_after_topdown_pick"),
+        operate("select", sugared, name="select_sugared_coffee"),
     ]
     return finish_plan(episode, stages, metadata={
-        "target_sugared_coffee_id": target,
+        "sugared_coffee_id": sugared,
         "delivery_order": [first, second],
         "final_slot_assignment": slots,
         "dining_region_config": dining_region_config_summary(actions.dining_region_config),

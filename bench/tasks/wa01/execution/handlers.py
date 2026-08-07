@@ -64,11 +64,13 @@ def build_stage_handlers(
     def record_sugar(target: str, **kwargs: Any) -> dict[str, Any]:
         """在糖块物理投递完成后触发加糖语义事件。"""
 
-        del kwargs
+        coffee_id = kwargs.get("coffee_id")
+        if coffee_id is None:
+            raise ValueError("record_sugar_delivery requires coffee_id metadata")
         return apply_sugar_delivery_event(
             controller,
             target,
-            coffee_id=controller.env.target_sugared_coffee_id,
+            coffee_id=str(coffee_id),
             accept=accept_sugar_delivery,
         )
 
@@ -239,7 +241,6 @@ def verify_cups_ready_for_selection(controller: Any, **kwargs: Any) -> dict[str,
         "dining_regions_occupied": bool(env.dining_regions_occupied),
         "cups_together": bool(env.cups_together),
         "sugar_consumed": bool(env.sugar_consumed),
-        "sugar_assignment_correct": bool(env.sugar_assignment_correct),
     }
     if all(checks.values()):
         env.record_cups_together_before_selection()
@@ -272,7 +273,6 @@ def apply_sugar_delivery_event(
     env = _refresh(controller)
     checks = {
         "sugar_consumed": bool(env.sugar_consumed),
-        "sugar_assignment_correct": bool(env.sugar_assignment_correct),
     }
     passed = all(checks.values())
     return {

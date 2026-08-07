@@ -712,10 +712,10 @@
     {
       "action_schema": "membench.pandaomron_hybrid13.v2",
       "allow_partial_calibration": false,
-      "config_hash": "sha256:7d4c88753f9bd057c5007f546c935e748a37b2eab891fef26f3ef9eec74dd3b8",
+      "config_hash": "sha256:3e28f621947e9d60bc32567588e4403ea6adf4cd82a36777d7a6a2ac2671d9f8",
       "control_frequency_hz": 20,
       "env_split": "pretrain",
-      "episode_identity": "sha256:d90165603377984c36851e7d69d39e6a642602ba5e5c9789ff17d920e8b28ffc",
+      "episode_identity": "sha256:847a5da65e749e47c9889aca1d77b0f560720e99e02aef354ba56987d34cca54",
       "facts": {
         "delivery_order": [
           "coffee_B",
@@ -726,11 +726,10 @@
           "coffee_B": "right"
         },
         "max_horizon": 5000,
-        "seed": 0,
-        "target_sugared_coffee_id": "coffee_A"
+        "seed": 0
       },
       "initialization": {
-        "config_hash": "sha256:7d4c88753f9bd057c5007f546c935e748a37b2eab891fef26f3ef9eec74dd3b8",
+        "config_hash": "sha256:3e28f621947e9d60bc32567588e4403ea6adf4cd82a36777d7a6a2ac2671d9f8",
         "controller": {
           "max_joint_step": 0.025
         },
@@ -761,18 +760,18 @@
       "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
       "options": {},
       "prompt": {
-        "initial": "Two identical coffees are already prepared. Sugar the temporarily marked cup only, place both cups on the dining counter, then identify it.",
-        "policy": "Start at the coffee machine with two identical prepared coffees. Add one sugar cube to the temporarily marked coffee, carry both coffees to the dining counter, and identify the sugared coffee."
+        "initial": "Two identical coffees are already prepared. Add one sugar cube to either coffee, place both cups on the dining counter, then identify the sugared coffee.",
+        "policy": "Start at the coffee machine with two identical prepared coffees. Add one sugar cube to either coffee, carry both coffees to the dining counter, and identify the coffee you sugared."
       },
       "public": {
         "env_name": "WA01SortSugaredAndUnsugaredCoffee",
         "layout_id": 29,
-        "prompt": "Start at the coffee machine with two identical prepared coffees. Add one sugar cube to the temporarily marked coffee, carry both coffees to the dining counter, and identify the sugared coffee.",
+        "prompt": "Start at the coffee machine with two identical prepared coffees. Add one sugar cube to either coffee, carry both coffees to the dining counter, and identify the coffee you sugared.",
         "scene_seed": 0,
         "style_id": 29
       },
       "release_facts": {
-        "config_hash": "sha256:7d4c88753f9bd057c5007f546c935e748a37b2eab891fef26f3ef9eec74dd3b8",
+        "config_hash": "sha256:3e28f621947e9d60bc32567588e4403ea6adf4cd82a36777d7a6a2ac2671d9f8",
         "controller": {
           "max_joint_step": 0.025
         },
@@ -1695,7 +1694,7 @@
       "variant": "memory"
     }
   ],
-  "lock_hash": "sha256:b11b8f14e54a7bf5615231beebcbdb175dc23bbd26241b45b571203cfa89387f",
+  "lock_hash": "sha256:706284e8631a5e594382bf780f38622d7206ab210c46df452184db19e435dafa",
   "release_id": "all_tasks_v1",
   "schema_version": "membench.release_lock/v2"
 }

@@ -28,7 +28,6 @@ from bench.tasks.wa01.domain.episode import (
     MAX_INITIAL_CUP_REACH_DISTANCE,
     MIN_INITIAL_CUP_SEPARATION,
     coffee_initial_poses_for_seed,
-    validate_coffee_id,
 )
 
 
@@ -127,7 +126,6 @@ def apply_fixed_initial_object_regions(
     env: Any,
     *,
     seed: int,
-    target_sugared_coffee_id: str,
     enabled: bool = True,
     coffee_initial_z: float = 0.97748,
     coffee_mug_sliding_friction: float = 30.0,
@@ -157,8 +155,7 @@ def apply_fixed_initial_object_regions(
     }
     summary["coffee_initial_reach_center_xy"] = list(COFFEE_INITIAL_REACH_CENTER_XY)
     summary["coffee_initial_max_reach_distance"] = MAX_INITIAL_CUP_REACH_DISTANCE
-    summary["coffee_sampling_mode"] = "shared_green_region_rejection_sampling"
-    summary["target_sugared_coffee_id"] = validate_coffee_id(target_sugared_coffee_id)
+    summary["coffee_sampling_mode"] = "shared_reachable_region_rejection_sampling"
     sampled = coffee_initial_poses_for_seed(seed)
     for coffee_id in COFFEE_IDS:
         values = sampled[coffee_id]

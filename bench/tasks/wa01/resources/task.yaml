@@ -7,7 +7,6 @@ task:
   description: Deliver both coffees and select the one that received sugar.
   success_conditions:
     - sugar_consumed
-    - sugar_assignment_correct
     - cups_together_before_selection
     - correct_sugared_selection
 
@@ -20,7 +19,6 @@ scene:
   sugar_name: sugar_cube
 
 episode:
-  target_sugared_coffee_id: null
   first_delivery_coffee: null
   max_horizon: 5000
 

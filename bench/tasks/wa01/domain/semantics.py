@@ -11,35 +11,27 @@ from bench.tasks.wa01.domain.contracts import COFFEE_IDS
 class SemanticState:
     """集中保存无法仅由当前物理画面推导的任务历史状态。"""
 
-    target_sugared_coffee_id: str
     sugar_consumed: bool = False
     sugared_coffee_id: str | None = None
     unsugared_coffee_id: str | None = None
     cups_together_before_selection: bool = False
     selected_sugared_coffee_id: str | None = None
 
-    def __post_init__(self) -> None:
-        """在状态创建时立即校验目标杯子标识。"""
-
-        self.target_sugared_coffee_id = _coffee_id(self.target_sugared_coffee_id)
-
 
 @dataclass(frozen=True)
 class SuccessReport:
-    """保存四项权威成功条件的布尔结果。"""
+    """保存三项权威成功条件的布尔结果。"""
 
     sugar_consumed: bool
-    sugar_assignment_correct: bool
     cups_together_before_selection: bool
     correct_sugared_selection: bool
 
     @property
     def success(self) -> bool:
-        """仅当四项任务条件全部成立时返回成功。"""
+        """仅当三项任务条件全部成立时返回成功。"""
 
         return bool(
             self.sugar_consumed
-            and self.sugar_assignment_correct
             and self.cups_together_before_selection
             and self.correct_sugared_selection
         )
@@ -49,16 +41,9 @@ class SuccessReport:
 
         return {
             "sugar_consumed": self.sugar_consumed,
-            "sugar_assignment_correct": self.sugar_assignment_correct,
             "cups_together_before_selection": self.cups_together_before_selection,
             "correct_sugared_selection": self.correct_sugared_selection,
         }
-
-
-def set_target(state: SemanticState, coffee_id: str) -> None:
-    """更新本 episode 指定的加糖目标杯。"""
-
-    state.target_sugared_coffee_id = _coffee_id(coffee_id)
 
 
 def record_sugar_delivery(state: SemanticState, coffee_id: str) -> bool:
@@ -90,20 +75,12 @@ def record_selection(state: SemanticState, coffee_id: str) -> None:
 def evaluate_success(state: SemanticState) -> SuccessReport:
     """从统一语义状态计算唯一的最终成功报告。"""
 
-    expected_unsugared = (
-        "coffee_B" if state.target_sugared_coffee_id == "coffee_A" else "coffee_A"
-    )
-    assignment_correct = bool(
-        state.sugared_coffee_id == state.target_sugared_coffee_id
-        and state.unsugared_coffee_id == expected_unsugared
-    )
     selection_correct = bool(
         state.selected_sugared_coffee_id is not None
         and state.selected_sugared_coffee_id == state.sugared_coffee_id
     )
     return SuccessReport(
         sugar_consumed=bool(state.sugar_consumed),
-        sugar_assignment_correct=assignment_correct,
         cups_together_before_selection=bool(state.cups_together_before_selection),
         correct_sugared_selection=selection_correct,
     )
@@ -125,5 +102,4 @@ __all__ = [
     "latch_cups_together",
     "record_selection",
     "record_sugar_delivery",
-    "set_target",
 ]
