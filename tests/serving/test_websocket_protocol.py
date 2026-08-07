@@ -26,7 +26,7 @@ def _unused_port() -> int:
 
 def _serve(port: int) -> None:
     WebsocketPolicyServer(
-        FakePolicyBackend(horizon=3, image_size=(8, 8)),
+        FakePolicyBackend(horizon=3, image_size=(224, 224)),
         host="127.0.0.1",
         port=port,
         api_key=API_KEY,
@@ -59,9 +59,9 @@ def _observation() -> CanonicalObservation:
         task_id="WX-01",
         state=np.zeros(37, dtype=np.float32),
         images={
-            "agentview_left": np.zeros((8, 8, 3), dtype=np.uint8),
-            "agentview_right": np.zeros((8, 8, 3), dtype=np.uint8),
-            "eye_in_hand": np.zeros((8, 8, 3), dtype=np.uint8),
+            "agentview_left": np.zeros((224, 224, 3), dtype=np.uint8),
+            "agentview_right": np.zeros((224, 224, 3), dtype=np.uint8),
+            "eye_in_hand": np.zeros((224, 224, 3), dtype=np.uint8),
         },
         prompt="return the cup",
     )

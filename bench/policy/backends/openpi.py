@@ -20,6 +20,32 @@ from bench.policy.protocol import (
 from bench.policy.checkpoint import resolve_checkpoint_identity
 from bench.runtime.data_contract import ACTION_DIM, ACTION_SCHEMA, STATE_DIM, STATE_SCHEMA
 
+# Fallback camera subset forwarded to the policy, used only when a config's
+# repack does not declare an images mapping. The wire contract always requires
+# the full 3-camera rgbd_v3 set; the backend forwards only the policy's subset.
+_DEFAULT_POLICY_CAMERAS = ("agentview_right", "eye_in_hand")
+
+
+def _policy_cameras_from_config(train_config: Any) -> tuple[str, ...]:
+    """Derive the camera aliases a policy consumes from its config's repack.
+
+    The repack maps dataset columns onto the image aliases fed to the policy, so
+    its ``images`` keys are exactly the cameras the policy uses. This reads the
+    pinned OpenPI config as-is (no fork changes required); the wire contract
+    still requires all three rgbd_v3 cameras and the backend forwards only the
+    derived subset to the policy.
+    """
+    repack = getattr(getattr(train_config, "data", None), "repack_transforms", None)
+    if repack is not None:
+        for transform in getattr(repack, "inputs", ()):
+            structure = getattr(transform, "structure", None)
+            if not isinstance(structure, dict):
+                continue
+            images = structure.get("images")
+            if isinstance(images, dict) and images:
+                return tuple(images.keys())
+    return _DEFAULT_POLICY_CAMERAS
+
 
 class OpenPIBackend:
     def __init__(
@@ -31,11 +57,20 @@ class OpenPIBackend:
         action_horizon: int,
         image_size: tuple[int, int],
         state_schema: str = STATE_SCHEMA,
+        policy_cameras: tuple[str, ...] = _DEFAULT_POLICY_CAMERAS,
         server_id: str | None = None,
         code_revision: dict[str, str] | None = None,
     ) -> None:
         self.policy = policy
         self.config_name = config_name
+        policy_cameras = tuple(policy_cameras)
+        required_cameras = ("agentview_left", "agentview_right", "eye_in_hand")
+        if not policy_cameras or not set(policy_cameras) <= set(required_cameras):
+            raise ValueError(
+                f"policy_cameras must be a non-empty subset of {required_cameras}, "
+                f"got {policy_cameras}"
+            )
+        self._policy_cameras = policy_cameras
         self._contract = PolicyContract(
             server_id=server_id or f"openpi-{config_name}",
             policy={
@@ -47,7 +82,7 @@ class OpenPIBackend:
             observation=ObservationContract(
                 state_schema=state_schema,
                 state_dim=STATE_DIM,
-                required_cameras=("agentview_left", "agentview_right", "eye_in_hand"),
+                required_cameras=required_cameras,
                 image_size=image_size,
             ),
             action=ActionContract(
@@ -100,6 +135,7 @@ class OpenPIBackend:
             action_horizon=horizon,
             image_size=image_size,
             state_schema=state_schema,
+            policy_cameras=_policy_cameras_from_config(train_config),
             server_id=server_id,
             code_revision=code_revision,
         )
@@ -118,9 +154,7 @@ class OpenPIBackend:
         observation = request.observation
         policy_input = {
             "images": {
-                "agentview_left": observation.images["agentview_left"],
-                "agentview_right": observation.images["agentview_right"],
-                "eye_in_hand": observation.images["eye_in_hand"],
+                alias: observation.images[alias] for alias in self._policy_cameras
             },
             "state": observation.state,
             "prompt": observation.prompt,
