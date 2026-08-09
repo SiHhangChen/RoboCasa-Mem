@@ -51,6 +51,9 @@ class WebsocketPolicyServer:
             raise RuntimeError(
                 "websockets>=12 is required; install the MobileMemBench project dependencies"
             ) from exc
+        # Surface the websockets library's own listening/connection logs, like the
+        # original OpenPI server does.
+        logging.getLogger("websockets.server").setLevel(logging.INFO)
         self._inference_lock = asyncio.Lock()
         self._client_lock = asyncio.Lock()
         LOGGER.info("Serving %s on ws://%s:%d", self.backend.contract.server_id, self.host, self.port)
@@ -95,6 +98,7 @@ class WebsocketPolicyServer:
             return
 
         async with self._client_lock:
+            LOGGER.info("Connection from %s opened", websocket.remote_address)
             await websocket.send(encode_message(self.backend.contract.to_hello()))
             active_episode: str | None = None
             async for frame in websocket:
@@ -127,6 +131,7 @@ class WebsocketPolicyServer:
                         )
                     )
                 await websocket.send(encode_message(response))
+            LOGGER.info("Connection from %s closed", websocket.remote_address)
 
     async def handle_reset(
         self,

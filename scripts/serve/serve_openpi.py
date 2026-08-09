@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import os
 from pathlib import Path
+import socket
 import subprocess
 import sys
 
@@ -45,7 +47,11 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    # Surface INFO logs from the model loader and the policy server, matching the
+    # original OpenPI serve script.
+    logging.basicConfig(level=logging.INFO, force=True)
     args = parse_args()
+    logging.info("Loading model from %s (config: %s)", args.checkpoint, args.config)
     backend = OpenPIBackend.from_checkpoint(
         config_name=args.config,
         checkpoint_dir=args.checkpoint,
@@ -56,6 +62,13 @@ def main() -> None:
         checkpoint_uri=args.checkpoint_uri,
         code_revision={"membench": _git_revision(ROOT), "policy_repo": _git_revision(ROOT / "policy" / "openpi")},
     )
+    logging.info("Model loaded")
+    hostname = socket.gethostname()
+    try:
+        local_ip = socket.gethostbyname(hostname)
+    except OSError:
+        local_ip = "unknown"
+    logging.info("Creating server (host: %s, ip: %s)", hostname, local_ip)
     WebsocketPolicyServer(
         backend,
         host=args.host,
