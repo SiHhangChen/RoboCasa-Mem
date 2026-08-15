@@ -46,3 +46,12 @@ data/
 
 # Converted training datasets (97G) are generated artifacts, kept out of git.
 lerobot_data/
+
+# Pretrained model weights (30G) are downloaded artifacts, kept out of git.
+pretrain_model/
+
+# XLA autotune cache, regenerated on first run.
+.openpi-cache/
+
+# Training logs.
+*.log
