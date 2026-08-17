@@ -129,12 +129,17 @@ class RolloutRunner:
                     if env_steps >= self.suite.rollout.max_steps:
                         break
                     shared_runtime = runtime.metadata.get("shared_runtime")
+                    task_terminal = False
+                    task_failure_code = None
                     if shared_runtime is not None:
                         transition = shared_runtime.step(action)
                         observation = transition.observation
                         reward = transition.reward
                         done = transition.terminal
                         info = transition.info
+                        if transition.diagnostics is not None:
+                            task_terminal = bool(transition.diagnostics.terminal)
+                            task_failure_code = transition.diagnostics.failure_code
                     else:
                         step_result = runtime.env.step(action)
                         observation, reward, done, info = _normalize_env_step(step_result)
@@ -154,18 +159,34 @@ class RolloutRunner:
                             else:
                                 frames = adapter.build_observation(runtime).images
                             session.append_frames(frames)
-                    if adapter.check_success(runtime, info):
+                    step_success = adapter.check_success(runtime, info)
+                    # A semantic protocol violation is terminal even if this
+                    # episode reached a candidate success on an earlier step.
+                    # This matters for full-horizon tasks such as WR-04, where
+                    # removing the object again must revoke that candidate.
+                    if task_terminal and task_failure_code:
+                        success = False
+                        failure_reason = task_failure_code
+                        break
+                    if step_success:
                         success = True
                         if success_step is None:
                             success_step = env_steps
                         if self.suite.rollout.stop_on_success:
                             break
+                    elif not self.suite.rollout.stop_on_success:
+                        # With full-horizon evaluation, success is a final-state
+                        # property rather than a historical latch.
+                        success = False
+                    if task_terminal and not step_success:
+                        failure_reason = "task_terminal"
+                        break
                     if done and not self.suite.rollout.ignore_done:
                         failure_reason = "env_done"
                         break
                 if success and self.suite.rollout.stop_on_success:
                     break
-                if failure_reason == "env_done":
+                if failure_reason is not None:
                     break
             if not success and failure_reason is None:
                 failure_reason = "max_steps"
@@ -292,11 +313,16 @@ class RolloutRunner:
             if resume and self.artifacts is not None
             else set()
         )
-        results = [
-            self.run_episode(adapter, seed)
-            for seed in self.suite.seeds
-            if seed not in completed
-        ]
+        pending = [seed for seed in self.suite.seeds if seed not in completed]
+        results = []
+        for index, seed in enumerate(pending, start=1):
+            print(
+                f"[eval] [{index}/{len(pending)}] seed={seed:06d} running...",
+                flush=True,
+            )
+            result = self.run_episode(adapter, seed)
+            print(_format_episode_progress(result, index, len(pending)), flush=True)
+            results.append(result)
         if self.artifacts is not None:
             self.artifacts.write_summary()
         return results
@@ -374,6 +400,31 @@ class RolloutRunner:
             return dict(adapter.diagnostics(runtime))
         except Exception as exc:
             return {"diagnostics_error": f"{type(exc).__name__}: {exc}"}
+
+
+def _format_episode_progress(
+    result: EpisodeResult,
+    index: int,
+    total: int,
+) -> str:
+    """Format one completed episode as a single progress line for the console."""
+    tag = f"[eval] [{index}/{total}] seed={result.seed:06d}"
+    if result.status == "success":
+        outcome = "SUCCESS"
+        detail = f"step={result.success_step}"
+    elif result.status == "failure":
+        outcome = "FAILURE"
+        detail = f"reason={result.failure_reason}"
+    else:
+        outcome = result.status.upper()
+        detail = f"error={result.error}" if result.error is not None else ""
+        if len(detail) > 160:
+            detail = detail[:160]
+    return (
+        f"{tag} {outcome} {detail} "
+        f"steps={result.env_steps} calls={result.policy_calls} "
+        f"dur={result.duration_s:.1f}s"
+    )
 
 
 def _normalize_env_step(

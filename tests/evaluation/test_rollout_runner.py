@@ -22,6 +22,7 @@ from bench.policy.protocol import (
 )
 from bench.policy.protocol.contracts import ACTION_SCHEMA
 from bench.runtime.data_contract import STATE_SCHEMA
+from bench.runtime.contracts import RuntimeStep, TaskDiagnostics
 
 
 def _contract() -> PolicyContract:
@@ -130,6 +131,129 @@ def test_runner_replans_and_stops_on_success(tmp_path: Path):
     assert result.policy_actions_consumed == 3
     assert result.reward_sum == 3
     assert (writer.episodes_dir / "seed_001000" / "result.json").is_file()
+
+
+class SemanticTerminalRuntime:
+    def __init__(self) -> None:
+        self.steps = 0
+
+    def step(self, action) -> RuntimeStep:
+        del action
+        self.steps += 1
+        terminal = self.steps >= 3
+        return RuntimeStep(
+            observation={"step": self.steps},
+            reward=0.0,
+            diagnostics=TaskDiagnostics(
+                success=False,
+                terminal=terminal,
+                failure_code=(
+                    "sink_reentered_after_departure" if terminal else None
+                ),
+            ),
+        )
+
+
+class SemanticTerminalAdapter(FakeAdapter):
+    def create_episode(self, *, seed, policy_contract, suite):
+        del policy_contract, suite
+        shared = SemanticTerminalRuntime()
+        return EpisodeRuntime(
+            episode_id=f"wx01-{seed}",
+            seed=seed,
+            env=FakeEnv(),
+            observation={"step": 0},
+            prompt="return cup",
+            metadata={"shared_runtime": shared},
+        )
+
+    def check_success(self, runtime, info):
+        del runtime, info
+        return False
+
+
+def test_semantic_terminal_stops_even_when_env_done_is_ignored(tmp_path: Path):
+    suite = EvalSuiteConfig(
+        suite_version="test",
+        task_id="WX-01",
+        env_split="pretrain",
+        seeds=(1000,),
+        rollout=RolloutConfig(
+            max_steps=10,
+            replan_steps=2,
+            ignore_done=True,
+        ),
+        artifacts=ArtifactConfig(record_video=False),
+    )
+    runner = RolloutRunner(client=FakeClient(), suite=suite)
+
+    result = runner.run_episode(SemanticTerminalAdapter(), 1000)
+
+    assert result.status == "failure"
+    assert result.failure_reason == "sink_reentered_after_departure"
+    assert result.env_steps == 3
+
+
+class SuccessThenViolationRuntime:
+    def __init__(self) -> None:
+        self.steps = 0
+
+    def step(self, action) -> RuntimeStep:
+        del action
+        self.steps += 1
+        success = self.steps in (2, 3)
+        violation = self.steps >= 4
+        return RuntimeStep(
+            observation={"step": self.steps},
+            info={"success": success},
+            diagnostics=TaskDiagnostics(
+                success=success,
+                terminal=success or violation,
+                failure_code="item_removed_after_success" if violation else None,
+            ),
+        )
+
+
+class SuccessThenViolationAdapter(FakeAdapter):
+    def create_episode(self, *, seed, policy_contract, suite):
+        del policy_contract, suite
+        shared = SuccessThenViolationRuntime()
+        return EpisodeRuntime(
+            episode_id=f"wr04-{seed}",
+            seed=seed,
+            env=FakeEnv(),
+            observation={"step": 0},
+            prompt="return sponge",
+            metadata={"shared_runtime": shared},
+        )
+
+
+def test_full_horizon_success_is_revoked_by_later_violation() -> None:
+    suite = EvalSuiteConfig(
+        suite_version="test",
+        task_id="WR-04",
+        env_split="pretrain",
+        seeds=(1000,),
+        rollout=RolloutConfig(
+            max_steps=10,
+            replan_steps=2,
+            stop_on_success=False,
+            ignore_done=True,
+        ),
+        artifacts=ArtifactConfig(record_video=False),
+    )
+    runner = RolloutRunner(client=FakeClient(), suite=suite)
+
+    result = runner.run_episode(
+        SuccessThenViolationAdapter(task_id="WR-04"),
+        1000,
+    )
+
+    assert result.status == "failure"
+    assert result.success is False
+    assert result.success_step == 2
+    assert result.failure_reason == "item_removed_after_success"
+    assert result.env_steps == 4
 
 
 class CloseFailAdapter(FakeAdapter):

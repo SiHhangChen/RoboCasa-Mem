@@ -172,7 +172,11 @@ class RuntimeStep:
 
     @property
     def terminal(self) -> bool:
-        return bool(self.terminated or self.truncated)
+        return bool(
+            self.terminated
+            or self.truncated
+            or (self.diagnostics is not None and self.diagnostics.terminal)
+        )
 
 
 class EpisodeRuntime(Protocol):
