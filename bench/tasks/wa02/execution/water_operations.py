@@ -1,4 +1,4 @@
-"""Physical WA-02 water-button, fill, and service-placement primitives.
+"""Physical WA-02 sensor-fill and service-placement primitives.
 
 No function in this module writes task history.  Callers receive concrete
 motion and physical-query evidence; ``handlers.py`` is responsible for making
@@ -14,191 +14,11 @@ import numpy as np
 from bench.execution.manipulation.object_interactions import get_object_hold_status
 from bench.tasks.wa02.domain.contracts import CUP_IDS, SERVICE_SLOTS, TEMPERATURES
 from bench.tasks.wa02.execution.geometry import (
-    button_press_pose_world,
     current_held_or_object_position_world,
-    load_anchor_pose,
     pose_world_to_base,
     resolve_held_fill_pose,
     service_slot_position_world,
 )
-
-
-def operate_water_button(
-    controller: Any,
-    *,
-    mode: str,
-    temperature: str,
-    prepress_z_offset: float,
-    press_z_offset: float,
-    hold_steps: int,
-    gripper_action: float,
-    near_miss_position_tolerance: float,
-    require_physical_button_motion: bool = True,
-    control_mode: str = "buttons",
-    faucet_switch_pose_file: str | None = None,
-    **_unused: Any,
-) -> dict[str, Any]:
-    """Physically press a bench-owned temperature button, then set the fixture.
-
-    The added MuJoCo button is a physical interaction target but is not wired
-    to RoboCasa's faucet internals.  The bridge to ``set_verified_faucet_state``
-    is therefore permitted only after an executed press reaches the calibrated
-    target.  It is deliberately not a semantic fill or selection proxy.
-    """
-
-    normalized_mode = str(mode).strip().lower()
-    normalized_temp = str(temperature).strip().lower()
-    if normalized_mode not in {"on", "off"}:
-        return _failure("operate_water_button", "invalid_faucet_mode", mode=mode)
-    if normalized_temp not in TEMPERATURES:
-        return _failure(
-            "operate_water_button", "invalid_water_temperature", temperature=temperature
-        )
-    if str(control_mode).strip().lower() not in {
-        "button",
-        "buttons",
-        "water_button",
-        "water_buttons",
-    }:
-        return _failure(
-            "operate_water_button",
-            "unsupported_water_control_mode",
-            control_mode=control_mode,
-        )
-    if int(hold_steps) < 1:
-        return _failure("operate_water_button", "button_hold_steps_must_be_positive")
-    if not bool(controller.runtime_config.execute):
-        return _dry_result(
-            "operate_water_button",
-            mode=normalized_mode,
-            temperature=normalized_temp,
-        )
-
-    env = controller.env
-    try:
-        controller.refresh_obs()
-        button = np.asarray(env.water_button_position(normalized_temp), dtype=float)
-        prepress_pose = button_press_pose_world(
-            controller.obs,
-            button_position_world=button,
-            z_offset=float(prepress_z_offset),
-        )
-        press_pose = button_press_pose_world(
-            controller.obs,
-            button_position_world=button,
-            z_offset=float(press_z_offset),
-        )
-        faucet_calibration = None
-        if faucet_switch_pose_file not in (None, "", "none"):
-            _, payload = load_anchor_pose(str(faucet_switch_pose_file))
-            faucet_calibration = {
-                "file": str(faucet_switch_pose_file),
-                "anchor": payload.get("anchor"),
-            }
-    except Exception as exc:
-        return _failure(
-            "operate_water_button",
-            "water_button_target_unavailable",
-            mode=normalized_mode,
-            temperature=normalized_temp,
-            error=f"{type(exc).__name__}: {exc}",
-        )
-
-    prepress = _run_world_stage(
-        controller,
-        prepress_pose,
-        stage="water_button_prepress",
-        gripper_action=float(gripper_action),
-    )
-    press = (
-        _run_world_stage(
-            controller,
-            press_pose,
-            stage="water_button_press",
-            gripper_action=float(gripper_action),
-            record_trajectory=True,
-        )
-        if bool(prepress.get("pass", False))
-        else _skipped("water_button_press", "prepress_failed")
-    )
-    press_eef = np.asarray(
-        controller.stage_executor.current_eef_site_world(), dtype=float
-    )
-    endpoint_error = float(np.linalg.norm(press_eef[:3, 3] - press_pose[:3, 3]))
-    press_endpoint = endpoint_error <= float(near_miss_position_tolerance)
-    hold = (
-        controller.run_gripper_command(float(gripper_action), int(hold_steps))
-        if bool(press.get("pass", False))
-        else _skipped("water_button_hold", "press_failed")
-    )
-    retreat = (
-        _run_world_stage(
-            controller,
-            prepress_pose,
-            stage="water_button_retreat",
-            gripper_action=float(gripper_action),
-        )
-        if _gripper_command_pass(hold, required_steps=int(hold_steps))
-        else _skipped("water_button_retreat", "button_hold_failed")
-    )
-    motion_verified = bool(
-        prepress.get("pass", False)
-        and press.get("pass", False)
-        and press_endpoint
-        and _gripper_command_pass(hold, required_steps=int(hold_steps))
-    )
-    state_applied = False
-    state_matches = False
-    if motion_verified or not bool(require_physical_button_motion):
-        try:
-            env.set_verified_faucet_state(
-                mode=normalized_mode,
-                temperature=normalized_temp,
-            )
-            state_applied = True
-            state_matches = bool(
-                env.faucet_matches(
-                    mode=normalized_mode,
-                    temperature=normalized_temp if normalized_mode == "on" else None,
-                )
-            )
-        except Exception:
-            state_matches = False
-    checks = {
-        "prepress": bool(prepress.get("pass", False)),
-        "press": bool(press.get("pass", False)),
-        "press_endpoint": bool(press_endpoint),
-        "button_hold": _gripper_command_pass(hold, required_steps=int(hold_steps)),
-        "physical_button_motion": bool(motion_verified),
-        "faucet_fixture_state": bool(state_matches),
-        "retreat": bool(retreat.get("pass", False)),
-    }
-    if not bool(require_physical_button_motion):
-        # The operation remains physical even in permissive calibration mode;
-        # only this diagnostic requirement becomes non-blocking.
-        checks["physical_button_motion"] = True
-    return {
-        "primitive": "operate_water_button",
-        "mode": normalized_mode,
-        "temperature": normalized_temp,
-        "button_position_world": button.astype(float).tolist(),
-        "prepress_target_world": prepress_pose.astype(float).tolist(),
-        "press_target_world": press_pose.astype(float).tolist(),
-        "press_endpoint_world": press_eef[:3, 3].astype(float).tolist(),
-        "press_endpoint_error_m": endpoint_error,
-        "near_miss_position_tolerance": float(near_miss_position_tolerance),
-        "fixture_state_applied_after_verified_press": bool(state_applied),
-        "faucet_switch_calibration": faucet_calibration,
-        "stages": {
-            "prepress": _without_obs(prepress),
-            "press": _without_obs(press),
-            "hold": _without_obs(hold),
-            "retreat": _without_obs(retreat),
-        },
-        "checks": checks,
-        "pass": bool(all(checks.values())),
-        "reason": None if all(checks.values()) else "water_button_operation_failed",
-    }
 
 
 def fill_held_cup_under_faucet(
@@ -210,6 +30,8 @@ def fill_held_cup_under_faucet(
     gripper_action: float,
     cup_z_offset_from_water: float,
     entry_z_offset: float,
+    entry_settle_steps: int = 1,
+    under_water_settle_steps: int = 1,
     xy_near_water_tolerance: float,
     sink_fill_pose_file: str | None = None,
     water_site_offset_x: float = 0.0,
@@ -235,6 +57,11 @@ def fill_held_cup_under_faucet(
         )
     if int(hold_steps) < 1:
         return _failure("fill_held_cup_under_faucet", "fill_hold_steps_must_be_positive")
+    if int(entry_settle_steps) < 0 or int(under_water_settle_steps) < 0:
+        return _failure(
+            "fill_held_cup_under_faucet",
+            "fill_stage_settle_steps_must_be_non_negative",
+        )
     if not bool(controller.runtime_config.execute):
         return _dry_result(
             "fill_held_cup_under_faucet",
@@ -244,18 +71,24 @@ def fill_held_cup_under_faucet(
 
     env = controller.env
     try:
+        set_affinity = getattr(env, "set_sensor_faucet_affinity", None)
+        if callable(set_affinity):
+            set_affinity(cup_id, normalized_temp)
         controller.refresh_obs()
-        faucet_ok = bool(env.faucet_matches(mode="on", temperature=normalized_temp))
         hold_before = get_object_hold_status(env, cup_id)
         fill = resolve_held_fill_pose(
             controller,
             cup_id,
+            temperature=normalized_temp,
             cup_z_offset_from_water=float(cup_z_offset_from_water),
             water_site_offset_x=float(water_site_offset_x),
             water_site_offset_y=float(water_site_offset_y),
             sink_fill_pose_file=sink_fill_pose_file,
         )
     except Exception as exc:
+        clear_affinity = getattr(env, "clear_sensor_faucet_affinity", None)
+        if callable(clear_affinity):
+            clear_affinity(cup_id)
         return _failure(
             "fill_held_cup_under_faucet",
             "fill_target_unavailable",
@@ -269,7 +102,9 @@ def fill_held_cup_under_faucet(
     entry_pose[:3, 3] += np.asarray([0.0, 0.0, float(entry_z_offset)], dtype=float)
     callback_factory = getattr(env, "water_stream_intercept_callback", None)
     stream_callback = (
-        callback_factory(cup_id) if callable(callback_factory) else None
+        callback_factory(cup_id, normalized_temp)
+        if callable(callback_factory)
+        else None
     )
 
     entry = _run_world_stage(
@@ -279,6 +114,7 @@ def fill_held_cup_under_faucet(
         gripper_action=float(gripper_action),
         holding_object=cup_id,
         post_step_callback=stream_callback,
+        settle_steps=int(entry_settle_steps),
     )
     descend = (
         _run_world_stage(
@@ -289,15 +125,34 @@ def fill_held_cup_under_faucet(
             holding_object=cup_id,
             record_trajectory=True,
             post_step_callback=stream_callback,
+            settle_steps=int(under_water_settle_steps),
         )
         if bool(entry.get("pass", False))
         else _skipped("held_fill_under_faucet", "entry_failed")
     )
-    cup_under_water = _cup_is_under_water(env, cup_id)
+    cup_under_water = _cup_is_under_water(env, cup_id, normalized_temp)
+    faucet_ok = bool(env.faucet_matches(mode="on", temperature=normalized_temp))
     cup_position_at_fill = _actual_cup_position(env, controller, cup_id)
     water_site = np.asarray(fill["water_site_world"], dtype=float)
     xy_error = float(np.linalg.norm(cup_position_at_fill[:2] - water_site[:2]))
     cup_xy_near_water = xy_error <= float(xy_near_water_tolerance)
+    faucet_wait = (
+        _wait_for_sensor_faucet(
+            controller,
+            env,
+            cup_id,
+            normalized_temp,
+            gripper_action=float(gripper_action),
+            max_wait_steps=_sensor_faucet_wait_steps(env),
+        )
+        if bool(descend.get("pass", False))
+        and not (bool(cup_under_water) and bool(faucet_ok))
+        else None
+    )
+    if bool((faucet_wait or {}).get("activated", False)):
+        controller.refresh_obs()
+        cup_under_water = _cup_is_under_water(env, cup_id, normalized_temp)
+        faucet_ok = bool(env.faucet_matches(mode="on", temperature=normalized_temp))
     hold = (
         _run_fill_dwell(
             controller,
@@ -312,7 +167,7 @@ def fill_held_cup_under_faucet(
         else _skipped("held_fill_hold", "cup_not_verified_under_water")
     )
     checks = {
-        "faucet_on_at_requested_temperature": bool(faucet_ok),
+        "requested_sensor_faucet_active": bool(faucet_ok),
         "cup_held_before_fill": bool(hold_before.get("held", False)),
         "entry": bool(entry.get("pass", False)),
         "under_water_motion": bool(descend.get("pass", False)),
@@ -335,6 +190,9 @@ def fill_held_cup_under_faucet(
         restore_stream = getattr(env, "set_water_stream_intercept", None)
         if callable(restore_stream):
             restore_stream(None)
+        clear_affinity = getattr(env, "clear_sensor_faucet_affinity", None)
+        if callable(clear_affinity):
+            clear_affinity(cup_id)
     return {
         "primitive": "fill_held_cup_under_faucet",
         "cup_id": cup_id,
@@ -351,6 +209,11 @@ def fill_held_cup_under_faucet(
         "stages": {
             "entry": _without_obs(entry),
             "under_water": _without_obs(descend),
+            "sensor_faucet_wait": (
+                _without_obs(faucet_wait)
+                if faucet_wait is not None
+                else _skipped("held_fill_sensor_faucet_wait", "sensor_faucet_already_active")
+            ),
             "hold": _without_obs(hold),
         },
         "post_fill_arm_motion": "return_arm_holding_cup_next_workflow_stage",
@@ -523,6 +386,7 @@ def _run_world_stage(
     holding_object: str | None = None,
     record_trajectory: bool = False,
     post_step_callback: Any | None = None,
+    settle_steps: int | None = None,
 ) -> dict[str, Any]:
     return controller.run_planned_stage(
         pose_world_to_base(controller.obs, pose_world),
@@ -531,7 +395,54 @@ def _run_world_stage(
         holding_object=holding_object,
         record_trajectory=bool(record_trajectory),
         post_step_callback=post_step_callback,
+        settle_steps=settle_steps,
     )
+
+
+def _sensor_faucet_wait_steps(env: Any) -> int:
+    """Bound the faucet settle wait above the configured dwell threshold."""
+
+    settle = getattr(env, "_sensor_zone_settle_steps", None)
+    threshold = int(settle()) if callable(settle) else 0
+    return max(1, threshold + int(threshold * 0.6) + 5)
+
+
+def _wait_for_sensor_faucet(
+    controller: Any,
+    env: Any,
+    cup_id: str,
+    temperature: str,
+    *,
+    gripper_action: float,
+    max_wait_steps: int,
+) -> dict[str, Any]:
+    """Hold the cup under the nozzle until the sensor faucet activates.
+
+    The descent already moves the cup into the zone; the faucet only turns on
+    after the cup dwells there for ``zone_settle_steps``.  This loop steps in
+    place and drives the intercept callback so the dwell counter advances.
+    """
+
+    callback = env.water_stream_intercept_callback(cup_id, temperature)
+    steps = 0
+    while steps < int(max_wait_steps):
+        if env.cup_is_under_sensor_faucet(cup_id, temperature):
+            return {
+                "stage": "held_fill_sensor_faucet_wait",
+                "activated": True,
+                "steps": int(steps),
+                "reason": "sensor_faucet_settle_completed",
+            }
+        result = controller.run_gripper_command(float(gripper_action), 1)
+        step_count = int(result.get("steps", 0)) or 1
+        callback(result.get("obs") or {})
+        steps += step_count
+    return {
+        "stage": "held_fill_sensor_faucet_wait",
+        "activated": False,
+        "steps": int(steps),
+        "reason": "sensor_faucet_wait_timeout",
+    }
 
 
 def _run_fill_dwell(
@@ -611,9 +522,9 @@ def _run_fill_dwell(
     }
 
 
-def _cup_is_under_water(env: Any, cup_id: str) -> bool:
+def _cup_is_under_water(env: Any, cup_id: str, temperature: str) -> bool:
     try:
-        return bool(env.sink.check_obj_under_water(env, cup_id))
+        return bool(env.cup_is_under_sensor_faucet(cup_id, temperature))
     except Exception:
         return False
 
@@ -656,6 +567,5 @@ def _dry_result(primitive: str, **details: Any) -> dict[str, Any]:
 
 __all__ = [
     "fill_held_cup_under_faucet",
-    "operate_water_button",
     "place_cup_on_service_slot",
 ]

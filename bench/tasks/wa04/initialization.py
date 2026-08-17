@@ -169,9 +169,8 @@ def apply_robot_base_initial_state(
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Apply the one allowed reset-time base initialization method.
 
-    In manual-path mode, the first temperature determines whether reset starts
-    at the hot or cold button calibration.  This does not alter hidden labels;
-    the temperature order was already resolved in the immutable episode plan.
+    Manual-path reset uses the configured neutral sample. Temperature is not
+    encoded by the initial Base pose; it is selected later by the faucet side.
     """
 
     first_temperature = str(episode.fill_temperature_order[0])

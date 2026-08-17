@@ -330,25 +330,11 @@ def topdown_eef_rotation_world(obs: Mapping[str, Any]) -> np.ndarray:
     return matrix_from_base_obs(dict(obs))[:3, :3] @ np.diag([1.0, -1.0, -1.0])
 
 
-def button_press_pose_world(
-    obs: Mapping[str, Any],
-    *,
-    button_position_world: Any,
-    z_offset: float,
-) -> np.ndarray:
-    """Create a downwards press pose at one live water-button position."""
-
-    position = _vec3(button_position_world, "button_position_world")
-    pose = np.eye(4, dtype=float)
-    pose[:3, :3] = topdown_eef_rotation_world(obs)
-    pose[:3, 3] = position + np.asarray([0.0, 0.0, float(z_offset)], dtype=float)
-    return pose
-
-
 def resolve_held_fill_pose(
     controller: Any,
     cup_id: str,
     *,
+    temperature: str,
     cup_z_offset_from_water: float,
     water_site_offset_x: float = 0.0,
     water_site_offset_y: float = 0.0,
@@ -365,7 +351,13 @@ def resolve_held_fill_pose(
     if cup_id not in CUP_IDS:
         raise ValueError(f"invalid WA-02 cup id: {cup_id!r}")
     env = controller.env
-    water_site = _vec3(env.water_site_position(), "sink water site")
+    try:
+        site_value = env.water_site_position(temperature)
+    except TypeError:
+        # Compatibility for geometry-only test doubles; production WA-02
+        # always resolves the selected touchless faucet explicitly.
+        site_value = env.water_site_position()
+    water_site = _vec3(site_value, f"{temperature} sensor-faucet water site")
     current_eef = np.asarray(
         controller.stage_executor.current_eef_site_world(), dtype=float
     ).reshape(4, 4)
@@ -491,7 +483,6 @@ def _vec3(value: Any, label: str) -> np.ndarray:
 __all__ = [
     "DEFAULT_CUP_GRASP_YAW_OFFSETS_DEG",
     "build_pick_payload_selector",
-    "button_press_pose_world",
     "current_held_or_object_position_world",
     "load_anchor_pose",
     "pose_world_to_base",

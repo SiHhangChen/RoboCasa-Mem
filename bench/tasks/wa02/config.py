@@ -36,7 +36,7 @@ from bench.tasks.wa02.domain.geometry import (
 
 PACKAGE_ROOT = Path(__file__).resolve().parent
 DEFAULT_TASK_CONFIG_FILE = PACKAGE_ROOT / "resources" / "task.yaml"
-DEFAULT_INITIAL_STATION_ID = "water_button_station"
+DEFAULT_INITIAL_STATION_ID = "sink_fill_station"
 
 
 def _normalize_degrees(value: float) -> float:
@@ -296,7 +296,7 @@ def resolve_action_config(*, config: TaskConfig) -> ActionConfig:
     ):
         raise ValueError("WA-02 cup-pick yaw tolerance must be positive and finite")
     cup_pick = _resolve_grasp_approach_sector(cup_pick)
-    faucet = dict(_section(operations, "faucet"))
+    sensor_faucets = dict(_section(operations, "sensor_faucets"))
     held_fill = dict(_section(operations, "held_fill"))
     held_fill_navigation_xy_tolerance = float(
         held_fill.pop("navigation_xy_tolerance", 0.03)
@@ -311,12 +311,6 @@ def resolve_action_config(*, config: TaskConfig) -> ActionConfig:
     by_temperature = _section(held_fill, "by_temperature")
     by_service_slot = _section(service_place, "by_slot")
 
-    faucet.update(
-        {
-            "water_button_positions_file": str(_resource(config, "water_button_positions")),
-            "faucet_switch_pose_file": str(_resource(config, "faucet_switch_pose")),
-        }
-    )
     fill_base = {key: value for key, value in held_fill.items() if key != "by_temperature"}
     use_sink_fill_calibration = bool(
         fill_base.pop("use_sink_fill_calibration", False)
@@ -351,7 +345,7 @@ def resolve_action_config(*, config: TaskConfig) -> ActionConfig:
         cup_pick_metadata=cup_pick,
         cup_pick_navigation_xy_tolerance=cup_pick_navigation_xy_tolerance,
         cup_pick_navigation_yaw_tolerance=cup_pick_navigation_yaw_tolerance,
-        faucet_metadata=faucet,
+        sensor_faucet_metadata=sensor_faucets,
         held_fill_navigation_xy_tolerance=held_fill_navigation_xy_tolerance,
         held_fill_metadata_by_temperature=fill_by_temperature,
         service_place_metadata_by_slot=service_by_slot,
@@ -441,8 +435,7 @@ def _validate_resources(config: TaskConfig) -> None:
     for name in (
         "manual_base_path",
         "station_poses",
-        "water_button_positions",
-        "faucet_switch_pose",
+        "sensor_faucet_layout",
         "sink_fill_pose",
         "planner_script",
     ):

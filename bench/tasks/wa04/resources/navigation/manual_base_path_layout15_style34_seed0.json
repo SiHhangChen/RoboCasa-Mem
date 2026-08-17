@@ -5,22 +5,35 @@
     "style_id": 34,
     "seed": 0,
     "calibration_seed": 1,
-    "description": "WA-04 manually recorded forward loop: button, shared cup pick, fill, shared service placement, then return to button.",
-      "record_source": "reused_from_wa02_user_line_teleoperation_2026-08-02"
+    "description": "WA-04 manually recorded forward loop: shared cup pick, fill, per-slot service placement, then return.",
+    "record_source": "user_line_teleoperation_2026-08-02"
   },
   "default_start_index": 0,
   "route_mode": "forward_loop",
   "station_targets": {
     "navigation_start": 0,
-    "water_button_station": [0, 13],
-    "water_button_station:hot_on": [0, 13],
-    "water_button_station:cold_on": [0, 13],
-    "water_button_station:hot_off": [0, 13],
-    "water_button_station:cold_off": [0, 13],
     "cup_pick_station": 4,
-    "cup_A:pick": 4,
-    "cup_B:pick": 4,
-    "cup_C:pick": 4,
+    "cup_A:pick": {
+      "index": 4,
+      "routes": {
+        "13": [13, 0, 1, 2, 3, 4],
+        "14": [14, 10, 11, 12, 13, 0, 1, 2, 3, 4]
+      }
+    },
+    "cup_B:pick": {
+      "index": 4,
+      "routes": {
+        "13": [13, 0, 1, 2, 3, 4],
+        "14": [14, 10, 11, 12, 13, 0, 1, 2, 3, 4]
+      }
+    },
+    "cup_C:pick": {
+      "index": 4,
+      "routes": {
+        "13": [13, 0, 1, 2, 3, 4],
+        "14": [14, 10, 11, 12, 13, 0, 1, 2, 3, 4]
+      }
+    },
     "sink_basin": 8,
     "sink_basin:fill": 8,
     "sink_basin:holding:cup_A": 8,
@@ -29,25 +42,31 @@
     "service_area": {
       "index": 10,
       "routes": {
-        "13": [13, 12, 11, 10]
+        "13": [13, 15, 16, 10],
+        "14": [14, 10]
       }
     },
     "service_area:slot_1": {
       "index": 10,
       "routes": {
-        "13": [13, 12, 11, 10]
+        "13": [13, 15, 16, 10],
+        "14": [14, 10]
       }
     },
     "service_area:slot_2": {
-      "index": 10,
+      "index": 17,
       "routes": {
-        "13": [13, 12, 11, 10]
+        "8": [8, 9, 10, 17],
+        "13": [13, 15, 16, 10, 17],
+        "14": [14, 17]
       }
     },
     "service_area:slot_3": {
       "index": 10,
       "routes": {
-        "13": [13, 12, 11, 10]
+        "8": [8, 9, 10],
+        "13": [13, 15, 16, 10],
+        "17": [17, 10]
       }
     },
     "service_area:holding:cup_A": 10,
@@ -77,21 +96,21 @@
       "index": 3,
       "name": "button_to_cup_forward",
       "xy": [1.188, -3.959],
-      "yaw": -1.570
+      "yaw": -1.57
     },
     {
       "index": 4,
       "name": "shared_cup_pick_verified_preset",
       "xy": [1.3789267853889002, -3.7609959163360895],
-      "yaw": 0.000009949271771056808,
-      "record_source": "reused_from_wa02_cup_pick_station_calibration",
+      "yaw": 9.949271771056808e-06,
+      "record_source": "outputs/wa04_cup_pick_station_calibration.json",
       "replaces_recorded_xy": [1.396, -3.779],
       "replaces_recorded_yaw": -0.047
     },
     {
       "index": 5,
       "name": "cup_to_fill_left_turn",
-      "xy": [1.205, -3.560],
+      "xy": [1.205, -3.56],
       "yaw": 1.485
     },
     {
@@ -141,6 +160,34 @@
       "name": "button_return_left_turn",
       "xy": [1.455, -3.057],
       "yaw": -0.048
+    },
+    {
+      "index": 14,
+      "name": "service_slot_3_ready",
+      "xy": [1.476, -1.872],
+      "yaw": -0.038,
+      "record_source": "slot_3_service_station_from_slot_offset"
+    },
+    {
+      "index": 15,
+      "name": "button_to_service_left_turn",
+      "xy": [1.455, -3.057],
+      "yaw": 1.533,
+      "record_source": "forward_service_return_from_button"
+    },
+    {
+      "index": 16,
+      "name": "button_to_service_forward",
+      "xy": [1.476, -2.35],
+      "yaw": 1.533,
+      "record_source": "forward_service_return_from_button"
+    },
+    {
+      "index": 17,
+      "name": "service_slot_2_ready",
+      "xy": [1.476, -2.057],
+      "yaw": -0.038,
+      "record_source": "slot_2_service_station_from_slot_offset"
     }
   ]
 }

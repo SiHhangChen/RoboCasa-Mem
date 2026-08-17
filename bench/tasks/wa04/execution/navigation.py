@@ -24,13 +24,14 @@ from bench.execution.sampling.station_sampler import SimpleStationSampler
 from bench.tasks.wa04.domain.contracts import CUP_IDS, SERVICE_SLOTS
 
 
-WATER_BUTTON_STATION = "water_button_station"
 CUP_PICK_STATION = "cup_pick_station"
 CUP_A_PICK_STATION = "cup_A_pick_station"
 CUP_B_PICK_STATION = "cup_B_pick_station"
 CUP_C_PICK_STATION = "cup_C_pick_station"
 SINK_FILL_STATION = "sink_fill_station"
 SERVICE_AREA_STATION = "service_area_station"
+SERVICE_AREA_SLOT_2_STATION = "service_area_slot_2_station"
+SERVICE_AREA_SLOT_3_STATION = "service_area_slot_3_station"
 
 
 @dataclass(frozen=True)
@@ -214,13 +215,18 @@ def station_aliases() -> dict[Any, str]:
     """Map workflow anchors to their task-owned station IDs."""
 
     return {
-        WATER_BUTTON_STATION: WATER_BUTTON_STATION,
         CUP_PICK_STATION: CUP_PICK_STATION,
         CUP_A_PICK_STATION: CUP_A_PICK_STATION,
         CUP_B_PICK_STATION: CUP_B_PICK_STATION,
         CUP_C_PICK_STATION: CUP_C_PICK_STATION,
         SINK_FILL_STATION: SINK_FILL_STATION,
         SERVICE_AREA_STATION: SERVICE_AREA_STATION,
+        SERVICE_AREA_SLOT_2_STATION: SERVICE_AREA_SLOT_2_STATION,
+        SERVICE_AREA_SLOT_3_STATION: SERVICE_AREA_SLOT_3_STATION,
+        ("service_area", "slot_2"): SERVICE_AREA_SLOT_2_STATION,
+        ("service_area", "slot_3"): SERVICE_AREA_SLOT_3_STATION,
+        "service_area:slot_2": SERVICE_AREA_SLOT_2_STATION,
+        "service_area:slot_3": SERVICE_AREA_SLOT_3_STATION,
         "cup_A": CUP_A_PICK_STATION,
         "cup_B": CUP_B_PICK_STATION,
         "cup_C": CUP_C_PICK_STATION,
@@ -260,6 +266,17 @@ def build_navigation_config(
         manual_base_path_segment_yaw_threshold=float(
             values.pop("manual_base_path_segment_yaw_threshold", 0.05)
         ),
+        base_velocity_profile_enabled=bool(
+            values.pop("base_velocity_profile_enabled", True)
+        ),
+        base_profile_v_max=float(values.pop("base_profile_v_max", 0.65)),
+        base_profile_a_max=float(values.pop("base_profile_a_max", 1.6)),
+        base_profile_a_dec=float(values.pop("base_profile_a_dec", 1.2)),
+        base_profile_v_min=float(values.pop("base_profile_v_min", 0.22)),
+        base_profile_w_max=float(values.pop("base_profile_w_max", 1.2)),
+        base_profile_alpha_max=float(values.pop("base_profile_alpha_max", 3.0)),
+        base_profile_alpha_dec=float(values.pop("base_profile_alpha_dec", 2.5)),
+        base_profile_w_min=float(values.pop("base_profile_w_min", 0.20)),
         base_single_axis_tracking=bool(values.pop("base_single_axis_tracking", False)),
         base_snap_to_target_after_success=bool(
             values.pop("base_snap_to_target_after_success", False)
@@ -283,15 +300,6 @@ def station_specs(env: Any) -> dict[str, dict[str, Any]]:
 
     counter = getattr(env, "counter", None)
     sink = getattr(env, "sink", None)
-    buttons = [
-        _xy_or_none(_water_button_position(env, temperature))
-        for temperature in ("hot", "cold")
-    ]
-    button_xy = _first_available_xy(
-        _mean_xy(buttons),
-        fixture_xy(counter),
-        fixture_xy(sink),
-    )
     cup_points = {cup_id: object_xy(env, cup_id) for cup_id in CUP_IDS}
     cup_xy = _first_available_xy(
         _mean_xy(list(cup_points.values())),
@@ -306,15 +314,6 @@ def station_specs(env: Any) -> dict[str, dict[str, Any]]:
     ]
     service_xy = _first_available_xy(_mean_xy(service_points), fixture_xy(counter))
     return {
-        WATER_BUTTON_STATION: {
-            "station_id": WATER_BUTTON_STATION,
-            "fixture": counter or sink,
-            "anchor_xy": button_xy,
-            "source_fixture": safe_name(counter or sink),
-            "source_object_or_phase": "water_buttons",
-            "stand_off": 0.16,
-            "tangential_offsets": (-0.08, -0.04, 0.0, 0.04, 0.08),
-        },
         CUP_PICK_STATION: {
             "station_id": CUP_PICK_STATION,
             "fixture": counter,
@@ -424,13 +423,6 @@ def build_navigation_assembly(
     )
 
 
-def _water_button_position(env: Any, temperature: str) -> np.ndarray | None:
-    try:
-        return np.asarray(env.water_button_position(temperature), dtype=float)
-    except Exception:
-        return None
-
-
 def _water_site_position(env: Any) -> np.ndarray | None:
     try:
         return np.asarray(env.water_site_position(), dtype=float)
@@ -473,10 +465,11 @@ __all__ = [
     "CUP_C_PICK_STATION",
     "CUP_PICK_STATION",
     "NavigationAssembly",
+    "SERVICE_AREA_SLOT_2_STATION",
+    "SERVICE_AREA_SLOT_3_STATION",
     "SERVICE_AREA_STATION",
     "SINK_FILL_STATION",
     "StationHeightBaseDriver",
-    "WATER_BUTTON_STATION",
     "build_navigation_assembly",
     "build_navigation_config",
     "move_station_torso_to_height",

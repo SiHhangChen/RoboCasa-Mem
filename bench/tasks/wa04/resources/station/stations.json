@@ -7,18 +7,6 @@
   "style_id": 34,
   "seed": 0,
   "stations": {
-    "water_button_station": {
-      "samples": [
-        {
-          "station_id": "water_button_station",
-          "sample_index": 0,
-          "base_xy": [1.514, -3.015],
-          "base_yaw": 0.003,
-          "torso_height": 0.007,
-          "record_source": "manual_path_sample_0"
-        }
-      ]
-    },
     "cup_pick_station": {
       "samples": [
         {
@@ -88,6 +76,30 @@
           "base_yaw": -0.038,
           "torso_height": 0.01,
           "record_source": "manual_path_sample_10"
+        }
+      ]
+    },
+    "service_area_slot_2_station": {
+      "samples": [
+        {
+          "station_id": "service_area_slot_2_station",
+          "sample_index": 0,
+          "base_xy": [1.476, -2.057],
+          "base_yaw": -0.038,
+          "torso_height": 0.01,
+          "record_source": "slot_2_service_station_from_slot_offset"
+        }
+      ]
+    },
+    "service_area_slot_3_station": {
+      "samples": [
+        {
+          "station_id": "service_area_slot_3_station",
+          "sample_index": 0,
+          "base_xy": [1.476, -2.242],
+          "base_yaw": -0.038,
+          "torso_height": 0.01,
+          "record_source": "reuses_shared_service_area_station_verified_by_slot_3_recording"
         }
       ]
     }

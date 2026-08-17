@@ -25,7 +25,6 @@ from bench.execution.planning.nav_algo import normalize_angle
 from bench.tasks.wa02.domain.contracts import CUP_IDS, SERVICE_SLOTS
 from bench.tasks.wa02.execution.water_operations import (
     fill_held_cup_under_faucet,
-    operate_water_button,
     place_cup_on_service_slot,
 )
 
@@ -38,10 +37,6 @@ def build_stage_handlers(
     """Map workflow operation names to physical execution and verified events."""
 
     defaults = dict(handler_settings or {})
-
-    def water_button(target: str, **kwargs: Any) -> dict[str, Any]:
-        del target
-        return operate_water_button(controller, **{**defaults, **dict(kwargs)})
 
     def pick_upright_cup(target: str, **kwargs: Any) -> dict[str, Any]:
         cup_id = str(target)
@@ -316,7 +311,6 @@ def build_stage_handlers(
         "pick_upright_cup": pick_upright_cup,
         "return_arm_holding_cup": return_holding_cup,
         "lift_held_cup_after_sink_exit": lift_after_sink_exit,
-        "operate_water_button": water_button,
         "fill_held_under_faucet": fill,
         "place_on_service_slot": place,
         "record_verified_staging": record_staging,
@@ -409,15 +403,20 @@ def return_arm_holding_cup(
         "required": stream_handoff,
         "restored": not stream_handoff,
     }
+    deactivate_faucets = getattr(env, "deactivate_sensor_faucets", None)
     restore_stream = getattr(env, "set_water_stream_intercept", None)
     if (
         stream_handoff
         and bool(movement.get("pass", False))
-        and callable(restore_stream)
+        and (callable(deactivate_faucets) or callable(restore_stream))
     ):
         stream_restore = {
             "required": True,
-            **dict(restore_stream(None)),
+            **dict(
+                deactivate_faucets()
+                if callable(deactivate_faucets)
+                else restore_stream(None)
+            ),
         }
     checks: dict[str, bool] = {
         "cartesian_return": bool(movement.get("pass", False)),
@@ -820,6 +819,12 @@ def lift_held_cup_after_sink_exit(
         "cup_upright": bool(upright_z_axis >= upright_threshold),
     }
     passed = bool(all(checks.values()))
+    clear_affinity = getattr(env, "clear_sensor_faucet_affinity", None)
+    affinity_clear = (
+        dict(clear_affinity(cup_id))
+        if callable(clear_affinity)
+        else {"cup_id": cup_id, "cleared": False, "reason": "unsupported"}
+    )
     return {
         "primitive": "lift_held_cup_after_sink_exit",
         "cup_id": cup_id,
@@ -853,6 +858,7 @@ def lift_held_cup_after_sink_exit(
             "cup_upright_threshold": upright_threshold,
             "orientation_tolerance_deg": rotation_tolerance,
         },
+        "sensor_faucet_affinity_clear": affinity_clear,
         "checks": checks,
         "pass": passed,
         "reason": None if passed else "held_cup_sink_exit_lift_not_verified",

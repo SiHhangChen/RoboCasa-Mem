@@ -14,12 +14,17 @@ from bench.execution.navigation.base_motion import (
     step_base_and_hold_arm,
     world_xy_to_controller_action,
 )
+from bench.execution.navigation.velocity_profile import (
+    XY_ACTION_SPEED,
+    AxialProfileParams,
+    PlanarVelocityProfile,
+    resolve_control_dt,
+)
 from bench.execution.planning import matrix_from_base_obs, pose_from_matrix, rotation_error_deg
 from bench.execution.planning.nav_algo import normalize_angle
 from bench.tasks.wa04.domain.contracts import CUP_IDS, SERVICE_SLOTS
 from bench.tasks.wa04.execution.water_operations import (
     fill_held_cup_under_faucet,
-    operate_water_button,
     place_cup_on_service_slot,
 )
 
@@ -32,10 +37,6 @@ def build_stage_handlers(
     """Map workflow operation names to physical execution and verified events."""
 
     defaults = dict(handler_settings or {})
-
-    def water_button(target: str, **kwargs: Any) -> dict[str, Any]:
-        del target
-        return operate_water_button(controller, **{**defaults, **dict(kwargs)})
 
     def pick_upright_cup(target: str, **kwargs: Any) -> dict[str, Any]:
         cup_id = str(target)
@@ -310,7 +311,6 @@ def build_stage_handlers(
         "pick_upright_cup": pick_upright_cup,
         "return_arm_holding_cup": return_holding_cup,
         "lift_held_cup_after_sink_exit": lift_after_sink_exit,
-        "operate_water_button": water_button,
         "fill_held_under_faucet": fill,
         "place_on_service_slot": place,
         "record_verified_staging": record_staging,
@@ -403,15 +403,20 @@ def return_arm_holding_cup(
         "required": stream_handoff,
         "restored": not stream_handoff,
     }
+    deactivate_faucets = getattr(env, "deactivate_sensor_faucets", None)
     restore_stream = getattr(env, "set_water_stream_intercept", None)
     if (
         stream_handoff
         and bool(movement.get("pass", False))
-        and callable(restore_stream)
+        and (callable(deactivate_faucets) or callable(restore_stream))
     ):
         stream_restore = {
             "required": True,
-            **dict(restore_stream(None)),
+            **dict(
+                deactivate_faucets()
+                if callable(deactivate_faucets)
+                else restore_stream(None)
+            ),
         }
     checks: dict[str, bool] = {
         "cartesian_return": bool(movement.get("pass", False)),
@@ -498,6 +503,10 @@ def lift_held_cup_after_sink_exit(
     boundary_translation_gain: float = 3.0,
     boundary_min_action: float = 0.025,
     boundary_max_action: float = 0.35,
+    boundary_velocity_profile_enabled: bool = True,
+    boundary_profile_acceleration: float = 1.6,
+    boundary_profile_deceleration: float = 1.2,
+    boundary_profile_target_overshoot: float = 0.005,
     boundary_max_steps: int = 900,
     target_base_yaw: float | None = None,
     yaw_hold_gain: float = 0.30,
@@ -522,6 +531,10 @@ def lift_held_cup_after_sink_exit(
     translation_gain = float(boundary_translation_gain)
     min_action = float(boundary_min_action)
     max_action = float(boundary_max_action)
+    profile_enabled = bool(boundary_velocity_profile_enabled)
+    profile_acceleration = float(boundary_profile_acceleration)
+    profile_deceleration = float(boundary_profile_deceleration)
+    profile_target_overshoot = float(boundary_profile_target_overshoot)
     yaw_gain = float(yaw_hold_gain)
     lift = float(lift_offset)
     lift_tolerance = float(lift_position_tolerance)
@@ -537,6 +550,9 @@ def lift_held_cup_after_sink_exit(
         translation_gain,
         min_action,
         max_action,
+        profile_acceleration,
+        profile_deceleration,
+        profile_target_overshoot,
         yaw_gain,
         lift,
         lift_tolerance,
@@ -552,6 +568,13 @@ def lift_held_cup_after_sink_exit(
         raise ValueError("sink-exit boundary tolerances must be positive")
     if translation_gain <= 0.0 or not 0.0 < min_action <= max_action <= 1.0:
         raise ValueError("sink-exit Base action limits are invalid")
+    if profile_acceleration <= 0.0 or profile_deceleration <= 0.0:
+        raise ValueError("sink-exit velocity-profile rates must be positive")
+    if profile_enabled and not 0.0 < profile_target_overshoot < overshoot_tolerance:
+        raise ValueError(
+            "sink-exit velocity-profile target overshoot must be positive and "
+            "smaller than the boundary overshoot tolerance"
+        )
     if int(boundary_max_steps) <= 0:
         raise ValueError("boundary_max_steps must be positive")
     if lift <= 0.0:
@@ -575,6 +598,9 @@ def lift_held_cup_after_sink_exit(
             "stage": str(stage),
             "strategy": "cup_crosses_fixed_sink_local_x_then_vertical_lift",
             "configured_sink_exterior_local_x_min": boundary,
+            "boundary_control_mode": (
+                "velocity_profile_xy" if profile_enabled else "legacy_proportional_xy"
+            ),
             "lift_offset": lift,
             "dry_run": True,
             "physical_validation": {"deferred_to_execute": True},
@@ -604,19 +630,51 @@ def lift_held_cup_after_sink_exit(
     current_cup_local = initial_cup_local.copy()
     steps = 0
     crossed = bool(current_cup_local[0] <= boundary)
+    translation_profile = _sink_exit_translation_profile(
+        env,
+        enabled=profile_enabled,
+        min_action=min_action,
+        max_action=max_action,
+        acceleration=profile_acceleration,
+        deceleration=profile_deceleration,
+    )
+    command_norm_min = float("inf")
+    command_norm_max = 0.0
+    command_norm_final = 0.0
     while not crossed and steps < int(boundary_max_steps):
         remaining_x = boundary - float(current_cup_local[0])
+        control_remaining_x = (
+            remaining_x - profile_target_overshoot
+            if translation_profile is not None
+            else remaining_x
+        )
         local_error = np.asarray(
-            [remaining_x, remaining_x * route_ratio], dtype=float
+            [control_remaining_x, control_remaining_x * route_ratio], dtype=float
         )
         world_error = _counter_local_vector_to_world(env, local_error)
         controller_error = world_xy_to_controller_action(env, world_error)
-        command_xy = controller_error * translation_gain
+        if translation_profile is not None:
+            # The legacy proportional command spent hundreds of frames in its
+            # low-speed tail.  Use the same acceleration/braking profile as the
+            # calibrated manual Base path, while retaining the cup-boundary
+            # crossing condition and overshoot gate below.
+            command_xy = translation_profile.step_action(
+                controller_error,
+                tolerance=0.0,
+            )
+        else:
+            command_xy = controller_error * translation_gain
+            command_norm = float(np.linalg.norm(command_xy))
+            if command_norm > max_action:
+                command_xy *= max_action / command_norm
+            elif 0.0 < command_norm < min_action:
+                command_xy *= min_action / command_norm
+
         command_norm = float(np.linalg.norm(command_xy))
-        if command_norm > max_action:
-            command_xy *= max_action / command_norm
-        elif 0.0 < command_norm < min_action:
-            command_xy *= min_action / command_norm
+        if command_norm > 0.0:
+            command_norm_min = min(command_norm_min, command_norm)
+        command_norm_max = max(command_norm_max, command_norm)
+        command_norm_final = command_norm
 
         action = np.zeros(base_action_size, dtype=float)
         action[:2] = command_xy[:2]
@@ -641,6 +699,25 @@ def lift_held_cup_after_sink_exit(
     boundary_base_xy = np.asarray(controller.obs["robot0_base_pos"], dtype=float)[:2]
     boundary_base_yaw = float(base_yaw(dict(controller.obs)))
     overshoot = max(0.0, boundary - float(boundary_cup_local[0]))
+    boundary_control = {
+        "mode": (
+            "velocity_profile_xy"
+            if translation_profile is not None
+            else "legacy_proportional_xy"
+        ),
+        "translation_gain": translation_gain,
+        "min_action": min_action,
+        "max_action": max_action,
+        "profile_acceleration": profile_acceleration,
+        "profile_deceleration": profile_deceleration,
+        "profile_target_overshoot": profile_target_overshoot,
+        "control_dt": float(resolve_control_dt(env)),
+        "command_norm_min": (
+            0.0 if not np.isfinite(command_norm_min) else command_norm_min
+        ),
+        "command_norm_max": command_norm_max,
+        "command_norm_final": command_norm_final,
+    }
     boundary_checks = {
         "configured_edge_matches_live_sink": bool(
             geometry_error <= geometry_tolerance
@@ -670,6 +747,7 @@ def lift_held_cup_after_sink_exit(
             "boundary_base_xy": boundary_base_xy.tolist(),
             "boundary_base_yaw": boundary_base_yaw,
             "base_translation_steps": int(steps),
+            "boundary_control": boundary_control,
             "boundary_overshoot_m": overshoot,
             "checks": boundary_checks,
             "pass": False,
@@ -741,6 +819,12 @@ def lift_held_cup_after_sink_exit(
         "cup_upright": bool(upright_z_axis >= upright_threshold),
     }
     passed = bool(all(checks.values()))
+    clear_affinity = getattr(env, "clear_sensor_faucet_affinity", None)
+    affinity_clear = (
+        dict(clear_affinity(cup_id))
+        if callable(clear_affinity)
+        else {"cup_id": cup_id, "cleared": False, "reason": "unsupported"}
+    )
     return {
         "primitive": "lift_held_cup_after_sink_exit",
         "cup_id": cup_id,
@@ -760,6 +844,7 @@ def lift_held_cup_after_sink_exit(
         "boundary_base_xy": boundary_base_xy.tolist(),
         "boundary_base_yaw": boundary_base_yaw,
         "base_translation_steps": int(steps),
+        "boundary_control": boundary_control,
         "boundary_overshoot_m": overshoot,
         "lift_offset": lift,
         "lift_position_tolerance": lift_tolerance,
@@ -773,6 +858,7 @@ def lift_held_cup_after_sink_exit(
             "cup_upright_threshold": upright_threshold,
             "orientation_tolerance_deg": rotation_tolerance,
         },
+        "sensor_faucet_affinity_clear": affinity_clear,
         "checks": checks,
         "pass": passed,
         "reason": None if passed else "held_cup_sink_exit_lift_not_verified",
@@ -821,6 +907,31 @@ def _counter_local_vector_to_world(env: Any, local_vector_xy: Any) -> np.ndarray
         dtype=float,
     )
     return rotation @ values
+
+
+def _sink_exit_translation_profile(
+    env: Any,
+    *,
+    enabled: bool,
+    min_action: float,
+    max_action: float,
+    acceleration: float,
+    deceleration: float,
+) -> PlanarVelocityProfile | None:
+    """Build the bounded sink-exit profile in physical XY speed units."""
+
+    if not bool(enabled):
+        return None
+    return PlanarVelocityProfile(
+        AxialProfileParams(
+            v_max=float(max_action) * XY_ACTION_SPEED,
+            a_max=float(acceleration),
+            a_dec=float(deceleration),
+            v_min=float(min_action) * XY_ACTION_SPEED,
+            action_speed=XY_ACTION_SPEED,
+        ),
+        dt=resolve_control_dt(env),
+    )
 
 
 def _refresh(controller: Any) -> Any:

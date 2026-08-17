@@ -120,7 +120,7 @@ class ActionConfig:
     cup_pick_metadata: Mapping[str, Any]
     cup_pick_navigation_xy_tolerance: float
     cup_pick_navigation_yaw_tolerance: float
-    faucet_metadata: Mapping[str, Any]
+    sensor_faucet_metadata: Mapping[str, Any]
     held_fill_navigation_xy_tolerance: float
     held_fill_metadata_by_temperature: Mapping[str, Mapping[str, Any]]
     service_place_metadata_by_slot: Mapping[str, Mapping[str, Any]]

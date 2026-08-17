@@ -11,6 +11,7 @@ from bench.tasks.wa02.execution.handlers import (
     _sink_exit_translation_profile,
     lift_held_cup_after_sink_exit,
 )
+from bench.tasks.wa02.config import load_task_config, resolve_action_config
 
 
 def test_sink_exit_profile_removes_the_legacy_low_speed_tail() -> None:
@@ -65,6 +66,31 @@ def test_sink_exit_profile_can_fall_back_to_legacy_control() -> None:
         )
         is None
     )
+
+
+def test_wa02_uses_bounded_fast_sink_exit_and_short_service_settles() -> None:
+    actions = resolve_action_config(config=load_task_config())
+    sink_exit = dict(actions.sink_exit_lift_metadata)
+
+    assert sink_exit["boundary_max_action"] == pytest.approx(0.65)
+    assert sink_exit["boundary_profile_acceleration"] == pytest.approx(2.4)
+    assert sink_exit["boundary_profile_deceleration"] == pytest.approx(2.0)
+    assert sink_exit["boundary_profile_target_overshoot"] == pytest.approx(0.008)
+    assert sink_exit["boundary_max_steps"] == 450
+    assert sink_exit["settle_steps"] == 4
+
+    for metadata in actions.service_place_metadata_by_slot.values():
+        assert metadata["entry_settle_steps"] == 2
+        assert metadata["place_settle_steps"] == 3
+        assert metadata["clearance_settle_steps"] == 2
+        assert metadata["retreat_settle_steps"] == 1
+
+    slot_1 = actions.service_place_metadata_by_slot["slot_1"]
+    assert slot_1["release_steps"] == 8
+    assert slot_1["release_settle_steps"] == 2
+    slot_2 = actions.service_place_metadata_by_slot["slot_2"]
+    assert "release_steps" not in slot_2
+    assert "release_settle_steps" not in slot_2
 
 
 def test_sink_exit_defaults_to_profile_without_changing_task_semantics() -> None:

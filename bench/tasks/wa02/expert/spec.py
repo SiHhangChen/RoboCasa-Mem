@@ -27,11 +27,6 @@ def build_expert_plan(inputs: ExpertPlanInputs) -> ExpertPlan:
         cup = hot if temperature == "hot" else cold
         label = "first" if ordinal == 1 else "second"
         stages.extend([
-            navigate("water_button_station", purpose=f"{temperature}_on",
-                     name=f"navigate_{label}_{temperature}_button_on"),
-            operate("operate_water_button", "sink", name=f"press_{label}_{temperature}_button_on",
-                    metadata={**dict(actions.faucet_metadata), "mode": "on", "temperature": temperature}),
-            ret("sink", f"return_after_{label}_{temperature}_button_on"),
             navigate(cup, purpose="pick", name=f"navigate_pick_{label}_{cup}",
                      metadata={
                          "xy_tolerance": float(actions.cup_pick_navigation_xy_tolerance),
@@ -43,7 +38,7 @@ def build_expert_plan(inputs: ExpertPlanInputs) -> ExpertPlan:
             navigate("sink_basin", purpose="fill", holding=cup,
                      name=f"navigate_fill_{label}_{temperature}_{cup}",
                      metadata={"xy_tolerance": float(actions.held_fill_navigation_xy_tolerance)}),
-            operate("fill_held_under_faucet", cup, name=f"physically_fill_{label}_{temperature}_{cup}",
+            operate("fill_held_under_faucet", cup, name=f"sensor_fill_{label}_{temperature}_{cup}",
                     metadata=actions.held_fill_metadata_by_temperature[temperature]),
             operate("return_arm_holding_cup", cup,
                     name=f"return_after_fill_{label}_{temperature}_{cup}",
@@ -59,13 +54,8 @@ def build_expert_plan(inputs: ExpertPlanInputs) -> ExpertPlan:
                     metadata=actions.service_place_metadata_by_slot[slot_by_cup[cup]]),
             ret(cup, f"return_after_service_{label}_{cup}"),
         ])
-    last = order[-1]
     requested = str(facts["requested_cup_id"])
     stages.extend([
-        navigate("water_button_station", purpose=f"{last}_off", name=f"navigate_final_{last}_button_off"),
-        operate("operate_water_button", "sink", name=f"press_final_{last}_button_off",
-                metadata={**dict(actions.faucet_metadata), "mode": "off", "temperature": last}),
-        ret("sink", f"return_after_final_{last}_button_off"),
         operate("verify_cups_staged", "cup_pair", name="verify_both_cups_staged_before_final_pick"),
         navigate("service_area", purpose=str(slot_by_cup[requested]), name=f"navigate_final_pick_{requested}"),
         operate("pick_upright_cup", requested, name=f"physical_final_pick_{requested}", metadata=actions.final_pick_metadata),

@@ -31,24 +31,21 @@ from bench.tasks.wa04.domain.semantics import (
     record_verified_fill,
     record_verified_staging,
 )
+from bench.tasks.wa04.sensor_faucet_asset import (
+    install_wa04_twin_sensor_faucets,
+    wa04_sensor_faucet_stream_name,
+)
 
 
 PACKAGE_ROOT = Path(__file__).resolve().parent
-DEFAULT_BUTTON_POSITIONS_FILE = (
-    PACKAGE_ROOT / "resources" / "poses" / "water_button_positions_layout15_style34_seed0.json"
+DEFAULT_SENSOR_FAUCET_LAYOUT_FILE = (
+    PACKAGE_ROOT
+    / "resources"
+    / "poses"
+    / "sensor_faucet_layout_layout15_style34_seed0.json"
 )
 IDENTICAL_WATER_CUP_XML = f"{assets_root}/objects/objaverse/cup/cup_2/model.xml"
-WATER_BUTTON_GEOM_NAMES = {
-    "hot": "bench_wa04_hot_water_button",
-    "cold": "bench_wa04_cold_water_button",
-}
-WATER_BUTTON_DEFAULT_POSITIONS = {
-    # The two compact buttons sit side-by-side on the 3.5 cm-wide counter
-    # strip immediately in front of the sink.  Hot is on the robot's left
-    # (+world Y) and cold is on its right (-world Y).
-    "hot": (1.856, -2.994, 0.93),
-    "cold": (1.856, -3.074, 0.93),
-}
+TEMPERATURES = ("hot", "cold")
 DEFAULT_CUP_SAMPLING_REGIONS = {
     "cup_A": {
         "region_center_xy": (0.5210, -0.4700),
@@ -82,7 +79,7 @@ class WA04ServeUniqueTemperatureCupAmongThree(Kitchen):
 
     def __init__(
         self,
-        water_button_positions_file: str | Path | None = None,
+        sensor_faucet_layout_file: str | Path | None = None,
         service_threshold: float = 0.12,
         cup_upright_threshold_deg: float = 15.0,
         cup_placement_seed: int = 0,
@@ -91,8 +88,13 @@ class WA04ServeUniqueTemperatureCupAmongThree(Kitchen):
         *args: Any,
         **kwargs: Any,
     ) -> None:
-        self.water_button_positions_file = (
-            None if water_button_positions_file is None else str(water_button_positions_file)
+        self.sensor_faucet_layout_file = (
+            None
+            if sensor_faucet_layout_file is None
+            else str(sensor_faucet_layout_file)
+        )
+        self._sensor_faucet_layout = _load_sensor_faucet_layout(
+            self.sensor_faucet_layout_file
         )
         self.service_threshold = float(service_threshold)
         self.cup_upright_threshold_deg = float(cup_upright_threshold_deg)
@@ -121,9 +123,33 @@ class WA04ServeUniqueTemperatureCupAmongThree(Kitchen):
         self.cup_fill_progress: dict[str, float] = {cup: 0.0 for cup in CUP_IDS}
         self._cup_liquid_full_local_pos: dict[str, np.ndarray] = {}
         self._cup_liquid_original_size: dict[str, np.ndarray] = {}
-        self._water_stream_original_local_pos: np.ndarray | None = None
-        self._water_stream_original_half_height: float | None = None
+        self._water_stream_original_local_pos: dict[str, np.ndarray] = {}
+        self._water_stream_original_half_height: dict[str, float] = {}
+        self._active_sensor_faucets: set[str] = set()
+        self._sensor_cup_by_temperature: dict[str, str | None] = {
+            temperature: None for temperature in TEMPERATURES
+        }
+        self._sensor_zone_entry_steps: dict[str, int] = {
+            temperature: 0 for temperature in TEMPERATURES
+        }
+        self._sensor_faucet_affinity_by_cup: dict[str, str] = {}
         self._water_stream_intercept_trace: dict[str, Any] = {}
+        self._selection_armed_by_cup: dict[str, bool] = {
+            cup: False for cup in CUP_IDS
+        }
+        self._selection_grasp_steps: dict[str, int] = {
+            cup: 0 for cup in CUP_IDS
+        }
+        self._selection_min_grasp_steps: int = 8
+        self._staging_detected_at: dict[str, np.ndarray | None] = {
+            cup: None for cup in CUP_IDS
+        }
+        self._physical_event_diagnostics: dict[str, Any] = {
+            "grasp_detected_by_cup": {},
+            "staging_detected_by_cup": {},
+            "selection_detected": None,
+        }
+        self._task_event_locked: bool = False
         super().__init__(*args, **kwargs)
 
     # Scene construction -------------------------------------------------
@@ -272,23 +298,26 @@ class WA04ServeUniqueTemperatureCupAmongThree(Kitchen):
         return result
 
     def edit_model_xml(self, xml_str: str) -> str:
-        """Install the bench-owned hot/cold buttons without task-label visuals."""
+        """Replace the legacy single spout with two touchless faucets."""
 
         xml_str = super().edit_model_xml(xml_str)
         root = ET.fromstring(xml_str)
         worldbody = root.find("worldbody")
         if worldbody is None:
             return xml_str
-        existing = {geom.get("name") for geom in worldbody.iter("geom") if geom.get("name")}
-        positions = self._water_button_positions()
-        for temperature, geom_name in WATER_BUTTON_GEOM_NAMES.items():
-            if geom_name not in existing:
-                _add_water_button_asset(
-                    worldbody,
-                    geom_name=geom_name,
-                    pos=positions[temperature],
-                    rgba="0.88 0.31 0.24 1" if temperature == "hot" else "0.24 0.54 0.90 1",
-                )
+        layout = self._sensor_faucet_layout
+        install_wa04_twin_sensor_faucets(
+            worldbody,
+            source_water_site_name=str(self.sink.water_site.get("name")),
+            local_x_offsets=dict(layout["spout_local_x_offsets"]),
+            local_yaw_degrees=dict(layout["spout_local_yaw_degrees"]),
+            stream_half_height=float(layout["stream_half_height"]),
+        )
+        _hide_legacy_sink_controls(
+            worldbody,
+            water_site_name=str(self.sink.water_site.get("name")),
+            handle_joint_name=f"{self.sink.naming_prefix}handle_joint",
+        )
         return ET.tostring(root, encoding="utf8").decode("utf8")
 
     def _setup_scene(self) -> None:
@@ -299,7 +328,9 @@ class WA04ServeUniqueTemperatureCupAmongThree(Kitchen):
         self.cup_filled = {cup: False for cup in CUP_IDS}
         self.cup_fill_progress = {cup: 0.0 for cup in CUP_IDS}
         self._semantic_state = _semantic_for_plan(self._episode_plan)
-        self.set_water_stream_intercept(None)
+        self._sensor_faucet_affinity_by_cup.clear()
+        self.deactivate_sensor_faucets()
+        self._reset_physical_event_tracking()
         for cup in CUP_IDS:
             self._set_water_liquid(cup, visible=False)
 
@@ -313,7 +344,9 @@ class WA04ServeUniqueTemperatureCupAmongThree(Kitchen):
         self.cup_temperatures = {cup: None for cup in CUP_IDS}
         self.cup_filled = {cup: False for cup in CUP_IDS}
         self.cup_fill_progress = {cup: 0.0 for cup in CUP_IDS}
-        self.set_water_stream_intercept(None)
+        self._sensor_faucet_affinity_by_cup.clear()
+        self.deactivate_sensor_faucets()
+        self._reset_physical_event_tracking()
         for cup in CUP_IDS:
             self._set_water_liquid(cup, visible=False)
 
@@ -388,10 +421,18 @@ class WA04ServeUniqueTemperatureCupAmongThree(Kitchen):
             self.cup_temperatures[str(cup_id)] = str(temperature)
             self.cup_filled[str(cup_id)] = True
             self.set_cup_fill_progress(str(cup_id), 1.0)
-        return applied
+        return bool(
+            applied
+            or self._semantic_state.filled_temperature_by_cup.get(str(cup_id))
+            == str(temperature)
+        )
 
     def record_verified_staging(self, cup_id: str, slot: str) -> bool:
-        return record_verified_staging(self._semantic_state, cup_id, slot)
+        applied = record_verified_staging(self._semantic_state, cup_id, slot)
+        return bool(
+            applied
+            or self._semantic_state.staged_slot_by_cup.get(str(cup_id)) == str(slot)
+        )
 
     def latch_cups_staged_before_final_pick(self) -> bool:
         return latch_cups_staged(
@@ -405,31 +446,31 @@ class WA04ServeUniqueTemperatureCupAmongThree(Kitchen):
     # Physical queries ---------------------------------------------------
 
     def update_state(self) -> None:
-        """Refresh only derived physical facts; it never writes hidden labels."""
+        """Refresh physical facts and commit verified task events."""
 
         super().update_state()
+        self._refresh_sensor_faucets()
+        self._update_task_events_from_physics()
 
     def object_position(self, cup_id: str) -> np.ndarray:
         return np.asarray(self.sim.data.body_xpos[self.obj_body_id[str(cup_id)]], dtype=float)
 
-    def water_site_position(self) -> np.ndarray | None:
+    def water_site_position(self, temperature: str | None = None) -> np.ndarray | None:
+        """Return one sensor-faucet stream center, or their midpoint."""
+
         try:
-            site_name = self.sink.water_site.get("name")
-            site_id = self.sim.model.site_name2id(site_name)
-            return np.asarray(self.sim.data.site_xpos[site_id], dtype=float)
+            if temperature is None:
+                positions = [self.water_site_position(value) for value in TEMPERATURES]
+                if any(value is None for value in positions):
+                    return None
+                return np.mean(np.vstack(positions), axis=0)
+            temp = _temperature(temperature)
+            site_id = self.sim.model.site_name2id(
+                wa04_sensor_faucet_stream_name(temp)
+            )
+            return np.asarray(self.sim.data.site_xpos[site_id], dtype=float).copy()
         except Exception:
             return None
-
-    def water_button_position(self, temperature: str) -> np.ndarray:
-        temp = str(temperature).strip().lower()
-        if temp not in WATER_BUTTON_GEOM_NAMES:
-            raise ValueError(f"invalid WA-04 water-button temperature: {temperature!r}")
-        geom_name = WATER_BUTTON_GEOM_NAMES[temp]
-        try:
-            geom_id = self.sim.model.geom_name2id(geom_name)
-            return np.asarray(self.sim.data.geom_xpos[geom_id], dtype=float)
-        except Exception:
-            return np.asarray(self._water_button_positions()[temp], dtype=float)
 
     def service_slot_position(self, slot: str) -> np.ndarray:
         value = self.service_slot_poses.get(str(slot))
@@ -497,40 +538,74 @@ class WA04ServeUniqueTemperatureCupAmongThree(Kitchen):
             for cup in CUP_IDS
         )
 
-    def set_verified_faucet_state(self, *, mode: str, temperature: str | None) -> None:
-        """Apply fixture state after a verified physical button/faucet operation."""
+    def faucet_matches(self, *, mode: str, temperature: str | None = None) -> bool:
+        """Report the derived touchless state; no handle state is consulted."""
 
         normalized_mode = str(mode).strip().lower()
         if normalized_mode not in {"on", "off"}:
-            raise ValueError("WA-04 faucet mode must be on or off")
-        temp = None if temperature is None else str(temperature).strip().lower()
-        if normalized_mode == "on" and temp not in {"hot", "cold"}:
-            raise ValueError("WA-04 opening faucet requires hot or cold temperature")
-        if temp == "hot":
-            self.sink.set_temp_state(env=self, rng=self.rng, min_temp=0.65, max_temp=0.75)
-        elif temp == "cold":
-            self.sink.set_temp_state(env=self, rng=self.rng, min_temp=0.25, max_temp=0.35)
-        self.sink.set_handle_state(env=self, rng=self.rng, mode=normalized_mode)
-        try:
-            self.sim.data.set_joint_qpos(f"{self.sink.naming_prefix}spout_joint", 0.0)
-            self.sim.forward()
-        except Exception:
-            pass
-        self.update_state()
-
-    def faucet_matches(self, *, mode: str, temperature: str | None = None) -> bool:
-        state = dict(self.sink.get_handle_state(env=self))
-        expected_on = str(mode).strip().lower() == "on"
-        if bool(state.get("water_on", False)) != expected_on:
             return False
+        self._refresh_sensor_faucets()
         if temperature is None:
-            return True
-        temp = str(temperature).strip().lower()
+            active = bool(self._active_sensor_faucets)
+        else:
+            active = _temperature(temperature) in self._active_sensor_faucets
+        return active if normalized_mode == "on" else not active
+
+    def cup_is_under_sensor_faucet(self, cup_id: str, temperature: str) -> bool:
+        cup = str(cup_id)
+        if cup not in CUP_IDS:
+            return False
+        temp = _temperature(temperature)
         return bool(
-            str(state.get("water_temp_state", "")).lower() == temp
-            or (temp == "hot" and float(state.get("water_temp", 0.0)) >= 0.60)
-            or (temp == "cold" and float(state.get("water_temp", 1.0)) <= 0.40)
+            self._cup_is_in_sensor_zone(cup, temp)
+            and temp in self._active_sensor_faucets
         )
+
+    def deactivate_sensor_faucets(self) -> dict[str, Any]:
+        """Turn both streams off and restore their full hidden geometry."""
+
+        self._active_sensor_faucets.clear()
+        self._sensor_cup_by_temperature = {
+            temperature: None for temperature in TEMPERATURES
+        }
+        self._sensor_zone_entry_steps = {
+            temperature: 0 for temperature in TEMPERATURES
+        }
+        result = self.set_water_stream_intercept(None)
+        for temperature in TEMPERATURES:
+            self._set_sensor_stream_visibility(temperature, visible=False)
+        return result
+
+    def set_sensor_faucet_affinity(
+        self, cup_id: str, temperature: str
+    ) -> dict[str, Any]:
+        """Limit one held cup to its planned faucet until sink exit."""
+
+        cup = str(cup_id)
+        if cup not in CUP_IDS:
+            raise ValueError(f"invalid WA-04 cup id: {cup_id!r}")
+        temp = _temperature(temperature)
+        self._sensor_faucet_affinity_by_cup[cup] = temp
+        for other in TEMPERATURES:
+            if other == temp:
+                continue
+            self._sensor_zone_entry_steps[other] = 0
+            if self._sensor_cup_by_temperature.get(other) == cup:
+                self._active_sensor_faucets.discard(other)
+                self._sensor_cup_by_temperature[other] = None
+                self._restore_sensor_stream_geometry(other)
+                self._set_sensor_stream_visibility(other, visible=False)
+        self.sim.forward()
+        return {"cup_id": cup, "temperature": temp, "applied": True}
+
+    def clear_sensor_faucet_affinity(self, cup_id: str) -> dict[str, Any]:
+        cup = str(cup_id)
+        previous = self._sensor_faucet_affinity_by_cup.pop(cup, None)
+        return {
+            "cup_id": cup,
+            "previous_temperature": previous,
+            "cleared": previous is not None,
+        }
 
     # Diagnostics and task result --------------------------------------
 
@@ -550,6 +625,7 @@ class WA04ServeUniqueTemperatureCupAmongThree(Kitchen):
         return {
             "success": report.success,
             "success_checks": report.checks(),
+            "physical_events": dict(self._physical_event_diagnostics),
             "oracle": {
                 "temperature_by_cup": dict(self._semantic_state.temperature_by_cup),
                 "requested_temperature": self._semantic_state.requested_temperature,
@@ -557,6 +633,11 @@ class WA04ServeUniqueTemperatureCupAmongThree(Kitchen):
                 "service_slot_by_cup": dict(self._semantic_state.service_slot_by_cup),
             },
             "fill": {
+                "water_control_mode": "twin_proximity_sensor_faucets",
+                "active_sensor_faucets": sorted(self._active_sensor_faucets),
+                "sensor_cup_by_temperature": dict(
+                    self._sensor_cup_by_temperature
+                ),
                 "cup_filled": dict(self.cup_filled),
                 "cup_fill_progress": dict(self.cup_fill_progress),
                 "cup_temperatures": dict(self.cup_temperatures),
@@ -666,35 +747,24 @@ class WA04ServeUniqueTemperatureCupAmongThree(Kitchen):
             # During early model construction object liquid sites may not exist yet.
             return {"applied": False, "cup_id": cup, "progress": value}
 
-    def set_water_stream_intercept(self, cup_id: str | None) -> dict[str, Any]:
-        """Restore the full stream or end its visible cylinder at a cup rim."""
+    def set_water_stream_intercept(
+        self,
+        cup_id: str | None,
+        temperature: str | None = None,
+    ) -> dict[str, Any]:
+        """Restore both streams or end one active stream at the cup rim."""
 
         try:
-            model = self.sim.model
-            site_name = str(self.sink.water_site.get("name"))
-            site_id = int(model.site_name2id(site_name))
-            if self._water_stream_original_local_pos is None:
-                self._water_stream_original_local_pos = np.asarray(
-                    model.site_pos[site_id], dtype=float
-                ).copy()
-            if self._water_stream_original_half_height is None:
-                self._water_stream_original_half_height = float(
-                    model.site_size[site_id][1]
-                )
-            original_pos = np.asarray(
-                self._water_stream_original_local_pos, dtype=float
-            )
-            original_half_height = float(
-                self._water_stream_original_half_height
-            )
-            model.site_pos[site_id] = original_pos
-            model.site_size[site_id][1] = original_half_height
             if cup_id is None:
+                streams = {
+                    temp: self._restore_sensor_stream_geometry(temp)
+                    for temp in TEMPERATURES
+                }
                 self.sim.forward()
                 result = {
                     "restored": True,
                     "intercepted": False,
-                    "half_height": original_half_height,
+                    "streams": streams,
                 }
                 self._water_stream_intercept_trace = result
                 return result
@@ -702,18 +772,33 @@ class WA04ServeUniqueTemperatureCupAmongThree(Kitchen):
             cup = str(cup_id)
             if cup not in CUP_IDS:
                 raise ValueError(f"invalid WA-04 cup id: {cup_id!r}")
+            if temperature is None:
+                candidates = [
+                    temp
+                    for temp in TEMPERATURES
+                    if self._sensor_cup_by_temperature.get(temp) == cup
+                ]
+                if len(candidates) != 1:
+                    raise ValueError("WA-04 stream interception requires one temperature")
+                temp = candidates[0]
+            else:
+                temp = _temperature(temperature)
+
+            model = self.sim.model
+            site_id, original_pos, original_half_height = (
+                self._sensor_stream_geometry(temp)
+            )
+            model.site_pos[site_id] = original_pos
+            model.site_size[site_id][1] = original_half_height
             self.sim.forward()
             body_id = int(self.obj_body_id[cup])
-            body_position = np.asarray(
-                self.sim.data.body_xpos[body_id], dtype=float
-            )
+            body_position = np.asarray(self.sim.data.body_xpos[body_id], dtype=float)
             body_rotation = np.asarray(
                 self.sim.data.body_xmat[body_id], dtype=float
             ).reshape(3, 3)
             rim_world = body_position + body_rotation @ np.asarray(
                 self.objects[cup].top_offset, dtype=float
             )
-
             site_center_world = np.asarray(
                 self.sim.data.site_xpos[site_id], dtype=float
             )
@@ -722,7 +807,7 @@ class WA04ServeUniqueTemperatureCupAmongThree(Kitchen):
             ).reshape(3, 3)[:, 2]
             axis_z = float(site_axis_world[2])
             if axis_z <= 0.5:
-                raise RuntimeError("WA-04 sink water stream is not vertically aligned")
+                raise RuntimeError("WA-04 sensor-faucet stream is not vertical")
             stream_top_world_z = float(
                 site_center_world[2] + original_half_height * axis_z
             )
@@ -736,6 +821,7 @@ class WA04ServeUniqueTemperatureCupAmongThree(Kitchen):
             truncated_pos[2] += original_half_height - truncated_half_height
             model.site_pos[site_id] = truncated_pos
             model.site_size[site_id][1] = truncated_half_height
+            model.site_rgba[site_id][3] = 0.52
             self.sim.forward()
             intercepted = bool(
                 truncated_half_height < original_half_height - 1.0e-6
@@ -743,6 +829,8 @@ class WA04ServeUniqueTemperatureCupAmongThree(Kitchen):
             result = {
                 "restored": False,
                 "intercepted": intercepted,
+                "control_mode": "proximity_sensor",
+                "temperature": temp,
                 "cup_id": cup,
                 "cup_rim_world_z": float(rim_world[2]),
                 "stream_top_world_z": stream_top_world_z,
@@ -754,61 +842,312 @@ class WA04ServeUniqueTemperatureCupAmongThree(Kitchen):
             }
             self._water_stream_intercept_trace = result
             return result
-
         except Exception as exc:
             result = {
                 "restored": cup_id is None,
                 "intercepted": False,
                 "cup_id": None if cup_id is None else str(cup_id),
+                "temperature": temperature,
                 "error": f"{type(exc).__name__}: {exc}",
             }
             self._water_stream_intercept_trace = result
             return result
 
-    def water_stream_intercept_callback(self, cup_id: str):
-        """Update the stream before each recorded frame as a cup enters/exits."""
+    def water_stream_intercept_callback(
+        self,
+        cup_id: str,
+        temperature: str | None = None,
+    ):
+        """Drive sensor activation and stream truncation during cup motion."""
 
         cup = str(cup_id)
         if cup not in CUP_IDS:
             raise ValueError(f"invalid WA-04 cup id: {cup_id!r}")
-        active = bool(self._water_stream_intercept_trace.get("intercepted", False))
+        temp = (
+            _temperature(temperature)
+            if temperature is not None
+            else str(self._water_stream_intercept_trace.get("temperature") or "")
+        )
+        temp = _temperature(temp)
+        active = False
 
         def callback(obs: dict[str, Any]) -> dict[str, Any] | None:
+            del obs
             nonlocal active
-            try:
-                under_water = bool(self.sink.check_obj_under_water(self, cup))
-            except Exception:
-                under_water = False
-            if under_water:
-                result = self.set_water_stream_intercept(cup)
+            in_zone, activated = self._advance_sensor_zone(cup, temp)
+            if activated:
+                self._set_sensor_stream_visibility(temp, visible=True)
+                result = self.set_water_stream_intercept(cup, temp)
                 active = bool(result.get("intercepted", False))
                 return self._get_observations(force_update=True)
-            if active:
-                self.set_water_stream_intercept(None)
+            if in_zone:
+                return None
+            if active or temp in self._active_sensor_faucets:
+                self._active_sensor_faucets.discard(temp)
+                self._sensor_cup_by_temperature[temp] = None
+                self._restore_sensor_stream_geometry(temp)
+                self._set_sensor_stream_visibility(temp, visible=False)
+                self.sim.forward()
                 active = False
                 return self._get_observations(force_update=True)
             return None
 
         return callback
 
-    def _water_button_positions(self) -> dict[str, tuple[float, float, float]]:
-        positions = dict(WATER_BUTTON_DEFAULT_POSITIONS)
-        path = _button_positions_path(self.water_button_positions_file)
-        if path is None or not path.is_file():
-            return positions
-        payload = json.loads(path.read_text(encoding="utf-8"))
-        raw = payload.get("positions", payload)
-        if not isinstance(raw, dict):
-            raise ValueError(f"invalid WA-04 water button resource: {path}")
-        for temperature in WATER_BUTTON_GEOM_NAMES:
-            value = raw.get(temperature)
-            array = np.asarray(value, dtype=float).reshape(-1) if value is not None else None
-            if array is None:
+    def _sensor_zone_settle_steps(self) -> int:
+        """Steps a cup must stay inside a sensor zone before activation."""
+
+        threshold = self._sensor_faucet_layout.get("zone_settle_steps", 0)
+        try:
+            return max(0, int(threshold))
+        except Exception:
+            return 0
+
+    def _advance_sensor_zone(self, cup_id: str, temperature: str) -> tuple[bool, bool]:
+        temp = _temperature(temperature)
+        allowed = self._sensor_faucet_affinity_by_cup.get(str(cup_id))
+        if allowed is not None and allowed != temp:
+            self._sensor_zone_entry_steps[temp] = 0
+            self._active_sensor_faucets.discard(temp)
+            if self._sensor_cup_by_temperature.get(temp) == str(cup_id):
+                self._sensor_cup_by_temperature[temp] = None
+            self._restore_sensor_stream_geometry(temp)
+            self._set_sensor_stream_visibility(temp, visible=False)
+            return False, False
+        in_zone = self._cup_is_in_sensor_zone(cup_id, temp)
+        if not in_zone:
+            self._sensor_zone_entry_steps[temp] = 0
+            return False, False
+        count = int(self._sensor_zone_entry_steps.get(temp, 0)) + 1
+        self._sensor_zone_entry_steps[temp] = count
+        activated = count >= self._sensor_zone_settle_steps()
+        if activated:
+            self._active_sensor_faucets.add(temp)
+            self._sensor_cup_by_temperature[temp] = str(cup_id)
+        return True, activated
+
+    def _refresh_sensor_faucets(self) -> None:
+        threshold = self._sensor_zone_settle_steps()
+        for temp in TEMPERATURES:
+            cup = None
+            for candidate in CUP_IDS:
+                if not self._cup_is_in_sensor_zone(candidate, temp):
+                    continue
+                allowed = self._sensor_faucet_affinity_by_cup.get(candidate)
+                if allowed is not None and allowed != temp:
+                    continue
+                cup = candidate
+                break
+            was_active = temp in self._active_sensor_faucets
+            if cup is None:
+                self._sensor_zone_entry_steps[temp] = 0
+                self._active_sensor_faucets.discard(temp)
+                self._sensor_cup_by_temperature[temp] = None
+                if was_active:
+                    self._restore_sensor_stream_geometry(temp)
+                self._set_sensor_stream_visibility(temp, visible=False)
+            else:
+                count = int(self._sensor_zone_entry_steps.get(temp, 0)) + 1
+                self._sensor_zone_entry_steps[temp] = count
+                settled = count >= threshold
+                if settled:
+                    self._active_sensor_faucets.add(temp)
+                    self._sensor_cup_by_temperature[temp] = cup
+                    self._set_sensor_stream_visibility(temp, visible=True)
+                elif was_active:
+                    self._active_sensor_faucets.discard(temp)
+                    self._sensor_cup_by_temperature[temp] = None
+                    self._restore_sensor_stream_geometry(temp)
+                    self._set_sensor_stream_visibility(temp, visible=False)
+
+    def _cup_is_in_sensor_zone(self, cup_id: str, temperature: str) -> bool:
+        try:
+            cup_position = self.object_position(cup_id)
+            stream_position = self.water_site_position(temperature)
+            if stream_position is None:
+                return False
+            layout = self._sensor_faucet_layout
+            xy_distance = float(
+                np.linalg.norm(cup_position[:2] - stream_position[:2])
+            )
+            stream_top_z = float(
+                stream_position[2] + float(layout["stream_half_height"])
+            )
+            return bool(
+                xy_distance <= float(layout["sensor_xy_radius"])
+                and float(cup_position[2]) >= float(layout["sensor_min_cup_z"])
+                and float(cup_position[2])
+                <= stream_top_z + float(layout["sensor_max_cup_z_above_nozzle"])
+            )
+        except Exception:
+            return False
+
+    # Physical task-event derivation ------------------------------------
+
+    def _cup_physically_grasped(self, cup_id: str) -> bool:
+        cup = str(cup_id)
+        if cup not in CUP_IDS:
+            return False
+        try:
+            from bench.execution.manipulation.object_interactions import (
+                get_object_hold_status,
+            )
+
+            hold = get_object_hold_status(env=self, object_name=cup)
+            # ``check_contact`` and ``check_obj_grasped`` only establish
+            # contact with a closed gripper.  Neither proves that the cup was
+            # actually picked up, so use the hold helper's near-EEF gate and
+            # require a subsequent lift/displacement from its staging pose.
+            return bool(
+                hold.get("held", False)
+                and self.cup_is_upright(cup)
+                and self._cup_moved_from_staging(cup)
+            )
+        except Exception:
+            return False
+
+    def _cup_moved_from_staging(self, cup_id: str) -> bool:
+        """Require physical separation from the recorded service position."""
+
+        baseline = self._staging_detected_at.get(str(cup_id))
+        if baseline is None:
+            return False
+        try:
+            current = self.object_position(str(cup_id))
+            lift = float(current[2] - baseline[2])
+            lateral = float(np.linalg.norm(current[:2] - baseline[:2]))
+            return bool(lift >= 0.02 or lateral >= 0.04)
+        except Exception:
+            return False
+
+    def _cup_physically_staged(self, cup_id: str, slot: str) -> bool:
+        if cup_id not in CUP_IDS or slot not in SERVICE_SLOTS:
+            return False
+        try:
+            return bool(self.cup_is_at_service_slot(cup_id, slot))
+        except Exception:
+            return False
+
+    def _reset_physical_event_tracking(self) -> None:
+        self._selection_armed_by_cup = {cup: False for cup in CUP_IDS}
+        self._selection_grasp_steps = {cup: 0 for cup in CUP_IDS}
+        self._staging_detected_at = {cup: None for cup in CUP_IDS}
+        self._physical_event_diagnostics = {
+            "grasp_detected_by_cup": {},
+            "staging_detected_by_cup": {},
+            "selection_detected": None,
+        }
+        self._task_event_locked = False
+
+    def _update_task_events_from_physics(self) -> None:
+        """Commit fill, staging, and final selection from physical evidence."""
+
+        if self._task_event_locked or self._episode_plan is None:
+            return
+        plan = self._episode_plan
+        for cup in CUP_IDS:
+            if cup in self._semantic_state.filled_temperature_by_cup:
                 continue
-            if array.size < 3 or not np.all(np.isfinite(array[:3])):
-                raise ValueError(f"invalid WA-04 {temperature} button position in {path}")
-            positions[temperature] = tuple(float(item) for item in array[:3])
-        return positions
+            temperature = next(
+                (
+                    temp
+                    for temp in TEMPERATURES
+                    if self._sensor_cup_by_temperature.get(temp) == cup
+                ),
+                None,
+            )
+            if temperature is None or not self.cup_is_under_sensor_faucet(cup, temperature):
+                continue
+            progress = min(1.0, float(self.cup_fill_progress.get(cup, 0.0)) + 0.025)
+            self.set_cup_fill_progress(cup, progress)
+            if progress >= 1.0 - 1.0e-6 and record_verified_fill(
+                self._semantic_state, cup, temperature
+            ):
+                self.cup_temperatures[cup] = temperature
+                self.cup_filled[cup] = True
+                self._physical_event_diagnostics.setdefault(
+                    "fill_detected_by_cup", {}
+                )[cup] = temperature
+
+        for cup in CUP_IDS:
+            if cup in self._semantic_state.staged_slot_by_cup:
+                continue
+            slot = str(plan.service_slot_by_cup[cup])
+            if self._cup_physically_staged(cup, slot) and record_verified_staging(
+                self._semantic_state, cup, slot
+            ):
+                self._staging_detected_at[cup] = self.object_position(cup).copy()
+                self._physical_event_diagnostics.setdefault(
+                    "staging_detected_by_cup", {}
+                )[cup] = slot
+
+        latch_cups_staged(
+            self._semantic_state,
+            currently_ready=self.are_cups_physically_staged(),
+        )
+        if self._semantic_state.final_taken_cup_id is None and all(
+            cup in self._semantic_state.staged_slot_by_cup for cup in CUP_IDS
+        ):
+            for cup in CUP_IDS:
+                if not self._selection_armed_by_cup[cup]:
+                    if not self._cup_physically_grasped(cup):
+                        self._selection_armed_by_cup[cup] = True
+                    continue
+                if self._cup_physically_grasped(cup):
+                    self._selection_grasp_steps[cup] += 1
+                    if self._selection_grasp_steps[cup] >= self._selection_min_grasp_steps:
+                        record_final_take(self._semantic_state, cup)
+                        self._physical_event_diagnostics["selection_detected"] = cup
+                else:
+                    self._selection_grasp_steps[cup] = 0
+
+        if (
+            all(cup in self._semantic_state.filled_temperature_by_cup for cup in CUP_IDS)
+            and all(cup in self._semantic_state.staged_slot_by_cup for cup in CUP_IDS)
+            and self._semantic_state.final_taken_cup_id is not None
+        ):
+            self._task_event_locked = True
+
+    def _sensor_stream_geometry(
+        self, temperature: str
+    ) -> tuple[int, np.ndarray, float]:
+        temp = _temperature(temperature)
+        model = self.sim.model
+        site_id = int(model.site_name2id(wa04_sensor_faucet_stream_name(temp)))
+        if temp not in self._water_stream_original_local_pos:
+            self._water_stream_original_local_pos[temp] = np.asarray(
+                model.site_pos[site_id], dtype=float
+            ).copy()
+        if temp not in self._water_stream_original_half_height:
+            self._water_stream_original_half_height[temp] = float(
+                model.site_size[site_id][1]
+            )
+        return (
+            site_id,
+            np.asarray(self._water_stream_original_local_pos[temp], dtype=float),
+            float(self._water_stream_original_half_height[temp]),
+        )
+
+    def _restore_sensor_stream_geometry(self, temperature: str) -> dict[str, Any]:
+        site_id, original_pos, original_half_height = self._sensor_stream_geometry(
+            temperature
+        )
+        self.sim.model.site_pos[site_id] = original_pos
+        self.sim.model.site_size[site_id][1] = original_half_height
+        return {
+            "temperature": _temperature(temperature),
+            "restored": True,
+            "half_height": original_half_height,
+        }
+
+    def _set_sensor_stream_visibility(
+        self, temperature: str, *, visible: bool
+    ) -> None:
+        try:
+            site_id, _, _ = self._sensor_stream_geometry(temperature)
+            self.sim.model.site_rgba[site_id][3] = 0.52 if visible else 0.0
+        except Exception:
+            pass
 
 
 def _default_semantic_state() -> SemanticState:
@@ -835,58 +1174,95 @@ def _semantic_for_plan(plan: EpisodePlan | None) -> SemanticState:
     )
 
 
-def _button_positions_path(value: str | None) -> Path | None:
-    if value is None:
-        return DEFAULT_BUTTON_POSITIONS_FILE
-    text = str(value).strip()
-    if text.lower() in {"", "none", "off", "false"}:
-        return None
-    return Path(text)
+def _load_sensor_faucet_layout(value: str | None) -> dict[str, Any]:
+    path = DEFAULT_SENSOR_FAUCET_LAYOUT_FILE if value is None else Path(str(value))
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if payload.get("config_kind") != "wa04_sensor_faucet_layout":
+        raise ValueError(f"invalid WA-04 sensor-faucet resource: {path}")
+    nozzles = payload.get("nozzle_positions")
+    if not isinstance(nozzles, Mapping) or set(nozzles) != set(TEMPERATURES):
+        raise ValueError("WA-04 sensor-faucet layout requires hot and cold nozzles")
+    resolved_nozzles: dict[str, list[float]] = {}
+    for temperature in TEMPERATURES:
+        position = np.asarray(nozzles[temperature], dtype=float).reshape(-1)
+        if position.size != 3 or not np.all(np.isfinite(position)):
+            raise ValueError(f"invalid WA-04 {temperature} sensor-faucet position")
+        resolved_nozzles[temperature] = position.astype(float).tolist()
+    raw_offsets = payload.get("spout_local_x_offsets")
+    if not isinstance(raw_offsets, Mapping) or set(raw_offsets) != set(TEMPERATURES):
+        raise ValueError("WA-04 sensor-faucet layout requires hot and cold spout offsets")
+    offsets = {temperature: float(raw_offsets[temperature]) for temperature in TEMPERATURES}
+    if not all(np.isfinite(item) for item in offsets.values()):
+        raise ValueError("WA-04 sensor-faucet spout offsets must be finite")
+    raw_yaws = payload.get("spout_local_yaw_degrees")
+    if not isinstance(raw_yaws, Mapping) or set(raw_yaws) != set(TEMPERATURES):
+        raise ValueError("WA-04 sensor-faucet layout requires hot and cold spout yaws")
+    yaws = {temperature: float(raw_yaws[temperature]) for temperature in TEMPERATURES}
+    if not all(np.isfinite(item) for item in yaws.values()):
+        raise ValueError("WA-04 sensor-faucet spout yaws must be finite")
+    numeric = {
+        name: float(payload[name])
+        for name in (
+            "sensor_xy_radius",
+            "sensor_min_cup_z",
+            "sensor_max_cup_z_above_nozzle",
+            "stream_half_height",
+        )
+    }
+    if not all(np.isfinite(item) for item in numeric.values()):
+        raise ValueError("WA-04 sensor-faucet layout values must be finite")
+    if numeric["sensor_xy_radius"] <= 0.0 or numeric["stream_half_height"] <= 0.0:
+        raise ValueError("WA-04 sensor radius and stream height must be positive")
+    zone_settle = int(payload.get("zone_settle_steps", 0) or 0)
+    if zone_settle < 0:
+        raise ValueError("WA-04 zone_settle_steps must be non-negative")
+    return {
+        **numeric,
+        "zone_settle_steps": zone_settle,
+        "nozzle_positions": resolved_nozzles,
+        "spout_local_x_offsets": offsets,
+        "spout_local_yaw_degrees": yaws,
+        "source": str(path),
+    }
 
 
-def _add_water_button_asset(
-    parent: ET.Element,
+def _hide_legacy_sink_controls(
+    worldbody: ET.Element,
     *,
-    geom_name: str,
-    pos: tuple[float, float, float],
-    rgba: str,
+    water_site_name: str,
+    handle_joint_name: str,
 ) -> None:
-    """Create a compact pressable visual/physical button primitive."""
+    """Keep RoboSuite's named nodes while hiding the superseded controls.
 
-    body = ET.SubElement(
-        parent,
-        "body",
-        {"name": f"{geom_name}_body", "pos": " ".join(f"{item:.6f}" for item in pos)},
-    )
-    visual = {"contype": "0", "conaffinity": "0", "group": "1"}
-    ET.SubElement(
-        body,
-        "geom",
-        {"name": f"{geom_name}_base", "type": "box", "pos": "0 0 0.020", "size": "0.016 0.025 0.020", "rgba": "0.10 0.11 0.12 1", **visual},
-    )
-    plunger = ET.SubElement(body, "body", {"name": f"{geom_name}_plunger", "pos": "0 0 0"})
-    # MuJoCo requires every body carrying a joint to have positive mass and
-    # inertia. RoboCasa's visual defaults may set geom density to zero, so do
-    # not rely on compiler inference for this task-owned moving plunger.
-    ET.SubElement(
-        plunger,
-        "inertial",
-        {
-            "pos": "0 0 0.074",
-            "mass": "0.020",
-            "diaginertia": "0.00002 0.00002 0.00002",
-        },
-    )
-    ET.SubElement(plunger, "joint", {"name": f"{geom_name}_press_joint", "type": "slide", "axis": "0 0 1", "limited": "true", "range": "-0.012 0", "springref": "0", "stiffness": "18", "damping": "2"})
-    ET.SubElement(
-        plunger,
-        "geom",
-        {"name": geom_name, "type": "cylinder", "pos": "0 0 0.075", "size": "0.012 0.008", "rgba": rgba, "contype": "1", "conaffinity": "1", "group": "1", "friction": "0.8 0.005 0.0001"},
-    )
+    RoboSuite builds its fixture-id tables from the pre-composition model and
+    expects every named geom to survive in the final MJCF.  Removing the old
+    spout / handle mesh geoms therefore makes reset fail even though MuJoCo can
+    compile the edited XML.  Alpha-zero geoms preserve those identifiers while
+    leaving only the two bench-owned faucet clones visible.
+    """
+
+    targets: list[ET.Element] = []
+    for body in worldbody.iter("body"):
+        if any(site.get("name") == water_site_name for site in body.findall("site")):
+            targets.append(body)
+        if any(joint.get("name") == handle_joint_name for joint in body.findall("joint")):
+            targets.append(body)
+    for body in targets:
+        for geom in body.iter("geom"):
+            geom.set("rgba", "0 0 0 0")
+            geom.set("contype", "0")
+            geom.set("conaffinity", "0")
+
+
+def _temperature(value: str) -> str:
+    temperature = str(value).strip().lower()
+    if temperature not in TEMPERATURES:
+        raise ValueError(f"invalid WA-04 water temperature: {value!r}")
+    return temperature
 
 
 __all__ = [
     "IDENTICAL_WATER_CUP_XML",
-    "WATER_BUTTON_GEOM_NAMES",
+    "TEMPERATURES",
     "WA04ServeUniqueTemperatureCupAmongThree",
 ]

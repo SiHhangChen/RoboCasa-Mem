@@ -21,7 +21,8 @@ scene:
 episode:
   requested_cup_id: null
   requested_temperature: null
-  # Cup order and slot assignment are independently seed-balanced.
+  # Cup order and slot assignment are independently seed-balanced.  Temperature
+  # is encoded only by the selected faucet, never by cup appearance.
   fill_order: balanced
   service_slot_by_cup: null
   max_horizon: 8500
@@ -34,6 +35,8 @@ initial_state:
     cups:
       cup_A:
         # Divide WA-02's original two-cup span into three parallel regions.
+        # Keep all three cups in compact 12 x 12 cm regions near the counter
+        # edge, sharing the manually tuned -Y center of the verified grasp run.
         region_center_xy: [0.5210, -0.4700]
         region_size_xy: [0.1200, 0.1200]
         yaw_rad: -0.6302
@@ -74,10 +77,6 @@ initial_state:
     fill_under_water_steps: 40
     service_threshold: 0.12
     cup_upright_threshold_deg: 15.0
-    initial_base_path_index_by_first_temperature:
-      # Both buttons are reachable from the same recorded water-work station.
-      hot: 0
-      cold: 0
 
 sensors:
   cameras: [robot0_agentview_left, robot0_agentview_right, robot0_eye_in_hand]
@@ -92,9 +91,8 @@ sensors:
 resources:
   manual_base_path: navigation/manual_base_path_layout15_style34_seed0.json
   station_poses: station/stations.json
-  water_button_positions: poses/water_button_positions_layout15_style34_seed0.json
+  sensor_faucet_layout: poses/sensor_faucet_layout_layout15_style34_seed0.json
   cup_grasp_candidates: poses/water_cup_grasp_candidates.json
-  faucet_switch_pose: poses/faucet_switch_pose_layout15_style34_seed0.json
   sink_fill_pose: poses/sink_cup_place_pose_layout15_style34_seed0.json
   planner_script: ../../../execution/planning/mplib_planner.py
 
@@ -110,6 +108,17 @@ navigation:
   manual_base_path_xy_tolerance: 0.12
   manual_base_path_yaw_tolerance: 0.08
   manual_base_path_segment_yaw_threshold: 0.05
+  # WA04 uses broad, calibrated corridors. These bounded profile limits stay
+  # below the controller maxima while shortening each long traverse and turn.
+  base_velocity_profile_enabled: true
+  base_profile_v_max: 0.75
+  base_profile_a_max: 1.8
+  base_profile_a_dec: 1.5
+  base_profile_v_min: 0.22
+  base_profile_w_max: 1.35
+  base_profile_alpha_max: 3.5
+  base_profile_alpha_dec: 3.0
+  base_profile_w_min: 0.20
   base_single_axis_tracking: false
   base_snap_to_target_after_success: false
   use_station_astar_paths: false
@@ -143,15 +152,17 @@ manipulation:
     qpos_step: 0.02
     rrt_range: 0.1
   runtime:
-    max_joint_step: 0.025
-    settle_steps: 20
+    # 0.035 rad at 20 Hz is a 0.7 rad/s command increment. A 0.05-rad trial
+    # caused unacceptable terminal tracking lag during a held-cup arm return.
+    max_joint_step: 0.035
+    settle_steps: 15
     position_threshold: 0.12
     orientation_threshold_deg: 15.0
     qpos_threshold: 0.24
-    open_steps: 20
-    close_steps: 90
-    release_steps: 45
-    release_settle_steps: 80
+    open_steps: 5
+    close_steps: 25
+    release_steps: 20
+    release_settle_steps: 20
   static_scene:
     enabled: false
     validate_collisions: false
@@ -169,7 +180,9 @@ operations:
   cup_pick:
     # Cup poses need a tighter terminal Base pose than the collision-limited
     # sink and service samples on the same calibrated manual path.
-    navigation_xy_tolerance: 0.01
+    # A 2 cm terminal window remains well inside the arm planner's reachable
+    # workspace, while avoiding the long low-speed tail needed to reach 1 cm.
+    navigation_xy_tolerance: 0.02
     navigation_yaw_tolerance_rad: 0.017453292519943295
     orientation_mode: mug-body-side
     # Use the same world-frame entry sector as service placement. Angles locate
@@ -179,19 +192,19 @@ operations:
       center_deg: 180.0
       half_width_deg: 60.0
     pregrasp_height: 0.18
+    # The middle cup can leave the arm just below the 15-degree orientation
+    # gate after the default hold. Give the joint controller time to converge
+    # before validating the physical pregrasp pose.
+    pregrasp_settle_steps: 30
     grasp_clearance: -0.02
     lift_height: 0.12
     grasp_yaw_offsets_deg: [0.0, -45.0, 45.0, -90.0, 90.0]
     retreat_to_pregrasp_after_grasp: true
     post_retreat_lift_height: 0.08
-  faucet:
-    control_mode: buttons
-    prepress_z_offset: 0.08
-    press_z_offset: -0.010
-    hold_steps: 12
-    gripper_action: 1.0
-    near_miss_position_tolerance: 0.09
-    allow_physical_near_miss: true
+  sensor_faucets:
+    control_mode: proximity_sensor
+    hot_side: robot_left
+    cold_side: robot_right
   held_fill:
     navigation_xy_tolerance: 0.03
     # Use the interactively captured full EEF pose, reanchored to the live
@@ -202,6 +215,8 @@ operations:
     gripper_action: 1.0
     cup_z_offset_from_water: -0.02
     entry_z_offset: 0.0
+    entry_settle_steps: 1
+    under_water_settle_steps: 1
     xy_near_water_tolerance: 0.08
     by_temperature:
       cold: {}
@@ -232,6 +247,14 @@ operations:
     post_release_clearance_z_offset: 0.22
     release_separation_assist_distance: 0.06
     placement_exit_standoff: 0.08
+    # The generic manipulation runtime otherwise adds ten stationary control
+    # frames after every placement segment.  These shorter task-owned holds
+    # still leave the strict Cartesian checks active at entry / place and keep
+    # the independent pre-release and post-placement physical verification.
+    entry_settle_steps: 2
+    place_settle_steps: 3
+    clearance_settle_steps: 2
+    retreat_settle_steps: 1
     # Pre-release safety gate. Final staging independently requires <= 0.12 m,
     # counter contact, and an upright cup, leaving 0.02 m verification margin.
     service_target_xy_tolerance: 0.10
@@ -239,6 +262,10 @@ operations:
     pre_release_min_height_from_slot: 0.0
     pre_release_max_height_from_slot: 0.10
     release_distance: 0.12
+    by_slot:
+      slot_1:
+        release_steps: 8
+        release_settle_steps: 2
   final_pick:
     orientation_mode: object-y-topdown
     pregrasp_height: 0.12
@@ -246,7 +273,9 @@ operations:
     lift_height: 0.12
     grasp_yaw_offset_deg: 0.0
   return_arm:
-    settle_steps: 2
+    # Faster interpolation needs a short terminal hold so the physical joints
+    # converge before Base motion starts.
+    settle_steps: 5
   return_arm_holding_cup:
     # Pull the freshly grasped cup toward the robot in Base X while preserving
     # the exact grasp rotation, so the cup remains upright during navigation.
@@ -268,19 +297,25 @@ operations:
     route_local_y_per_x: 0.02583025830258303
     boundary_translation_gain: 3.0
     boundary_min_action: 0.025
-    boundary_max_action: 0.35
-    boundary_max_steps: 900
+    # This controller only carries the cup across the fixed sink edge; the
+    # calibrated navigation stage takes over immediately afterwards.  Match
+    # its brisk corridor speed and brake before the 2 cm overshoot gate.
+    boundary_max_action: 0.65
+    boundary_velocity_profile_enabled: true
+    boundary_profile_acceleration: 2.4
+    boundary_profile_deceleration: 2.0
+    boundary_profile_target_overshoot: 0.008
+    boundary_max_steps: 450
     target_base_yaw: -0.038
     yaw_hold_gain: 0.30
     lift_offset: 0.03
     lift_position_tolerance: 0.003
     lift_correction_attempts: 2
-    settle_steps: 40
+    settle_steps: 4
     gripper_action: 1.0
     orientation_tolerance_deg: 15.0
     max_end_effector_distance: 0.18
   handlers:
-    require_physical_button_motion: true
     require_physical_fill: true
 
 semantics:

@@ -22,7 +22,7 @@ def _environment(config: Any, scene: Any, plan: Any, resources: Mapping[str, Any
     regions = resolve_cup_sampling_regions(dict(initial_objects.get("cups") or {}))
     constraints = resolve_cup_region_constraints(dict(initial_objects.get("cup_region_constraints") or {}))
     return {
-        "water_button_positions_file": str(resources["water_button_positions"]),
+        "sensor_faucet_layout_file": str(resources["sensor_faucet_layout"]),
         "service_threshold": float(config.semantics.get("service_threshold", 0.12)),
         "cup_upright_threshold_deg": float(config.semantics.get("cup_upright_threshold_deg", 15.0)),
         "cup_placement_seed": int(plan.seed),

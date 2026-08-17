@@ -9,13 +9,16 @@ def resolve_prompt_spec(*, requested_temperature: str, variant: str) -> PromptSp
         raise ValueError("WA-04 requested_temperature must be hot or cold")
     return PromptSpec(
         initial_prompt=(
-            "Remember the temperature bound to each of the three identical cups. "
-            f"Exactly one cup contains {temperature} water, and the final view does not reveal which one."
+            "Remember which of the three identical cups is filled with "
+            f"{temperature} water. The final view does not reveal which one."
         ),
         policy_prompt=(
-            f"Fill three identical cups so exactly one contains {temperature} water "
-            f"and the other two contain {'cold' if temperature == 'hot' else 'hot'} water, "
-            f"stage all three cups, then take the {temperature}-water cup."
+            f"We need two cups of {'cold' if temperature == 'hot' else 'hot'} water "
+            f"and one cup of {temperature} water. "
+            "The left faucet dispenses hot water and the right faucet dispenses cold water. "
+            "You may fill hot or cold water in any order. "
+            "Finally place all three cups to the left of the sink, "
+            f"then pick up the cup filled with {temperature} water."
         ),
         variant=str(variant),
     )
