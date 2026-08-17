@@ -16,6 +16,7 @@
 #   OUTPUT_ROOT   评测输出根目录，默认 outputs/eval
 #   SERVER_HOST   客户端连接的服务端地址，默认 127.0.0.1（同机）
 #   PORT          服务端端口，默认 8000
+#   RETRY_ERRORS  设为 1 时续跑 status=error 的 episode（断网中断后恢复用），默认 0
 
 set -euo pipefail
 
@@ -28,6 +29,7 @@ RUN_ID="${RUN_ID:-wa01-pi05-lora-45000}"
 OUTPUT_ROOT="${OUTPUT_ROOT:-outputs/eval}"
 SERVER_HOST="${SERVER_HOST:-127.0.0.1}"
 PORT="${PORT:-8000}"
+RETRY_ERRORS="${RETRY_ERRORS:-0}"
 
 OPENPI_PYTHON="${ROOT}/policy/openpi/.venv/bin/python"
 ROBOCASA_RUN=(conda run -n robocasa)
@@ -64,11 +66,16 @@ case "${1:-}" in
         export PYTHONPATH=.
         export MUJOCO_GL="${MUJOCO_GL:-egl}"
         export PYOPENGL_PLATFORM="${PYOPENGL_PLATFORM:-egl}"
+        retry_args=()
+        if [[ "${RETRY_ERRORS}" == "1" ]]; then
+            retry_args=(--retry-errors)
+        fi
         "${ROBOCASA_RUN[@]}" python scripts/eval/run_remote.py \
             --endpoint "ws://${SERVER_HOST}:${PORT}" \
             --suite "${SUITE}" \
             --output-root "${OUTPUT_ROOT}" \
-            --run-id "${RUN_ID}"
+            --run-id "${RUN_ID}" \
+            "${retry_args[@]}"
         ;;
     summary)
         cd "${ROOT}"

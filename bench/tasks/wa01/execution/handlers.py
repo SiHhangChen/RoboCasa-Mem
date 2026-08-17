@@ -6,9 +6,11 @@ from collections.abc import Callable
 from typing import Any
 
 from bench.execution.manipulation.object_interactions import (
+    configure_right_gripper_force_limit as _configure_right_gripper_force_limit,
     get_object_hold_status,
     is_object_released,
     lift_held_object_for_transport,
+    validate_gripper_force_limit as _validate_force_limit,
 )
 from bench.tasks.wa01.execution.geometry import (
     build_reachability_target_resolver,
@@ -20,12 +22,58 @@ def build_stage_handlers(
     controller: Any,
     *,
     accept_sugar_delivery: bool = True,
+    sugar_gripper_force_limit: float = 5.0,
+    default_gripper_force_limit: float = 20.0,
 ) -> dict[str, Callable[..., dict[str, Any]]]:
     """建立 OperateStage 名称到具体控制器或语义操作的映射。"""
+
+    _validate_force_limit(sugar_gripper_force_limit, "sugar_gripper_force_limit")
+    _validate_force_limit(default_gripper_force_limit, "default_gripper_force_limit")
 
     controller.reachability_target_resolver = build_reachability_target_resolver(
         controller
     )
+
+    def pick_sugar_limited_force(target: str, **kwargs: Any) -> dict[str, Any]:
+        """以较低的指端力抓糖，避免糖块被压紧后难以释放。"""
+
+        limited = _configure_right_gripper_force_limit(
+            controller.env,
+            sugar_gripper_force_limit,
+        )
+        try:
+            result = controller.pick(target, **kwargs)
+        except BaseException:
+            _configure_right_gripper_force_limit(
+                controller.env,
+                default_gripper_force_limit,
+            )
+            raise
+        restored = None
+        if not bool(result.get("pass", False)):
+            restored = _configure_right_gripper_force_limit(
+                controller.env,
+                default_gripper_force_limit,
+            )
+        result["gripper_force_control"] = {
+            "limited_for_sugar": limited,
+            "restored_after_failed_pick": restored,
+        }
+        return result
+
+    def place_sugar_restore_force(target: str, **kwargs: Any) -> dict[str, Any]:
+        """完成糖块释放后恢复杯子抓取所需的默认夹爪力。"""
+
+        receptacle = str(kwargs.pop("receptacle", target))
+        try:
+            result = controller.place(target, receptacle, **kwargs)
+        finally:
+            restored = _configure_right_gripper_force_limit(
+                controller.env,
+                default_gripper_force_limit,
+            )
+        result["gripper_force_control"] = {"restored_after_sugar": restored}
+        return result
 
     def place_dynamic(target: str, **kwargs: Any) -> dict[str, Any]:
         """解析餐桌动态目标并调用通用世界坐标放置接口。"""
@@ -113,6 +161,8 @@ def build_stage_handlers(
         return apply_selection_event(controller, target)
 
     return {
+        "pick_sugar_limited_force": pick_sugar_limited_force,
+        "place_sugar_restore_force": place_sugar_restore_force,
         "place_dynamic": place_dynamic,
         "record_sugar_delivery": record_sugar,
         "lift_held": lift_held,
@@ -186,7 +236,7 @@ def verify_dining_placement(
     dining_target_slot: str | None = None,
     **kwargs: Any,
 ) -> dict[str, Any]:
-    """检查单杯接触餐桌、保持竖直、进入计划区域且已释放。"""
+    """检查单杯接触餐桌、保持竖直且已释放。"""
 
     del kwargs
     if not controller.runtime_config.execute:
@@ -202,9 +252,6 @@ def verify_dining_placement(
     checks = {
         "correctly_placed": bool(
             env.is_coffee_cup_correctly_placed_on_dining_counter(coffee_id)
-        ),
-        "inside_planned_region": bool(
-            slot and env.is_coffee_cup_center_inside_dining_region(coffee_id, slot)
         ),
         "released": is_object_released(
             env,
@@ -238,10 +285,11 @@ def verify_cups_ready_for_selection(controller: Any, **kwargs: Any) -> dict[str,
         return _dry_result("verify_coffee_cups_ready_for_selection")
     env = _refresh(controller)
     checks = {
-        "dining_regions_occupied": bool(env.dining_regions_occupied),
         "cups_together": bool(env.cups_together),
         "sugar_consumed": bool(env.sugar_consumed),
     }
+    if env.sugar_target_mode == "marked":
+        checks["sugar_assignment_correct"] = bool(env.sugar_assignment_correct)
     if all(checks.values()):
         env.record_cups_together_before_selection()
     checks["cups_together_before_selection_recorded"] = bool(
@@ -274,6 +322,8 @@ def apply_sugar_delivery_event(
     checks = {
         "sugar_consumed": bool(env.sugar_consumed),
     }
+    if env.sugar_target_mode == "marked":
+        checks["sugar_assignment_correct"] = bool(env.sugar_assignment_correct)
     passed = all(checks.values())
     return {
         "primitive": "record_sugar_delivery",

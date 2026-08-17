@@ -19,9 +19,13 @@ def build_expert_plan(inputs: ExpertPlanInputs) -> ExpertPlan:
     facts = dict(episode.facts)
     actions = inputs.action_config
     first, second = (str(v) for v in facts["delivery_order"])
-    # The task accepts either cup.  The expert deterministically sugars the
-    # first cup in its delivery order so demonstrations remain reproducible.
-    sugared = first
+    sugar_target_mode = str(facts.get("sugar_target_mode", "unmarked"))
+    if sugar_target_mode == "marked":
+        sugared = str(facts["target_sugared_coffee_id"])
+    else:
+        # The unmarked task accepts either cup. The expert deterministically
+        # sugars the first delivery so demonstrations remain reproducible.
+        sugared = first
     slots = dict(facts["final_slot_assignment"])
     sugar = str(getattr(inputs.scene, "sugar_name", "sugar_cube"))
 
@@ -62,12 +66,13 @@ def build_expert_plan(inputs: ExpertPlanInputs) -> ExpertPlan:
     stages: list[object] = [
         navigate(sugar, purpose="pick", name="navigate_pick_sugar", skip_if_reachable=True,
                  fallback_if_unreachable=True),
-        operate("pick", sugar, name="pick_sugar", metadata=actions.sugar_pick_metadata),
+        operate("pick_sugar_limited_force", sugar, name="pick_sugar",
+                metadata=actions.sugar_pick_metadata),
         return_arm(sugar, "return_picked_sugar_to_regular_pose", 1.0),
         navigate(sugared, purpose="place", holding=sugar, name="navigate_place_sugar",
                  skip_if_reachable=True, fallback_if_unreachable=True,
                  metadata=actions.sugar_delivery_metadata),
-        operate("place", sugar, name="place_sugar",
+        operate("place_sugar_restore_force", sugar, name="place_sugar",
                 metadata={**dict(actions.sugar_delivery_metadata), "receptacle": sugared}),
         operate("record_sugar_delivery", sugar, name="record_sugar_delivery",
                 metadata={"coffee_id": sugared}),
@@ -80,6 +85,8 @@ def build_expert_plan(inputs: ExpertPlanInputs) -> ExpertPlan:
         operate("select", sugared, name="select_sugared_coffee"),
     ]
     return finish_plan(episode, stages, metadata={
+        "sugar_target_mode": sugar_target_mode,
+        "target_sugared_coffee_id": facts.get("target_sugared_coffee_id"),
         "sugared_coffee_id": sugared,
         "delivery_order": [first, second],
         "final_slot_assignment": slots,

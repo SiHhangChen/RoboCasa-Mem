@@ -11,10 +11,17 @@ from bench.tasks.wa01.execution.navigation import build_navigation_assembly
 def build_operation_handlers(descriptor: Any, env: Any, observation: dict[str, Any]) -> dict[str, Any]:
     navigation = build_navigation_assembly(env, observation, config=descriptor.navigation, seed=descriptor.scene.scene_seed)
     manipulation = build_manipulation_assembly(env, observation, settings=descriptor.config.manipulation, planner_script=descriptor.resources["planner_script"], execute=descriptor.execute)
+    handler_settings = descriptor.actions.handler_settings
     manipulation.controller.operation_handlers = build_stage_handlers(
         manipulation.controller,
         accept_sugar_delivery=bool(
-            descriptor.actions.handler_settings.get("accept_sugar_delivery", True)
+            handler_settings.get("accept_sugar_delivery", True)
+        ),
+        sugar_gripper_force_limit=float(
+            handler_settings.get("sugar_gripper_force_limit", 5.0)
+        ),
+        default_gripper_force_limit=float(
+            handler_settings.get("default_gripper_force_limit", 20.0)
         ),
     )
     return {"runner": StageRunner(navigation=navigation.controller, manipulation=manipulation.controller)}

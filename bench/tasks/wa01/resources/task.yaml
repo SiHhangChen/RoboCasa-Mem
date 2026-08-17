@@ -19,6 +19,7 @@ scene:
   sugar_name: sugar_cube
 
 episode:
+  sugar_target_mode: unmarked
   first_delivery_coffee: null
   max_horizon: 5000
 
@@ -29,7 +30,7 @@ initial_state:
   objects:
     enabled: true
     coffee_initial_z: 0.97748
-    coffee_mug_sliding_friction: 30.0
+    coffee_mug_sliding_friction: 0.95
     coffee_mug_mass_scale: 0.35
     sugar_plate_initial_region_center_xy: [-0.14, -4.76]
     sugar_plate_initial_region_size_xy: [0.0, 0.0]
@@ -115,9 +116,11 @@ manipulation:
     orientation_threshold_deg: 15.0
     qpos_threshold: 0.16
     open_steps: 10
-    close_steps: 50
-    release_steps: 20
-    release_settle_steps: 5
+    # The fingers reach the sugar in a few steps and then hold at the force cap,
+    # so closing longer only adds wall time (mirrors TS-01).
+    close_steps: 20
+    release_steps: 30
+    release_settle_steps: 10
   static_scene:
     enabled: true
     validate_collisions: false
@@ -134,10 +137,15 @@ manipulation:
 operations:
   sugar_pick:
     preshape_gripper_steps: 4
+    # Compensate the stable Panda model-to-RoboCasa TCP Z offset so the fingers
+    # close around the cube (mirrors TS-01), instead of pinching it near the
+    # finger-root which made the cube stick to the gripper on release.
+    grasp_clearance: -0.038
     pregrasp_settle_steps: 10
     grasp_settle_steps: 10
     lift_settle_steps: 10
   sugar_delivery:
+    release_steps: 40
     entry_settle_steps: 2
     place_settle_steps: 5
     clearance_settle_steps: 2
@@ -180,6 +188,8 @@ operations:
     settle_steps: 2
   handlers:
     accept_sugar_delivery: true
+    sugar_gripper_force_limit: 5.0
+    default_gripper_force_limit: 20.0
 
 recording:
   record_depth: true

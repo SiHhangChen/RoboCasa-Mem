@@ -31,7 +31,7 @@ from bench.tasks.wa01.domain.episode import (
 )
 
 
-COFFEE_MACHINE_FIXED_OFFSET_WORLD = (0.0, -0.20, 0.0)
+COFFEE_MACHINE_FIXED_OFFSET_WORLD = (-0.1, -0.35, 0.0)
 SUGAR_CUBE_INITIAL_OFFSET_XY = (0.0, 0.0)
 
 
@@ -128,7 +128,7 @@ def apply_fixed_initial_object_regions(
     seed: int,
     enabled: bool = True,
     coffee_initial_z: float = 0.97748,
-    coffee_mug_sliding_friction: float = 30.0,
+    coffee_mug_sliding_friction: float = 0.95,
     coffee_mug_mass_scale: float = 0.35,
     sugar_plate_initial_region_center_xy: tuple[float, float] = (-0.14, -4.76),
     sugar_plate_initial_region_size_xy: tuple[float, float] = (0.0, 0.0),

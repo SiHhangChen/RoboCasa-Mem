@@ -11,18 +11,35 @@ from bench.tasks.wa01.domain.contracts import COFFEE_IDS
 class SemanticState:
     """集中保存无法仅由当前物理画面推导的任务历史状态。"""
 
+    sugar_target_mode: str = "unmarked"
+    target_sugared_coffee_id: str | None = None
     sugar_consumed: bool = False
     sugared_coffee_id: str | None = None
     unsugared_coffee_id: str | None = None
     cups_together_before_selection: bool = False
     selected_sugared_coffee_id: str | None = None
 
+    def __post_init__(self) -> None:
+        """校验 unmarked 与 marked 两种互斥的目标配置。"""
+
+        self.sugar_target_mode = str(self.sugar_target_mode).strip().lower()
+        if self.sugar_target_mode not in {"unmarked", "marked"}:
+            raise ValueError(f"unsupported WA-01 sugar target mode: {self.sugar_target_mode!r}")
+        if self.sugar_target_mode == "marked":
+            if self.target_sugared_coffee_id is None:
+                raise ValueError("marked WA-01 semantics require a target coffee")
+            self.target_sugared_coffee_id = _coffee_id(self.target_sugared_coffee_id)
+        elif self.target_sugared_coffee_id is not None:
+            raise ValueError("unmarked WA-01 semantics cannot define a target coffee")
+
 
 @dataclass(frozen=True)
 class SuccessReport:
-    """保存三项权威成功条件的布尔结果。"""
+    """保存当前兼容模式下的权威成功条件。"""
 
+    sugar_target_mode: str
     sugar_consumed: bool
+    sugar_assignment_correct: bool | None
     cups_together_before_selection: bool
     correct_sugared_selection: bool
 
@@ -32,6 +49,7 @@ class SuccessReport:
 
         return bool(
             self.sugar_consumed
+            and self.sugar_assignment_correct is not False
             and self.cups_together_before_selection
             and self.correct_sugared_selection
         )
@@ -39,11 +57,14 @@ class SuccessReport:
     def checks(self) -> dict[str, bool]:
         """输出便于写入 diagnostics 的成功条件字典。"""
 
-        return {
+        result = {
             "sugar_consumed": self.sugar_consumed,
             "cups_together_before_selection": self.cups_together_before_selection,
             "correct_sugared_selection": self.correct_sugared_selection,
         }
+        if self.sugar_assignment_correct is not None:
+            result["sugar_assignment_correct"] = self.sugar_assignment_correct
+        return result
 
 
 def record_sugar_delivery(state: SemanticState, coffee_id: str) -> bool:
@@ -75,12 +96,25 @@ def record_selection(state: SemanticState, coffee_id: str) -> None:
 def evaluate_success(state: SemanticState) -> SuccessReport:
     """从统一语义状态计算唯一的最终成功报告。"""
 
+    assignment_correct: bool | None = None
+    if state.sugar_target_mode == "marked":
+        expected_unsugared = (
+            "coffee_B"
+            if state.target_sugared_coffee_id == "coffee_A"
+            else "coffee_A"
+        )
+        assignment_correct = bool(
+            state.sugared_coffee_id == state.target_sugared_coffee_id
+            and state.unsugared_coffee_id == expected_unsugared
+        )
     selection_correct = bool(
         state.selected_sugared_coffee_id is not None
         and state.selected_sugared_coffee_id == state.sugared_coffee_id
     )
     return SuccessReport(
+        sugar_target_mode=state.sugar_target_mode,
         sugar_consumed=bool(state.sugar_consumed),
+        sugar_assignment_correct=assignment_correct,
         cups_together_before_selection=bool(state.cups_together_before_selection),
         correct_sugared_selection=selection_correct,
     )
