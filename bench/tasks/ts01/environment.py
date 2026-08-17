@@ -13,6 +13,7 @@ from robocasa.environments.kitchen.kitchen import FixtureType, Kitchen
 from robocasa.models import assets_root
 from robocasa.utils import object_utils as OU
 
+from bench.tasks.button_asset import BUTTON_GLOW_RGBA, BUTTON_RGBA, add_button_asset
 from bench.tasks.ts01.domain.contracts import (
     AXIS,
     COMPLETION_BUTTON_NAME,
@@ -142,7 +143,6 @@ class TS01AddKSugarToHotChocolate(Kitchen):
                 worldbody,
                 geom_name=COMPLETION_BUTTON_GEOM_NAME,
                 pos=self._completion_button_position(),
-                rgba="0.20 0.72 0.32 1",
             )
         return ET.tostring(root, encoding="utf8").decode("utf8")
 
@@ -449,76 +449,16 @@ def _add_completion_button_asset(
     *,
     geom_name: str,
     pos: tuple[float, float, float],
-    rgba: str,
 ) -> None:
-    """Create the same compact spring-loaded button primitive used by WA02."""
+    """Install the same TM01-style completion button used by TS02."""
 
-    body = ET.SubElement(
+    add_button_asset(
         parent,
-        "body",
-        {
-            "name": f"{geom_name}_body",
-            "pos": " ".join(f"{item:.6f}" for item in pos),
-        },
-    )
-    visual = {"contype": "0", "conaffinity": "0", "group": "1"}
-    ET.SubElement(
-        body,
-        "geom",
-        {
-            "name": f"{geom_name}_base",
-            "type": "box",
-            "pos": "0 0 0.020",
-            "size": "0.060 0.060 0.020",
-            "rgba": "0.10 0.11 0.12 1",
-            **visual,
-        },
-    )
-    plunger = ET.SubElement(
-        body,
-        "body",
-        {"name": f"{geom_name}_plunger", "pos": "0 0 0"},
-    )
-    ET.SubElement(
-        plunger,
-        "inertial",
-        {
-            "pos": "0 0 0.074",
-            "mass": "0.020",
-            "diaginertia": "0.00002 0.00002 0.00002",
-        },
-    )
-    ET.SubElement(
-        plunger,
-        "joint",
-        {
-            "name": f"{geom_name}_press_joint",
-            "type": "slide",
-            "axis": "0 0 1",
-            "limited": "true",
-            "range": "-0.012 0",
-            "springref": "0",
-            # WA02's visual/physical shape is preserved, but its 18 N/m spring
-            # lets this vertical 20 g plunger sag almost the full 12 mm under
-            # gravity.  A stiffer return spring keeps the unpressed state near 0.
-            "stiffness": "120",
-            "damping": "2",
-        },
-    )
-    ET.SubElement(
-        plunger,
-        "geom",
-        {
-            "name": geom_name,
-            "type": "cylinder",
-            "pos": "0 0 0.075",
-            "size": "0.029 0.008",
-            "rgba": rgba,
-            "contype": "1",
-            "conaffinity": "1",
-            "group": "1",
-            "friction": "0.8 0.005 0.0001",
-        },
+        geom_name=geom_name,
+        pos=pos,
+        color_rgba=BUTTON_RGBA,
+        glow_rgba=BUTTON_GLOW_RGBA,
+        gravity_compensation=True,
     )
 
 

@@ -19,7 +19,6 @@ from robocasa.utils.object_utils import (
     get_pos_after_rel_offset,
 )
 
-from bench.tasks.wa02_button_asset import add_wa02_button_asset
 from bench.tasks.tm02.config import load_task_config, resolve_observer_config
 from bench.tasks.tm02.domain.contracts import (
     AXIS,
@@ -43,6 +42,7 @@ from bench.tasks.tm02.domain.episode import (
 from bench.tasks.tm02.domain.fill import PotFillState, advance_pot_fill
 from bench.tasks.tm02.domain.semantics import diagnostics, evaluate_success
 from bench.tasks.tm02.physical_events import PhysicalSample, TM02PhysicalObserver
+from bench.tasks.wa02_button_asset import add_wa02_button_asset
 RED_CAN_XML = f"{assets_root}/objects/objaverse/canned_food/canned_food_15/model.xml"
 TM02_SLIDE_CABINET_ASSET = (
     Path(__file__).resolve().parent
