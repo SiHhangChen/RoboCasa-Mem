@@ -1,0 +1,9 @@
+{
+  "default_select": "last",
+  "rules": [
+    {
+      "exact": "identify the sugared coffee",
+      "select": "first"
+    }
+  ]
+}

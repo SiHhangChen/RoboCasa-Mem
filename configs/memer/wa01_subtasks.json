@@ -1,0 +1,56 @@
+{
+  "task_id": "WA-01",
+  "high_level_instruction": "Start at the coffee machine with two identical prepared coffees. Add one sugar cube to either coffee, carry both coffees to the dining counter, and identify the coffee you sugared.",
+  "subtasks": {
+    "add_sugar": {
+      "label": "add one sugar cube to a coffee",
+      "keyframe": "last"
+    },
+    "place_first": {
+      "label": "carry the first coffee to the dining counter",
+      "keyframe": "last"
+    },
+    "place_second": {
+      "label": "carry the second coffee to the dining counter",
+      "keyframe": "last"
+    },
+    "identify": {
+      "label": "identify the sugared coffee",
+      "keyframe": "first"
+    }
+  },
+  "stage_prefixes": {
+    "add_sugar": [
+      "navigate_pick_sugar",
+      "pick_sugar",
+      "return_picked_sugar",
+      "navigate_place_sugar",
+      "place_sugar",
+      "record_sugar_delivery",
+      "return_after_place_sugar"
+    ],
+    "place_first": [
+      "verify_first",
+      "pick_first",
+      "return_first",
+      "return_after_place_first",
+      "navigate_deliver_first",
+      "place_first"
+    ],
+    "place_second": [
+      "navigate_pick_second",
+      "verify_second",
+      "pick_second",
+      "raise_second",
+      "return_second",
+      "navigate_deliver_second",
+      "place_second"
+    ],
+    "identify": [
+      "verify_cups_ready",
+      "pick_sugared_coffee",
+      "verify_sugared_coffee",
+      "select_sugared_coffee"
+    ]
+  }
+}

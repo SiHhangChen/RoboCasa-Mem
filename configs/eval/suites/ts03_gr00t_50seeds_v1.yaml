@@ -1,0 +1,37 @@
+# TS03 full evaluation suite for GR00T N1.7 policies.
+# 50 held-out seeds (1050-1099), disjoint from the training seed range (0-202).
+# TS03 samples one of four K/N hierarchy profiles by seed % 4; 1050-1099 covers
+# all four cells (~12-13 episodes each). replan_steps=20 executes the first half
+# of each 40-step GR00T chunk and then re-plans, matching the WR-03/WR-04
+# convention. max_steps=2800 is the TS03 task max_horizon; expert demos average
+# ~907 steps (max ~1272), so this leaves ~2-3x headroom. stop_on_success=true:
+# the completion-button press is a terminal state with no later revocation.
+
+suite_version: ts03_gr00t_50seeds_v1
+
+task:
+  id: TS03
+  env_split: pretrain
+  options:
+    task_config_file: bench/tasks/ts03/resources/task.yaml
+    observation_profile_file: configs/benchmark/observation_profiles/rgbd_v3.yaml
+
+seeds: {start: 1050, stop: 1100}
+
+rollout:
+  replan_steps: 20
+  max_steps: 2800
+  action_repeat: 1
+  stop_on_success: true
+  ignore_done: true
+
+artifacts:
+  record_video: true
+  video_cameras: [agentview_left, agentview_right, eye_in_hand]
+  video_fps: 20
+
+transport:
+  timeout_s: 30.0
+  connect_attempts: 10
+  connect_retry_delay_s: 2.0
+  inference_retries: 0

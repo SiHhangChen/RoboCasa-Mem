@@ -1,0 +1,33 @@
+# WR-04 smoke suite for GR00T N1.7 policies (action horizon 40).
+# Mirrors wr04_smoke_v1.yaml but replan_steps matched to the GR00T chunk size
+# (the generic smoke suite uses replan_steps=50 which exceeds the 40-step chunk).
+
+suite_version: wr04_smoke_gr00t_v1
+
+task:
+  id: WR-04
+  env_split: pretrain
+  options:
+    task_config_file: bench/tasks/wr04/resources/task.yaml
+    observation_profile_file: configs/benchmark/observation_profiles/rgbd_v3.yaml
+
+seeds: [1050, 1070, 1085]
+
+rollout:
+  replan_steps: 40
+  max_steps: 3200
+  action_repeat: 1
+  # Validate that the returned object remains valid for the full rollout.
+  stop_on_success: false
+  ignore_done: true
+
+artifacts:
+  record_video: true
+  video_cameras: [agentview_left, agentview_right, eye_in_hand]
+  video_fps: 20
+
+transport:
+  timeout_s: 30.0
+  connect_attempts: 10
+  connect_retry_delay_s: 2.0
+  inference_retries: 0
