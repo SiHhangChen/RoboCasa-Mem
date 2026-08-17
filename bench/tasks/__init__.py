@@ -130,6 +130,16 @@ BUILTIN_TASK_PLUGINS: tuple[TaskPlugin, ...] = (
         env_name="WR04ReturnSingleObjectToOriginalLevel",
     ),
     _builtin_task_plugin(
+        "WR-05",
+        aliases=("WR05", "WR_05"),
+        env_name="WR05ReturnCondimentPair",
+    ),
+    _builtin_task_plugin(
+        "WR-06",
+        aliases=("WR06", "WR_06"),
+        env_name="WR06ReturnSingleBottleToOriginalLevel",
+    ),
+    _builtin_task_plugin(
         "WX-01",
         aliases=("WX01", "WX_01"),
         env_name="WX01ReturnObjectToOriginalPlace",

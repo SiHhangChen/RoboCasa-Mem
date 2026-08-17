@@ -190,10 +190,10 @@
     {
       "action_schema": "membench.pandaomron_hybrid13.v2",
       "allow_partial_calibration": false,
-      "config_hash": "sha256:85cb45601910f4d94cc90b356787b2b98e5831029825c545d3d730716e50fef1",
+      "config_hash": "sha256:af95b2e22ec3ba49fa6efb52371284ca8d8d08338bb832e918f1513e370ee5f2",
       "control_frequency_hz": 20,
       "env_split": "pretrain",
-      "episode_identity": "sha256:839d6d3c58c2ba25c8ea38951d5f9d4adc9400c74ea22a1064097d8f3fb54d79",
+      "episode_identity": "sha256:ae05baeb4f7969660e0e3d915f60c307376d48fb86b0768ebf7cbfbdb5368eaf",
       "facts": {
         "drawer_order": [
           "drawer_left",
@@ -206,18 +206,17 @@
       },
       "initialization": {
         "allow_partial_calibration": false,
-        "config_hash": "sha256:85cb45601910f4d94cc90b356787b2b98e5831029825c545d3d730716e50fef1",
+        "config_hash": "sha256:af95b2e22ec3ba49fa6efb52371284ca8d8d08338bb832e918f1513e370ee5f2",
         "controller": {
           "max_joint_step": 0.015
         },
         "missing_physical_calibration": [
           "manual_base_path",
           "toaster_oven_interaction_poses",
-          "toaster_oven_time_pinch_off_pose",
           "toaster_oven_time_pinch_on_pose",
           "toaster_oven_time_pinch_on_for_off_pose"
         ],
-        "resource_hash": "sha256:a3c308b71fd19b48ac0dc14f62a21552010969fad76c61dfdafa7c6ca0d31234",
+        "resource_hash": "sha256:6e6ef6441211c78c9dea30e6c41e94dc1eacb061f1a855fc3368bc1ec88a458d",
         "task_id": "TM03"
       },
       "max_horizon": 4800,
@@ -256,21 +255,20 @@
       },
       "release_facts": {
         "allow_partial_calibration": false,
-        "config_hash": "sha256:85cb45601910f4d94cc90b356787b2b98e5831029825c545d3d730716e50fef1",
+        "config_hash": "sha256:af95b2e22ec3ba49fa6efb52371284ca8d8d08338bb832e918f1513e370ee5f2",
         "controller": {
           "max_joint_step": 0.015
         },
         "missing_physical_calibration": [
           "manual_base_path",
           "toaster_oven_interaction_poses",
-          "toaster_oven_time_pinch_off_pose",
           "toaster_oven_time_pinch_on_pose",
           "toaster_oven_time_pinch_on_for_off_pose"
         ],
-        "resource_hash": "sha256:a3c308b71fd19b48ac0dc14f62a21552010969fad76c61dfdafa7c6ca0d31234",
+        "resource_hash": "sha256:6e6ef6441211c78c9dea30e6c41e94dc1eacb061f1a855fc3368bc1ec88a458d",
         "task_id": "TM03"
       },
-      "resource_hash": "sha256:a3c308b71fd19b48ac0dc14f62a21552010969fad76c61dfdafa7c6ca0d31234",
+      "resource_hash": "sha256:6e6ef6441211c78c9dea30e6c41e94dc1eacb061f1a855fc3368bc1ec88a458d",
       "resources": {
         "drawer_grasp_pose": "bench/tasks/tm03/resources/calibration/cabinet_slot_1_hook_pose.json",
         "manual_base_path": "bench/tasks/tm03/resources/navigation/manual_base_path_layout39_style24_seed0.json",
@@ -301,10 +299,127 @@
     {
       "action_schema": "membench.pandaomron_hybrid13.v2",
       "allow_partial_calibration": false,
-      "config_hash": "sha256:8d2afc6db9ef033c2422b2449fa56ea13c8e370843c1b56650951263b71506af",
+      "config_hash": "sha256:d7b058b3b4f4865ff3ca96c09c0eba99443086b41dc13464fc0710eaa7c75216",
       "control_frequency_hz": 20,
       "env_split": "pretrain",
-      "episode_identity": "sha256:7044a474ed36a42a7620f3c0c7d1c0e5098b4719c5ef455cb3c8905950056104",
+      "episode_identity": "sha256:278c9bdb5609650209716d3531a080a753cb1ff5c90ef0e46b72c6bbfa96edcc",
+      "facts": {
+        "distractor_sugar_names": [
+          "sugar1"
+        ],
+        "max_horizon": 5200,
+        "prefix": "BC",
+        "seed": 0,
+        "selected_sugar_names": [
+          "sugar0",
+          "sugar2"
+        ],
+        "sugar_names": [
+          "sugar0",
+          "sugar1",
+          "sugar2"
+        ],
+        "tail": "ABC",
+        "target_sugar_count": 2,
+        "total_sugar_count": 3
+      },
+      "initialization": {
+        "allow_partial_calibration": false,
+        "config_hash": "sha256:d7b058b3b4f4865ff3ca96c09c0eba99443086b41dc13464fc0710eaa7c75216",
+        "controller": {
+          "max_joint_step": 0.025
+        },
+        "missing_physical_calibration": [],
+        "missing_scene_positions": [],
+        "resource_hash": "sha256:814912cb7cb8099fe521e4cb3a0fb933f7c92ab2138dfcaf7cb7b45697a41b20",
+        "route_count": 12,
+        "target_sugar_count": 2,
+        "task_id": "TM04",
+        "total_sugar_count": 3
+      },
+      "max_horizon": 5200,
+      "observation": {
+        "camera_aliases": [
+          "agentview_left",
+          "agentview_right",
+          "eye_in_hand"
+        ],
+        "camera_names": [
+          "robot0_agentview_left",
+          "robot0_agentview_right",
+          "robot0_eye_in_hand"
+        ],
+        "depth": true,
+        "image_size": [
+          224,
+          224
+        ],
+        "profile_hash": "sha256:cc8904e3b3bae61c0138914fc5a200a548f34f582d5650bb5f534b07b720470a",
+        "profile_id": "rgbd_v3"
+      },
+      "observation_profile": "rgbd_v3",
+      "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
+      "options": {},
+      "prompt": {
+        "initial": "First, press the blue water button beside the sink to turn on the faucet and fill the pot already in the sink. While the pot fills, complete the first part of each other task in either order: retrieve the can from the cabinet and place it in the marked area, and add one of the three sugar cubes to the hot chocolate saucepan. After the can has been placed and one sugar cube has been added, complete the three remaining steps in any order: turn off the faucet with the same blue button, close the cabinet door, and add one more sugar cube to the hot chocolate so that exactly two cubes are in the saucepan and one remains outside. When the faucet is off, the filled pot is stable in the sink, the can is in the marked area, the cabinet is closed, and exactly two sugar cubes are in the hot chocolate, press the red completion button beside the sink.",
+        "policy": "First, press the blue water button beside the sink to turn on the faucet and fill the pot already in the sink. While the pot fills, complete the first part of each other task in either order: retrieve the can from the cabinet and place it in the marked area, and add one of the three sugar cubes to the hot chocolate saucepan. After the can has been placed and one sugar cube has been added, complete the three remaining steps in any order: turn off the faucet with the same blue button, close the cabinet door, and add one more sugar cube to the hot chocolate so that exactly two cubes are in the saucepan and one remains outside. When the faucet is off, the filled pot is stable in the sink, the can is in the marked area, the cabinet is closed, and exactly two sugar cubes are in the hot chocolate, press the red completion button beside the sink."
+      },
+      "public": {
+        "env_name": "TM04FillPotRetrieveCanAndAddTwoSugars",
+        "layout_id": 15,
+        "prompt": "First, press the blue water button beside the sink to turn on the faucet and fill the pot already in the sink. While the pot fills, complete the first part of each other task in either order: retrieve the can from the cabinet and place it in the marked area, and add one of the three sugar cubes to the hot chocolate saucepan. After the can has been placed and one sugar cube has been added, complete the three remaining steps in any order: turn off the faucet with the same blue button, close the cabinet door, and add one more sugar cube to the hot chocolate so that exactly two cubes are in the saucepan and one remains outside. When the faucet is off, the filled pot is stable in the sink, the can is in the marked area, the cabinet is closed, and exactly two sugar cubes are in the hot chocolate, press the red completion button beside the sink.",
+        "scene_seed": 0,
+        "style_id": 34
+      },
+      "release_facts": {
+        "allow_partial_calibration": false,
+        "config_hash": "sha256:d7b058b3b4f4865ff3ca96c09c0eba99443086b41dc13464fc0710eaa7c75216",
+        "controller": {
+          "max_joint_step": 0.025
+        },
+        "missing_physical_calibration": [],
+        "missing_scene_positions": [],
+        "resource_hash": "sha256:814912cb7cb8099fe521e4cb3a0fb933f7c92ab2138dfcaf7cb7b45697a41b20",
+        "route_count": 12,
+        "target_sugar_count": 2,
+        "task_id": "TM04",
+        "total_sugar_count": 3
+      },
+      "resource_hash": "sha256:814912cb7cb8099fe521e4cb3a0fb933f7c92ab2138dfcaf7cb7b45697a41b20",
+      "resources": {
+        "cabinet_door_pose": "bench/tasks/tm02/resources/calibration/wr01_relative_lower_door_grasp.json",
+        "cabinet_station_poses": "bench/tasks/tm02/resources/calibration/wr01_relative_cabinet_stations.json",
+        "can_grasp_pose": "bench/tasks/tm02/resources/calibration/can_side_grasp.json",
+        "can_place_pose": "bench/tasks/tm04/resources/calibration/can_place_region_release.json",
+        "can_retrieval_prepose": "bench/tasks/tm02/resources/calibration/wr01_relative_lower_retrieval_prepose.json",
+        "manual_base_path": "bench/tasks/tm04/resources/navigation/manual_base_path_layout15_style34_seed0.json",
+        "planner_script": "bench/execution/planning/mplib_planner.py",
+        "sugar_delivery_poses": "bench/tasks/tm04/resources/calibration/sugar_delivery_poses.json",
+        "sugar_pick_poses": "bench/tasks/tm04/resources/calibration/sugar_pick_poses.json",
+        "sugar_scene_placements": "bench/tasks/tm04/resources/scene/sugar_placements.json"
+      },
+      "scene": {
+        "env_name": "TM04FillPotRetrieveCanAndAddTwoSugars",
+        "env_split": "pretrain",
+        "layout_id": 15,
+        "scene_seed": 0,
+        "style_id": 34
+      },
+      "schema_version": "membench.release_lock/v2",
+      "seed": 0,
+      "split": "evaluation",
+      "task_config_file": "bench/tasks/tm04/resources/task.yaml",
+      "task_id": "TM04",
+      "task_version": "1.0.0",
+      "variant": "memory"
+    },
+    {
+      "action_schema": "membench.pandaomron_hybrid13.v2",
+      "allow_partial_calibration": false,
+      "config_hash": "sha256:e10bef8bf338dd34f057d6354cb62b22edfa0f616074b90b2a38eda590c032c9",
+      "control_frequency_hz": 20,
+      "env_split": "pretrain",
+      "episode_identity": "sha256:3681d08bca6aa2515c888b595ca6dc753cb1a0f7abc74f67f9f89247d23d712e",
       "facts": {
         "distractor_sugar_names": [
           "sugar0",
@@ -336,7 +451,7 @@
         "total_sugar_count": 5
       },
       "initialization": {
-        "config_hash": "sha256:8d2afc6db9ef033c2422b2449fa56ea13c8e370843c1b56650951263b71506af",
+        "config_hash": "sha256:e10bef8bf338dd34f057d6354cb62b22edfa0f616074b90b2a38eda590c032c9",
         "controller": {
           "max_joint_step": 0.025
         },
@@ -378,7 +493,7 @@
         "style_id": 37
       },
       "release_facts": {
-        "config_hash": "sha256:8d2afc6db9ef033c2422b2449fa56ea13c8e370843c1b56650951263b71506af",
+        "config_hash": "sha256:e10bef8bf338dd34f057d6354cb62b22edfa0f616074b90b2a38eda590c032c9",
         "controller": {
           "max_joint_step": 0.025
         },
@@ -409,10 +524,10 @@
     {
       "action_schema": "membench.pandaomron_hybrid13.v2",
       "allow_partial_calibration": false,
-      "config_hash": "sha256:edaa40cefce011c27bbdce1da258f3e9b22a48168031de86246656c7ed876bf1",
+      "config_hash": "sha256:f6e7c822b0d0137c29ffd582c67079ef7517fe15b2b8b27fbddd83f0410c6efc",
       "control_frequency_hz": 20,
       "env_split": "pretrain",
-      "episode_identity": "sha256:42cd7cf5efd26cb62c6a138d1a5281a85b5dee20658bf6cef5d28c780649082f",
+      "episode_identity": "sha256:1b5cc58c2eaadf274457b560975ebe981919f181b9d6046b7983b259be36faad",
       "facts": {
         "demo_fixture_order": [
           "cabinet_slot_0",
@@ -420,10 +535,11 @@
           "cabinet_slot_1"
         ],
         "max_horizon": 2200,
-        "seed": 0
+        "seed": 0,
+        "target_fixture": "cabinet_slot_0"
       },
       "initialization": {
-        "config_hash": "sha256:edaa40cefce011c27bbdce1da258f3e9b22a48168031de86246656c7ed876bf1",
+        "config_hash": "sha256:f6e7c822b0d0137c29ffd582c67079ef7517fe15b2b8b27fbddd83f0410c6efc",
         "controller": {
           "max_joint_step": 0.015
         },
@@ -454,18 +570,18 @@
       "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
       "options": {},
       "prompt": {
-        "initial": "Inspect each cabinet exactly once, close it after inspection, and remember which cabinets have already been checked. After all three are closed, press the completion button.",
-        "policy": "Please inspect the three cabinets, close each drawer, then press the completion button."
+        "initial": "Exactly one of the three drawers contains a bright red cube. Search without revisiting drawers, and close each inspected drawer. Stop after finding and closing the target drawer. If finding it required inspecting k drawers, press the completion button exactly k times, releasing it between successive presses.",
+        "policy": "Search the three drawers for the red cube. Close every drawer after looking inside. Once you find the cube and close its drawer, press the completion button once for each drawer you inspected."
       },
       "public": {
         "env_name": "TS02InspectThreeCabinets",
         "layout_id": 24,
-        "prompt": "Please inspect the three cabinets, close each drawer, then press the completion button.",
+        "prompt": "Search the three drawers for the red cube. Close every drawer after looking inside. Once you find the cube and close its drawer, press the completion button once for each drawer you inspected.",
         "scene_seed": 0,
         "style_id": 24
       },
       "release_facts": {
-        "config_hash": "sha256:edaa40cefce011c27bbdce1da258f3e9b22a48168031de86246656c7ed876bf1",
+        "config_hash": "sha256:f6e7c822b0d0137c29ffd582c67079ef7517fe15b2b8b27fbddd83f0410c6efc",
         "controller": {
           "max_joint_step": 0.015
         },
@@ -497,10 +613,10 @@
     {
       "action_schema": "membench.pandaomron_hybrid13.v2",
       "allow_partial_calibration": false,
-      "config_hash": "sha256:6fe2ed497751aa40f97450083d51715384d6f4401b8ec89a0e44529af6f0780a",
+      "config_hash": "sha256:f3779c379b04169449f673a618f9538ad7d393ffbe77f64f3dad295295ac973c",
       "control_frequency_hz": 20,
       "env_split": "pretrain",
-      "episode_identity": "sha256:0f90145a2c461f2e17d621010f780231f7a0f0d6b45430879133370987334287",
+      "episode_identity": "sha256:cc1b4d980c69f23a594eb7c9d006fc7723df0699ddb9bf812a3e77d263d7691e",
       "facts": {
         "distractor_sugar_names": [
           "sugar1"
@@ -526,7 +642,7 @@
         "total_sugar_count": 2
       },
       "initialization": {
-        "config_hash": "sha256:6fe2ed497751aa40f97450083d51715384d6f4401b8ec89a0e44529af6f0780a",
+        "config_hash": "sha256:f3779c379b04169449f673a618f9538ad7d393ffbe77f64f3dad295295ac973c",
         "controller": {
           "max_joint_step": 0.025
         },
@@ -579,7 +695,7 @@
         "style_id": 37
       },
       "release_facts": {
-        "config_hash": "sha256:6fe2ed497751aa40f97450083d51715384d6f4401b8ec89a0e44529af6f0780a",
+        "config_hash": "sha256:f3779c379b04169449f673a618f9538ad7d393ffbe77f64f3dad295295ac973c",
         "controller": {
           "max_joint_step": 0.025
         },
@@ -621,25 +737,27 @@
     {
       "action_schema": "membench.pandaomron_hybrid13.v2",
       "allow_partial_calibration": false,
-      "config_hash": "sha256:f8d1551995ee32bac1cbbc742f650d6028d672b2386d94f3e3bfac8bc60630f5",
+      "config_hash": "sha256:5ec643ce0086c13c6600a210ba5637a66e32dd8271f47bb705fc6c333422096a",
       "control_frequency_hz": 20,
       "env_split": "pretrain",
-      "episode_identity": "sha256:d27dcd1eb74d258ed28a1054d3a6f9439ef3947f6a954bdcd405e431d2c8d5db",
+      "episode_identity": "sha256:ac51cb834391dbdd49f4bb6765a08cf209cea7e0eecc6157f2e0e028cb4b2463",
       "facts": {
         "demo_fixture_order": [
           "cabinet_slot_0",
           "cabinet_slot_1"
         ],
         "max_horizon": 1800,
-        "seed": 0
+        "seed": 0,
+        "target_fixture": "cabinet_slot_1"
       },
       "initialization": {
-        "config_hash": "sha256:f8d1551995ee32bac1cbbc742f650d6028d672b2386d94f3e3bfac8bc60630f5",
+        "config_hash": "sha256:5ec643ce0086c13c6600a210ba5637a66e32dd8271f47bb705fc6c333422096a",
         "controller": {
           "max_joint_step": 0.015
         },
         "order_profile_id": "left_right",
         "resource_hash": "sha256:4d60e5d3d02751a44d2565fc7018464bad876941b21633f17ab7699cad4efdce",
+        "target_fixture": "cabinet_slot_1",
         "task_id": "TS04",
         "task_revision": "TS04-v1"
       },
@@ -667,23 +785,24 @@
       "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
       "options": {},
       "prompt": {
-        "initial": "Inspect each of the two drawers exactly once, close it after inspection, remember which drawer has already been checked, then press the completion button.",
-        "policy": "Please inspect both drawers, close each one, then press the completion button."
+        "initial": "Exactly one of the two drawers contains a bright red cube. Search without revisiting drawers and close each inspected drawer. As soon as the cube is found and its drawer is closed, stop opening drawers and press the completion button once.",
+        "policy": "Search the drawers for the red cube, closing each drawer after inspection. Stop after finding and closing its drawer, then press the completion button once."
       },
       "public": {
         "env_name": "TS04InspectTwoDrawers",
         "layout_id": 24,
-        "prompt": "Please inspect both drawers, close each one, then press the completion button.",
+        "prompt": "Search the drawers for the red cube, closing each drawer after inspection. Stop after finding and closing its drawer, then press the completion button once.",
         "scene_seed": 0,
         "style_id": 24
       },
       "release_facts": {
-        "config_hash": "sha256:f8d1551995ee32bac1cbbc742f650d6028d672b2386d94f3e3bfac8bc60630f5",
+        "config_hash": "sha256:5ec643ce0086c13c6600a210ba5637a66e32dd8271f47bb705fc6c333422096a",
         "controller": {
           "max_joint_step": 0.015
         },
         "order_profile_id": "left_right",
         "resource_hash": "sha256:4d60e5d3d02751a44d2565fc7018464bad876941b21633f17ab7699cad4efdce",
+        "target_fixture": "cabinet_slot_1",
         "task_id": "TS04",
         "task_revision": "TS04-v1"
       },
@@ -712,10 +831,10 @@
     {
       "action_schema": "membench.pandaomron_hybrid13.v2",
       "allow_partial_calibration": false,
-      "config_hash": "sha256:3e28f621947e9d60bc32567588e4403ea6adf4cd82a36777d7a6a2ac2671d9f8",
+      "config_hash": "sha256:a020162c144ee7a4fa0cfb56db644312f062b8ab075b9c11ea83f1175a0ee3a9",
       "control_frequency_hz": 20,
       "env_split": "pretrain",
-      "episode_identity": "sha256:847a5da65e749e47c9889aca1d77b0f560720e99e02aef354ba56987d34cca54",
+      "episode_identity": "sha256:7b19f33386c442ba13029856ffb1489fa6076a3d1806decbf8e95422c8ddd17e",
       "facts": {
         "delivery_order": [
           "coffee_B",
@@ -726,10 +845,12 @@
           "coffee_B": "right"
         },
         "max_horizon": 5000,
-        "seed": 0
+        "seed": 0,
+        "sugar_target_mode": "unmarked",
+        "target_sugared_coffee_id": null
       },
       "initialization": {
-        "config_hash": "sha256:3e28f621947e9d60bc32567588e4403ea6adf4cd82a36777d7a6a2ac2671d9f8",
+        "config_hash": "sha256:a020162c144ee7a4fa0cfb56db644312f062b8ab075b9c11ea83f1175a0ee3a9",
         "controller": {
           "max_joint_step": 0.025
         },
@@ -771,7 +892,7 @@
         "style_id": 29
       },
       "release_facts": {
-        "config_hash": "sha256:3e28f621947e9d60bc32567588e4403ea6adf4cd82a36777d7a6a2ac2671d9f8",
+        "config_hash": "sha256:a020162c144ee7a4fa0cfb56db644312f062b8ab075b9c11ea83f1175a0ee3a9",
         "controller": {
           "max_joint_step": 0.025
         },
@@ -804,10 +925,10 @@
     {
       "action_schema": "membench.pandaomron_hybrid13.v2",
       "allow_partial_calibration": false,
-      "config_hash": "sha256:56592427c87c2b82f1b7343df741abdf0913dedd3e06945f9a66932d10246198",
+      "config_hash": "sha256:9798c767e58b54311e4e01602cb2af6e0aac4f129e45dd0371744a7f1ab9902f",
       "control_frequency_hz": 20,
       "env_split": "pretrain",
-      "episode_identity": "sha256:8884925c0cd6abe929fbd5c3575d735539ad39ed910c5b0614b00274d73d544d",
+      "episode_identity": "sha256:50545c2058454fab3b11bbf53e431aa36fc4b8b01263b329fdafcf334100a8a4",
       "facts": {
         "cold_cup_id": "cup_B",
         "fill_temperature_order": [
@@ -825,11 +946,11 @@
         }
       },
       "initialization": {
-        "config_hash": "sha256:56592427c87c2b82f1b7343df741abdf0913dedd3e06945f9a66932d10246198",
+        "config_hash": "sha256:9798c767e58b54311e4e01602cb2af6e0aac4f129e45dd0371744a7f1ab9902f",
         "controller": {
-          "max_joint_step": 0.025
+          "max_joint_step": 0.035
         },
-        "resource_hash": "sha256:8d54034ebcdbfdbdaa13571092f2a28890750372a0269ab39053a2a25676f6bf",
+        "resource_hash": "sha256:63041a2941f9504f8ab0a94539b5c80396c84e9283299d9d42d6b01d56872134",
         "task_id": "WA-02"
       },
       "max_horizon": 6000,
@@ -867,22 +988,21 @@
         "style_id": 34
       },
       "release_facts": {
-        "config_hash": "sha256:56592427c87c2b82f1b7343df741abdf0913dedd3e06945f9a66932d10246198",
+        "config_hash": "sha256:9798c767e58b54311e4e01602cb2af6e0aac4f129e45dd0371744a7f1ab9902f",
         "controller": {
-          "max_joint_step": 0.025
+          "max_joint_step": 0.035
         },
-        "resource_hash": "sha256:8d54034ebcdbfdbdaa13571092f2a28890750372a0269ab39053a2a25676f6bf",
+        "resource_hash": "sha256:63041a2941f9504f8ab0a94539b5c80396c84e9283299d9d42d6b01d56872134",
         "task_id": "WA-02"
       },
-      "resource_hash": "sha256:8d54034ebcdbfdbdaa13571092f2a28890750372a0269ab39053a2a25676f6bf",
+      "resource_hash": "sha256:63041a2941f9504f8ab0a94539b5c80396c84e9283299d9d42d6b01d56872134",
       "resources": {
         "cup_grasp_candidates": "bench/tasks/wa02/resources/poses/water_cup_grasp_candidates.json",
-        "faucet_switch_pose": "bench/tasks/wa02/resources/poses/faucet_switch_pose_layout15_style34_seed0.json",
         "manual_base_path": "bench/tasks/wa02/resources/navigation/manual_base_path_layout15_style34_seed0.json",
         "planner_script": "bench/execution/planning/mplib_planner.py",
+        "sensor_faucet_layout": "bench/tasks/wa02/resources/poses/sensor_faucet_layout_layout15_style34_seed0.json",
         "sink_fill_pose": "bench/tasks/wa02/resources/poses/sink_cup_place_pose_layout15_style34_seed0.json",
-        "station_poses": "bench/tasks/wa02/resources/station/stations.json",
-        "water_button_positions": "bench/tasks/wa02/resources/poses/water_button_positions_layout15_style34_seed0.json"
+        "station_poses": "bench/tasks/wa02/resources/station/stations.json"
       },
       "scene": {
         "env_name": "WA02ServeHotColdWaterCups",
@@ -902,10 +1022,10 @@
     {
       "action_schema": "membench.pandaomron_hybrid13.v2",
       "allow_partial_calibration": false,
-      "config_hash": "sha256:ddfaad0663db4fac988d0c95782ae4b8c3a101b70ce4a340fea234a6078e64a3",
+      "config_hash": "sha256:1198faac47cc855dae2c27b064bacaa85fbc7d5340a2f61f369c68e69e5e4067",
       "control_frequency_hz": 20,
       "env_split": "pretrain",
-      "episode_identity": "sha256:d21ef71076c6438e383cff66c061b8fe5cea0d2f92e64daa609b960e39fddd49",
+      "episode_identity": "sha256:e020c28067317c5781b1f6583ff06612dc70d0f61a3977379563af08e9a4c821",
       "facts": {
         "delivery_order": [
           "coffee_B",
@@ -922,7 +1042,7 @@
         "target_sugared_coffee_id": "coffee_B"
       },
       "initialization": {
-        "config_hash": "sha256:ddfaad0663db4fac988d0c95782ae4b8c3a101b70ce4a340fea234a6078e64a3",
+        "config_hash": "sha256:1198faac47cc855dae2c27b064bacaa85fbc7d5340a2f61f369c68e69e5e4067",
         "controller": {
           "max_joint_step": 0.025
         },
@@ -964,7 +1084,7 @@
         "style_id": 29
       },
       "release_facts": {
-        "config_hash": "sha256:ddfaad0663db4fac988d0c95782ae4b8c3a101b70ce4a340fea234a6078e64a3",
+        "config_hash": "sha256:1198faac47cc855dae2c27b064bacaa85fbc7d5340a2f61f369c68e69e5e4067",
         "controller": {
           "max_joint_step": 0.025
         },
@@ -997,10 +1117,10 @@
     {
       "action_schema": "membench.pandaomron_hybrid13.v2",
       "allow_partial_calibration": false,
-      "config_hash": "sha256:c3e88194cb94ef06ea32ca58844d9cf1eb9e827df964c2273b0ce2c7894132f5",
+      "config_hash": "sha256:8538693ff90889a75f80807c03060f09796fc9339ae2158c2b7bff48a013e725",
       "control_frequency_hz": 20,
       "env_split": "pretrain",
-      "episode_identity": "sha256:6f65659717876422e261f61adeb024414942f618c8ac6d0a587c442840a50f3d",
+      "episode_identity": "sha256:a7debe46050deaa97f7942a28f43a4e99d3c34bbd7f179c98e1e9ec7e44bf61a",
       "facts": {
         "fill_cup_order": [
           "cup_A",
@@ -1023,11 +1143,11 @@
         }
       },
       "initialization": {
-        "config_hash": "sha256:c3e88194cb94ef06ea32ca58844d9cf1eb9e827df964c2273b0ce2c7894132f5",
+        "config_hash": "sha256:8538693ff90889a75f80807c03060f09796fc9339ae2158c2b7bff48a013e725",
         "controller": {
-          "max_joint_step": 0.025
+          "max_joint_step": 0.035
         },
-        "resource_hash": "sha256:d78a1dfcb9a59a4ee2b6f8d637e50f7ea926541776eca8799f0d7037c59ee569",
+        "resource_hash": "sha256:4c7ad3676ae700363ee433c6b7997d8ba125a76a405e55c7aee0c55293e2d036",
         "task_id": "WA-04"
       },
       "max_horizon": 8500,
@@ -1054,33 +1174,32 @@
       "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
       "options": {},
       "prompt": {
-        "initial": "Remember the temperature bound to each of the three identical cups. Exactly one cup contains hot water, and the final view does not reveal which one.",
-        "policy": "Fill three identical cups so exactly one contains hot water and the other two contain cold water, stage all three cups, then take the hot-water cup."
+        "initial": "Remember which of the three identical cups is filled with hot water. The final view does not reveal which one.",
+        "policy": "We need two cups of cold water and one cup of hot water. The left faucet dispenses hot water and the right faucet dispenses cold water. You may fill hot or cold water in any order. Finally place all three cups to the left of the sink, then pick up the cup filled with hot water."
       },
       "public": {
         "env_name": "WA04ServeUniqueTemperatureCupAmongThree",
         "layout_id": 15,
-        "prompt": "Fill three identical cups so exactly one contains hot water and the other two contain cold water, stage all three cups, then take the hot-water cup.",
+        "prompt": "We need two cups of cold water and one cup of hot water. The left faucet dispenses hot water and the right faucet dispenses cold water. You may fill hot or cold water in any order. Finally place all three cups to the left of the sink, then pick up the cup filled with hot water.",
         "scene_seed": 0,
         "style_id": 34
       },
       "release_facts": {
-        "config_hash": "sha256:c3e88194cb94ef06ea32ca58844d9cf1eb9e827df964c2273b0ce2c7894132f5",
+        "config_hash": "sha256:8538693ff90889a75f80807c03060f09796fc9339ae2158c2b7bff48a013e725",
         "controller": {
-          "max_joint_step": 0.025
+          "max_joint_step": 0.035
         },
-        "resource_hash": "sha256:d78a1dfcb9a59a4ee2b6f8d637e50f7ea926541776eca8799f0d7037c59ee569",
+        "resource_hash": "sha256:4c7ad3676ae700363ee433c6b7997d8ba125a76a405e55c7aee0c55293e2d036",
         "task_id": "WA-04"
       },
-      "resource_hash": "sha256:d78a1dfcb9a59a4ee2b6f8d637e50f7ea926541776eca8799f0d7037c59ee569",
+      "resource_hash": "sha256:4c7ad3676ae700363ee433c6b7997d8ba125a76a405e55c7aee0c55293e2d036",
       "resources": {
         "cup_grasp_candidates": "bench/tasks/wa04/resources/poses/water_cup_grasp_candidates.json",
-        "faucet_switch_pose": "bench/tasks/wa04/resources/poses/faucet_switch_pose_layout15_style34_seed0.json",
         "manual_base_path": "bench/tasks/wa04/resources/navigation/manual_base_path_layout15_style34_seed0.json",
         "planner_script": "bench/execution/planning/mplib_planner.py",
+        "sensor_faucet_layout": "bench/tasks/wa04/resources/poses/sensor_faucet_layout_layout15_style34_seed0.json",
         "sink_fill_pose": "bench/tasks/wa04/resources/poses/sink_cup_place_pose_layout15_style34_seed0.json",
-        "station_poses": "bench/tasks/wa04/resources/station/stations.json",
-        "water_button_positions": "bench/tasks/wa04/resources/poses/water_button_positions_layout15_style34_seed0.json"
+        "station_poses": "bench/tasks/wa04/resources/station/stations.json"
       },
       "scene": {
         "env_name": "WA04ServeUniqueTemperatureCupAmongThree",
@@ -1417,10 +1536,10 @@
     {
       "action_schema": "membench.pandaomron_hybrid13.v2",
       "allow_partial_calibration": false,
-      "config_hash": "sha256:e8e88ec6d3c3bfdea7e8d7f8f402701a47434e14609f50e31149a7845f9b7e43",
+      "config_hash": "sha256:a7750d3ddbdf8803dde2ddd484f578d12601bb5e56acaba384b3817d484f904c",
       "control_frequency_hz": 20,
       "env_split": "pretrain",
-      "episode_identity": "sha256:d5ff17477a9d83342234acc17a0ab6fbdb26b977d0237ea8b1e0911212bd7cd2",
+      "episode_identity": "sha256:3e08e55a745b6953b5bf400b298f391bd6aee8ed7f28503342144b3bc0630b5f",
       "facts": {
         "demo_original_level": "shelf_lower",
         "max_horizon": 3200,
@@ -1428,7 +1547,7 @@
         "seed": 0
       },
       "initialization": {
-        "config_hash": "sha256:e8e88ec6d3c3bfdea7e8d7f8f402701a47434e14609f50e31149a7845f9b7e43",
+        "config_hash": "sha256:a7750d3ddbdf8803dde2ddd484f578d12601bb5e56acaba384b3817d484f904c",
         "controller": {
           "max_joint_step": 0.03
         },
@@ -1471,7 +1590,7 @@
         "style_id": 32
       },
       "release_facts": {
-        "config_hash": "sha256:e8e88ec6d3c3bfdea7e8d7f8f402701a47434e14609f50e31149a7845f9b7e43",
+        "config_hash": "sha256:a7750d3ddbdf8803dde2ddd484f578d12601bb5e56acaba384b3817d484f904c",
         "controller": {
           "max_joint_step": 0.03
         },
@@ -1504,10 +1623,222 @@
     {
       "action_schema": "membench.pandaomron_hybrid13.v2",
       "allow_partial_calibration": false,
-      "config_hash": "sha256:d6841882e3fdc4ee09b0c1191dcbda6dbff8c34b7abc22c8ce06a1e880bf9714",
+      "config_hash": "sha256:5d049825f3b045e9dd46a040728277f279413dc8655a7918287cb18cbe316304",
       "control_frequency_hz": 20,
       "env_split": "pretrain",
-      "episode_identity": "sha256:2ea325bd798d421053a9ff070a86912a65e40b6e14183b5a86c8fc5c94e2731e",
+      "episode_identity": "sha256:c431510743c9232a53506240eee5eec7701855ab7eb16ea3da5a546191a909b8",
+      "facts": {
+        "case_id": 0,
+        "home_assignment": {
+          "ketchup": "shelf_upper",
+          "mustard": "shelf_lower"
+        },
+        "max_horizon": 5000,
+        "return_sampled_offsets_xy": {
+          "ketchup": [
+            -0.07563536376660199,
+            -0.02029934730341542
+          ],
+          "mustard": [
+            -0.016270345485872306,
+            0.013893441892821518
+          ]
+        },
+        "return_sampling_metadata": {
+          "attempt": 1,
+          "fallback_used": false,
+          "half_extents": [
+            0.2,
+            0.03
+          ],
+          "lower_condiment": "mustard",
+          "minimum_separation": 0.2,
+          "nominal_separation": 0.2966666666666667,
+          "sampling_shape": "rectangle",
+          "seed": 0,
+          "upper_condiment": "ketchup",
+          "vertical_separation": 0.2966666666666667
+        },
+        "seed": 0,
+        "transport_order": [
+          "ketchup",
+          "mustard"
+        ],
+        "use_assignment": {
+          "ketchup": "plate_left",
+          "mustard": "plate_right"
+        }
+      },
+      "initialization": {
+        "config_hash": "sha256:5d049825f3b045e9dd46a040728277f279413dc8655a7918287cb18cbe316304",
+        "controller": {
+          "max_joint_step": 0.03
+        },
+        "resource_hash": "sha256:3149a7d3a58770ebd4d8e06f01cda0ce1d59ac3f81cf14a5ed90848511d9ac85",
+        "task_id": "WR-05",
+        "task_revision": "WR05-v1"
+      },
+      "max_horizon": 5000,
+      "observation": {
+        "camera_aliases": [
+          "agentview_left",
+          "agentview_right",
+          "eye_in_hand"
+        ],
+        "camera_names": [
+          "robot0_agentview_left",
+          "robot0_agentview_right",
+          "robot0_eye_in_hand"
+        ],
+        "depth": true,
+        "image_size": [
+          224,
+          224
+        ],
+        "profile_hash": "sha256:cc8904e3b3bae61c0138914fc5a200a548f34f582d5650bb5f534b07b720470a",
+        "profile_id": "rgbd_v3"
+      },
+      "observation_profile": "rgbd_v3",
+      "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
+      "options": {},
+      "prompt": {
+        "initial": "Observe the open shelf and remember the ketchup-to-mustard level binding. The return phase will not reveal their original levels.",
+        "policy": "Return the ketchup and mustard bottles to their original open-shelf levels."
+      },
+      "public": {
+        "env_name": "WR05ReturnCondimentPair",
+        "layout_id": 32,
+        "prompt": "Return the ketchup and mustard bottles to their original open-shelf levels.",
+        "scene_seed": 0,
+        "style_id": 32
+      },
+      "release_facts": {
+        "config_hash": "sha256:5d049825f3b045e9dd46a040728277f279413dc8655a7918287cb18cbe316304",
+        "controller": {
+          "max_joint_step": 0.03
+        },
+        "resource_hash": "sha256:3149a7d3a58770ebd4d8e06f01cda0ce1d59ac3f81cf14a5ed90848511d9ac85",
+        "task_id": "WR-05",
+        "task_revision": "WR05-v1"
+      },
+      "resource_hash": "sha256:3149a7d3a58770ebd4d8e06f01cda0ce1d59ac3f81cf14a5ed90848511d9ac85",
+      "resources": {
+        "ketchup_shelf_grasp": "bench/tasks/wr05/resources/calibration/shelf_ketchup_grasp.json",
+        "mustard_shelf_grasp": "bench/tasks/wr05/resources/calibration/shelf_mustard_grasp.json",
+        "planner_script": "bench/execution/planning/mplib_planner.py",
+        "plate_ketchup_return_grasp": "bench/tasks/wr05/resources/calibration/plate_ketchup_return_grasp.json",
+        "plate_mustard_return_grasp": "bench/tasks/wr05/resources/calibration/plate_mustard_return_grasp.json",
+        "stations": "bench/tasks/wr05/resources/calibration/stations.json"
+      },
+      "scene": {
+        "env_name": "WR05ReturnCondimentPair",
+        "env_split": "pretrain",
+        "layout_id": 32,
+        "scene_seed": 0,
+        "style_id": 32
+      },
+      "schema_version": "membench.release_lock/v2",
+      "seed": 0,
+      "split": "evaluation",
+      "task_config_file": "bench/tasks/wr05/resources/task.yaml",
+      "task_id": "WR-05",
+      "task_version": "1.0.0",
+      "variant": "memory"
+    },
+    {
+      "action_schema": "membench.pandaomron_hybrid13.v2",
+      "allow_partial_calibration": false,
+      "config_hash": "sha256:aaca5256a857bbc533c9a74414c4cdcf0e1730f5cdc7ae835c9b148ef5ca2690",
+      "control_frequency_hz": 20,
+      "env_split": "pretrain",
+      "episode_identity": "sha256:006db21f24cc29c36b26b6f8b3ace942491f11fa1db72786d3e5e55c7bd1c6ee",
+      "facts": {
+        "demo_original_level": "shelf_lower",
+        "max_horizon": 3200,
+        "placement_pair_seed": 0,
+        "seed": 0
+      },
+      "initialization": {
+        "config_hash": "sha256:aaca5256a857bbc533c9a74414c4cdcf0e1730f5cdc7ae835c9b148ef5ca2690",
+        "controller": {
+          "max_joint_step": 0.03
+        },
+        "resource_hash": "sha256:79cc18ab6b93d3107fe45f7d946b6e2d45cba9d9ab6ed46c37df4162d6ca9622",
+        "task_id": "WR-06",
+        "task_revision": "WR06-v1"
+      },
+      "max_horizon": 3200,
+      "observation": {
+        "camera_aliases": [
+          "agentview_left",
+          "agentview_right",
+          "eye_in_hand"
+        ],
+        "camera_names": [
+          "robot0_agentview_left",
+          "robot0_agentview_right",
+          "robot0_eye_in_hand"
+        ],
+        "depth": true,
+        "image_size": [
+          224,
+          224
+        ],
+        "profile_hash": "sha256:cc8904e3b3bae61c0138914fc5a200a548f34f582d5650bb5f534b07b720470a",
+        "profile_id": "rgbd_v3"
+      },
+      "observation_profile": "rgbd_v3",
+      "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
+      "options": {},
+      "prompt": {
+        "initial": "Remember whether the ketchup bottle starts on the lower or upper shelf. Move it to the fixed plate staging spot, then return it to its original shelf level.",
+        "policy": "Return the ketchup bottle to its original shelf level."
+      },
+      "public": {
+        "env_name": "WR06ReturnSingleBottleToOriginalLevel",
+        "layout_id": 32,
+        "prompt": "Return the ketchup bottle to its original shelf level.",
+        "scene_seed": 0,
+        "style_id": 32
+      },
+      "release_facts": {
+        "config_hash": "sha256:aaca5256a857bbc533c9a74414c4cdcf0e1730f5cdc7ae835c9b148ef5ca2690",
+        "controller": {
+          "max_joint_step": 0.03
+        },
+        "resource_hash": "sha256:79cc18ab6b93d3107fe45f7d946b6e2d45cba9d9ab6ed46c37df4162d6ca9622",
+        "task_id": "WR-06",
+        "task_revision": "WR06-v1"
+      },
+      "resource_hash": "sha256:79cc18ab6b93d3107fe45f7d946b6e2d45cba9d9ab6ed46c37df4162d6ca9622",
+      "resources": {
+        "item_shelf_grasp": "bench/tasks/wr06/resources/calibration/shelf_ketchup_grasp.json",
+        "planner_script": "bench/execution/planning/mplib_planner.py",
+        "plate_return_grasp": "bench/tasks/wr06/resources/calibration/plate_ketchup_return_grasp.json",
+        "stations": "bench/tasks/wr06/resources/calibration/stations.json"
+      },
+      "scene": {
+        "env_name": "WR06ReturnSingleBottleToOriginalLevel",
+        "env_split": "pretrain",
+        "layout_id": 32,
+        "scene_seed": 0,
+        "style_id": 32
+      },
+      "schema_version": "membench.release_lock/v2",
+      "seed": 0,
+      "split": "evaluation",
+      "task_config_file": "bench/tasks/wr06/resources/task.yaml",
+      "task_id": "WR-06",
+      "task_version": "1.0.0",
+      "variant": "memory"
+    },
+    {
+      "action_schema": "membench.pandaomron_hybrid13.v2",
+      "allow_partial_calibration": false,
+      "config_hash": "sha256:5098ad96ea19ee118b0356e144df0c980978c80931b5cd5d4d0cc29789a6e893",
+      "control_frequency_hz": 20,
+      "env_split": "pretrain",
+      "episode_identity": "sha256:50000d5eb4a3d1aefcb8f0736cab426e449ca09c87546fce000f60faa2893041",
       "facts": {
         "initial_object_poses": {
           "blocking_object": {
@@ -1622,11 +1953,11 @@
         ]
       },
       "initialization": {
-        "config_hash": "sha256:d6841882e3fdc4ee09b0c1191dcbda6dbff8c34b7abc22c8ce06a1e880bf9714",
+        "config_hash": "sha256:5098ad96ea19ee118b0356e144df0c980978c80931b5cd5d4d0cc29789a6e893",
         "controller": {
           "max_joint_step": 0.02
         },
-        "resource_hash": "sha256:7ff2d5e6c9b643b4f05e6b0b2be3e418bd871c5247d0d6ff3a8275332e0958be",
+        "resource_hash": "sha256:8e7d343f911db780a45ac69d5d765a187944ed14bf7950680dc054a825aa12b1",
         "task_id": "WX-01"
       },
       "max_horizon": 3200,
@@ -1653,26 +1984,27 @@
       "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
       "options": {},
       "prompt": {
-        "initial": "The cup has been moved away from its remembered dining-table spot. Clean that spot and return the cup to it.",
-        "policy": "Start with the sponge already grasped and the cup displaced. Wipe the remembered cup spot, put down the sponge, then return the cup to that original spot."
+        "initial": "The dining-table spot is dirty. Wipe it clean with the sponge, then place the cup onto the cleaned spot.",
+        "policy": "Start with the sponge already grasped. Wipe the dirty dining-table spot, then place the cup onto the cleaned spot."
       },
       "public": {
         "env_name": "WX01ReturnObjectToOriginalPlace",
         "layout_id": 38,
-        "prompt": "Start with the sponge already grasped and the cup displaced. Wipe the remembered cup spot, put down the sponge, then return the cup to that original spot.",
+        "prompt": "Start with the sponge already grasped. Wipe the dirty dining-table spot, then place the cup onto the cleaned spot.",
         "scene_seed": 0,
         "style_id": 38
       },
       "release_facts": {
-        "config_hash": "sha256:d6841882e3fdc4ee09b0c1191dcbda6dbff8c34b7abc22c8ce06a1e880bf9714",
+        "config_hash": "sha256:5098ad96ea19ee118b0356e144df0c980978c80931b5cd5d4d0cc29789a6e893",
         "controller": {
           "max_joint_step": 0.02
         },
-        "resource_hash": "sha256:7ff2d5e6c9b643b4f05e6b0b2be3e418bd871c5247d0d6ff3a8275332e0958be",
+        "resource_hash": "sha256:8e7d343f911db780a45ac69d5d765a187944ed14bf7950680dc054a825aa12b1",
         "task_id": "WX-01"
       },
-      "resource_hash": "sha256:7ff2d5e6c9b643b4f05e6b0b2be3e418bd871c5247d0d6ff3a8275332e0958be",
+      "resource_hash": "sha256:8e7d343f911db780a45ac69d5d765a187944ed14bf7950680dc054a825aa12b1",
       "resources": {
+        "blocking_cup_grasp_candidates": "bench/tasks/wx01/resources/poses/blocking_cup_single_wall_grasp_candidates.json",
         "cleaning_tool_grasp_pose": "bench/tasks/wx01/resources/poses/cleaning_tool_grasp.json",
         "manual_base_path": "bench/tasks/wx01/resources/navigation/manual_base_path_layout38_style38_seed0.json",
         "planner_script": "bench/execution/planning/mplib_planner.py",
@@ -1694,7 +2026,7 @@
       "variant": "memory"
     }
   ],
-  "lock_hash": "sha256:706284e8631a5e594382bf780f38622d7206ab210c46df452184db19e435dafa",
+  "lock_hash": "sha256:7ab98263ba856318153cd4b86f1b55c8ee0c0b1f8c2ea58e92cacf823291b2b5",
   "release_id": "all_tasks_v1",
   "schema_version": "membench.release_lock/v2"
 }

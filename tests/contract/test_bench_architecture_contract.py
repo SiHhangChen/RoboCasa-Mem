@@ -19,12 +19,13 @@ TASK_IDS = TaskCatalog.ids()
 
 
 @pytest.mark.contract
-def test_catalog_has_exactly_fourteen_stable_tasks() -> None:
-    assert len(TASK_IDS) == 14
-    assert len(set(TASK_IDS)) == 14
+def test_catalog_has_exactly_nineteen_stable_tasks() -> None:
+    assert len(TASK_IDS) == 19
+    assert len(set(TASK_IDS)) == 19
     assert TASK_IDS == (
-        "TM01", "TM02", "TM03", "TS01", "TS02", "TS03", "TS04",
-        "WA-01", "WA-02", "WR-01", "WR-02", "WR-03", "WR-04", "WX-01",
+        "TM01", "TM02", "TM03", "TM04", "TS01", "TS02", "TS03", "TS04",
+        "WA-01", "WA-02", "WA-03", "WA-04", "WR-01", "WR-02", "WR-03", "WR-04",
+        "WR-05", "WR-06", "WX-01",
     )
 
 

@@ -1,0 +1,46 @@
+{
+  "schema_version": 2,
+  "config_kind": "manual_grasp_pose",
+  "task": "WR-05",
+  "asset": "lightwheel/mustard/Mustard003",
+  "object_name": "mustard",
+  "pose_name": "plate_mustard_return_reverse_place",
+  "description": "Object-relative side grasp that reverses the nominal EEF/object transform used while placing the mustard upright.",
+  "pregrasp_offset_tcp": [
+    -0.058361321127689436,
+    0.1200130933328718,
+    -0.08118382612876918
+  ],
+  "selected": {
+    "eef_site_in_object": {
+      "matrix": [
+        [-0.9338025031130887, 0.000031353192453854464, -0.35778888215916915, 0.0],
+        [-0.35778888141477827, -0.00019064198161549597, 0.9338024844642454, 0.0],
+        [-0.00003893189248552226, 0.9999999813363064, 0.0001892397832878364, -0.01499999972004451],
+        [0.0, 0.0, 0.0, 1.0]
+      ],
+      "p": [
+        0.0,
+        0.0,
+        -0.01499999972004451
+      ],
+      "q_xyzw": [
+        0.1286457335915568,
+        -0.6952378408408496,
+        -0.6953744287932206,
+        0.12864300864075737
+      ]
+    }
+  },
+  "provenance": {
+    "source_episode": "outputs/wr05_full_demo_stable_20260811_112108/debug_failed/WR-05/seed_000000",
+    "source_stage": "place_mustard_at_plate_side",
+    "method": "reuse_nominal_held_eef_in_object_from_verified_placement",
+    "pregrasp_method": "reverse_selected_placement_entry_offset",
+    "reference_station_geometry": {
+      "task": "WA-02",
+      "phase": "physical_final_pick_cup_A",
+      "object_xy_in_base": [0.5320371726233926, 0.018775261829640844]
+    }
+  }
+}

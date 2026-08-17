@@ -53,6 +53,8 @@ _ENTRIES: tuple[CatalogEntry, ...] = (
     CatalogEntry("WR-02", "wr02", "WR02ReturnCondimentPair", "1.0.0", 5000),
     CatalogEntry("WR-03", "wr03", "WR03StoreAndRetrieveRememberedCan", "1.0.0", 15000),
     CatalogEntry("WR-04", "wr04", "WR04ReturnSingleObjectToOriginalLevel", "1.0.0", 3200),
+    CatalogEntry("WR-05", "wr05", "WR05ReturnCondimentPair", "1.0.0", 5000),
+    CatalogEntry("WR-06", "wr06", "WR06ReturnSingleBottleToOriginalLevel", "1.0.0", 3200),
     CatalogEntry("WX-01", "wx01", "WX01ReturnObjectToOriginalPlace", "1.0.0", 3200),
 )
 

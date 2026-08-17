@@ -1,0 +1,269 @@
+schema_version: 1
+
+task:
+  id: WR-06
+  display_name: Return the ketchup bottle to its original shelf level
+  description: Stage one ketchup bottle beside the fixed serving plate, then return it to its remembered original shelf level.
+  success_conditions:
+    - initial_level_physically_verified
+    - item_removed_from_home
+    - item_staged_at_fixed_plate
+    - memory_barrier_latched
+    - first_return_level_correct
+    - same_item_returned
+    - item_in_original_level
+    - no_stage_regression
+    - no_protocol_violation
+
+scene:
+  env_name: WR06ReturnSingleBottleToOriginalLevel
+  fixed_scene: true
+  layout_id: 32
+  style_id: 32
+  scene_seed: 0
+
+episode:
+  max_horizon: 3200
+
+initial_state:
+  robot_base:
+    mode: preserve_reset_pose
+  home_regions:
+    shelf_lower:
+      shelf_level: 0
+      # Keep the bottle away from layout 32's wall at the low-world-X end of
+      # the shelf.  The previous 0.72 m centered span sampled bottle centers
+      # down to x~=1.79 m, where recorded shelf approaches hit the wall.  This
+      # asymmetric span starts at x~=1.93 m after the object's boundary buffer.
+      size: [0.58, 0.13]
+      pos: [0.25, -1.0]
+      margin: 0.04
+    shelf_upper:
+      shelf_level: 1
+      size: [0.58, 0.13]
+      pos: [0.25, -1.0]
+      margin: 0.04
+  objects: {}
+
+sensors:
+  cameras: [robot0_agentview_left, robot0_agentview_right, robot0_eye_in_hand]
+  wrist_rgb_camera: robot0_eye_in_hand
+  width: 224
+  height: 224
+  depth: true
+  has_renderer: false
+  has_offscreen_renderer: true
+  use_camera_observations: true
+
+resources:
+  item_shelf_grasp: calibration/shelf_ketchup_grasp.json
+  plate_return_grasp: calibration/plate_ketchup_return_grasp.json
+  planner_script: ../../../execution/planning/mplib_planner.py
+  stations: calibration/stations.json
+
+navigation:
+  kinematic_base_navigation: false
+  base_action_frame: world
+  base_translation_action_sign: 1.0
+  base_tolerance: 0.04
+  base_yaw_tolerance: 0.08
+  base_max_steps: 2000
+  base_holding_drop_tolerance: 0.10
+  base_profile_v_max: 0.65
+  base_profile_a_max: 1.6
+  base_profile_a_dec: 1.2
+  base_profile_v_min: 0.22
+  base_profile_dock_v_max: 0.50
+  base_profile_dock_v_min: 0.28
+  base_profile_w_max: 1.2
+  base_profile_alpha_max: 3.0
+  base_profile_alpha_dec: 2.5
+  base_profile_w_min: 0.2
+  manual_base_path_enabled: false
+  base_single_axis_tracking: false
+  use_station_astar_paths: false
+  station_nav_use_docking: true
+  use_station_base_poses: true
+
+manipulation:
+  pick_place:
+    orientation_mode: object-y-topdown
+    mug_orientation_mode: mug-body-side
+    pregrasp_height: 0.15
+    grasp_clearance: -0.04
+    lift_height: 0.12
+    place_height: 0.10
+    retreat_height: 0.18
+    retreat_x: 0.0
+    retreat_y: -0.10
+  planner:
+    conda_env: membench
+    subprocess_timeout_s: 60.0
+    planning_time: 5.0
+    time_step: 0.1
+    qpos_step: 0.02
+    rrt_range: 0.1
+    preserve_ik_branch_stages: [place]
+    nearest_ik_samples: 256
+    nearest_ik_threshold: 0.01
+    nearest_ik_max_joint_delta: 2.15
+  runtime:
+    max_joint_step: 0.030
+    settle_steps: 8
+    position_threshold: 0.02
+    orientation_threshold_deg: 15.0
+    qpos_threshold: 0.16
+    open_steps: 4
+    close_steps: 9
+    release_steps: 5
+    release_settle_steps: 8
+  static_scene:
+    enabled: false
+    validate_collisions: false
+    fixture_keywords: counter,sink,cabinet
+    exclude_keywords: floor,wall
+    spacing: 0.04
+    inflate: 0.05
+    point_radius: 0.01
+    faces: bottom
+    point_cloud_stages: pregrasp,grasp,lift,place,clearance,retreat
+    min_z: 1.0
+    max_points: 4000
+
+operations:
+  shelf_pick:
+    orientation_mode: side-from-base
+    pregrasp_height: 0.08
+    close_gripper_action: 1.0
+    held_gripper_action: 1.0
+    post_close_hold_steps: 30
+    grasp_clearance: -0.005
+    lift_height: 0.01
+    allow_pregrasp_near_miss: true
+    allow_grasp_near_miss: true
+  item_shelf_pick: {}
+  return_pick:
+    orientation_mode: object-y-topdown
+    pregrasp_height: 0.04
+    manual_grasp_pregrasp_distance: 0.04
+    lift_height: 0.08
+  item_return_pick:
+    # Proven WR-05 plate re-pick contract: a WA-02-style low side grasp selected
+    # across several yaw offsets so the staged bottle is re-grasped reliably
+    # instead of being picked top-down.
+    grasp_near_miss_max_position_error: 0.05
+    orientation_mode: mug-body-side
+    pregrasp_height: 0.18
+    grasp_clearance: -0.02
+    grasp_offset_z: -0.055
+    lift_height: 0.12
+    plate_side_grasp_yaw_offsets_deg: [0.0, -45.0, 45.0, 90.0]
+    retreat_to_pregrasp_after_grasp: false
+  plate_place:
+    # Proven WR-05 plate-staging contract: preserve the calibrated EEF-to-bottle
+    # grasp transform, rotate the bottle's local +Z onto world +Z, and descend
+    # only until the bottle bottom enters its support guard.
+    placement_reference: bbox_bottom_center
+    placement_object_upright: true
+    place_height: 0.02
+    retreat_height: 0.14
+    retreat_x: 0.0
+    retreat_y: 0.0
+    placement_entry_z_offset: 0.12
+    post_release_clearance_distance: 0.0
+    post_release_clearance_z_offset: 0.22
+    placement_exit_z_offset: 0.22
+    # Descend vertically above the final slot. A lateral standoff makes the
+    # diagonal place path touch the counter before XY has converged, which used
+    # to release the bottle roughly 9 cm away from the requested slot.
+    placement_entry_standoff: 0.0
+    placement_exit_standoff: 0.08
+    placement_approach_angles_deg: [30.0, 90.0, 60.0, 120.0, 150.0, 0.0, 180.0]
+    entry_settle_steps: 20
+    place_settle_steps: 20
+    place_descent_stop_bottom_offset: 0.005
+    release_steps: 35
+    release_settle_steps: 10
+    release_separation_assist_distance: 0.0
+    clearance_settle_steps: 20
+    retreat_settle_steps: 8
+    dry_run_only: false
+    require_pre_release_support: true
+    pre_release_bottom_min_offset: -0.015
+    pre_release_bottom_max_offset: 0.015
+    pre_release_xy_tolerance: 0.06
+    # Once the fingers and arm have cleared, allow a small contact-driven slide
+    # while still requiring the bottle to remain upright and supported. This is
+    # well inside the task's 20 cm plate-stage region.
+    post_release_xy_tolerance: 0.08
+    pre_release_upright_tolerance_deg: 15.0
+    allow_place_near_miss: true
+    allow_place_trajectory_early_stop: true
+    place_near_miss_max_position_error: 0.13
+    allow_place_qpos_near_miss: true
+    place_near_miss_max_qpos_error: 0.24
+  home_place:
+    # The real bottle is already upright in the model frame, so the return
+    # target keeps the identity quaternion. Release only after the live bottle
+    # bottom is at its remembered shelf support, then settle it upright so a
+    # released return does not slide off the remembered shelf region.
+    settle_condiment_upright: true
+    upright_quat_xyzw: [0.0, 0.0, 0.0, 1.0]
+    placement_reference: object_origin
+    placement_object_upright: true
+    place_height: 0.0
+    retreat_height: 0.12
+    retreat_x: 0.0
+    retreat_y: 0.0
+    placement_approach_angles_deg: [-90.0, -60.0, -120.0]
+    placement_entry_standoff: 0.08
+    placement_exit_standoff: 0.08
+    placement_entry_z_offset: 0.05
+    placement_exit_z_offset: 0.05
+    require_pre_release_support: true
+    pre_release_bottom_min_offset: -0.015
+    pre_release_bottom_max_offset: 0.015
+    pre_release_xy_tolerance: 0.06
+    pre_release_upright_tolerance_deg: 15.0
+    release_steps: 45
+    release_settle_steps: 15
+    # The shelf is a flat open level (no sink walls).  Release is solved only
+    # by the gripper/shelf contact dynamics; no release pinning or pose
+    # correction is used, matching the WR-05 physical-release contract.
+    release_separation_assist_distance: 0.0
+    allow_place_near_miss: true
+    place_near_miss_max_position_error: 0.05
+    allow_place_qpos_near_miss: true
+    place_near_miss_max_qpos_error: 0.24
+    place_descent_stop_bottom_offset: 0.005
+    allow_place_trajectory_early_stop: true
+    release_anchor_align_support: false
+  normalize_transport_posture:
+    target_height: 0.02
+    tolerance: 0.002
+    max_steps: 240
+    gripper_action: 1.0
+    holding_follow_tolerance: 0.05
+  return_arm_empty:
+    gripper_action: -1.0
+  return_arm_holding:
+    gripper_action: 1.0
+  return_navigation:
+    holding_drop_tolerance: 0.18
+    tolerance: 0.01
+    yaw_tolerance: 0.02
+  handlers:
+    accessible_place_dry_run_only: true
+
+semantics:
+  plate_stage_threshold: 0.20
+  return_region_xy_margin: 0.04
+  return_region_height_tolerance: 0.10
+  physical_event_dwell_steps: 3
+  terminal_verification_steps: 100
+
+recording:
+  record_depth: true
+  depth_dtype: uint16
+  depth_scale: 0.001
+  action_schema: membench.pandaomron_hybrid13.v2

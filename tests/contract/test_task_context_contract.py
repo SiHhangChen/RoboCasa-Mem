@@ -17,8 +17,9 @@ ROOT = Path(__file__).resolve().parents[2]
 @pytest.mark.parametrize(
     "task_id",
     [
-        "TM01", "TM02", "TM03", "TS01", "TS02", "TS03", "TS04",
-        "WA-01", "WA-02", "WR-01", "WR-02", "WR-03", "WR-04", "WX-01",
+        "TM01", "TM02", "TM03", "TM04", "TS01", "TS02", "TS03", "TS04",
+        "WA-01", "WA-02", "WA-03", "WA-04", "WR-01", "WR-02", "WR-03", "WR-04",
+        "WR-05", "WR-06", "WX-01",
     ],
 )
 def test_all_plugins_expose_canonical_runtime_and_expert_apis(task_id: str) -> None:
@@ -41,16 +42,21 @@ def test_all_plugins_expose_canonical_runtime_and_expert_apis(task_id: str) -> N
         ("tm01_smoke_v1.yaml", 3200),
         ("tm02_smoke_v1.yaml", 3200),
         ("tm03_smoke_v1.yaml", 4800),
+        ("tm04_smoke_v1.yaml", 5200),
         ("ts01_smoke_v1.yaml", 2800),
         ("ts02_smoke_v1.yaml", 2200),
         ("ts03_smoke_v1.yaml", 2800),
         ("ts04_smoke_v1.yaml", 1800),
         ("wa01_smoke_v1.yaml", 5000),
         ("wa02_smoke_v1.yaml", 6000),
+        ("wa03_smoke_v1.yaml", 6500),
+        ("wa04_smoke_v1.yaml", 8500),
         ("wr01_smoke_v1.yaml", 15000),
         ("wr02_smoke_v1.yaml", 5000),
         ("wr03_smoke_v1.yaml", 15000),
         ("wr04_smoke_v1.yaml", 3200),
+        ("wr05_smoke_v1.yaml", 5000),
+        ("wr06_smoke_v1.yaml", 3200),
         ("wx01_smoke_v1.yaml", 3200),
     ],
 )
