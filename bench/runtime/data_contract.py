@@ -156,10 +156,11 @@ def validate_action(action: Any, *, dtype: Any = np.float32) -> np.ndarray:
         start, stop = axis.start, axis.stop
         low, high = axis.input_range
         if np.any(value[start:stop] < low) or np.any(value[start:stop] > high):
-            raise ValueError(
-                f"action axis {axis.name!r} must be within [{low}, {high}], "
-                f"got {value[start:stop].tolist()}"
-            )
+            # Policy outputs can exceed the normalized command range by small
+            # floating-point margins near the boundaries (e.g. gripper -1.001).
+            # Saturate rather than reject; the simulator controllers remain the
+            # clipping authority, consistent with absolute joint targets above.
+            value[start:stop] = np.clip(value[start:stop], low, high)
     return np.ascontiguousarray(value, dtype=dtype)
 
 

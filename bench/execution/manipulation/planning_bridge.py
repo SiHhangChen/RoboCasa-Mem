@@ -9,7 +9,12 @@ from typing import Any
 
 import numpy as np
 
-from bench.execution.manipulation.drivers import ArmDriver, PostStepCallback, qpos_for_controller
+from bench.execution.manipulation.drivers import (
+    ArmDriver,
+    PostStepCallback,
+    TrajectoryStopCheck,
+    qpos_for_controller,
+)
 from bench.execution.planning import (
     build_static_scene_point_cloud,
     make_collision_monitor,
@@ -21,6 +26,7 @@ from bench.execution.planning import (
     pose_from_matrix,
     preflight_arm_trajectory_collisions,
 )
+from bench.execution.planning.sim_state import preserved_integration_state
 
 
 PlannerFn = Callable[[dict[str, Any]], dict[str, Any]]
@@ -127,6 +133,7 @@ class PlannedStageExecutor:
         record_trajectory: bool = False,
         commit_virtual_state: bool | None = None,
         post_step_callback: PostStepCallback | None = None,
+        trajectory_stop_check: TrajectoryStopCheck | None = None,
         settle_steps: int | None = None,
         prepared_plan: dict[str, Any] | None = None,
         capture_prepared_plan: bool = False,
@@ -226,6 +233,7 @@ class PlannedStageExecutor:
             gripper_action=float(gripper_action),
             collision_monitor=monitor,
             post_step_callback=post_step_callback,
+            trajectory_stop_check=trajectory_stop_check,
         )
         self.obs = execution["obs"]
         self.clear_virtual_state()
@@ -329,8 +337,7 @@ class PlannedStageExecutor:
         current = qpos_for_controller(self.env, right)
         if qpos.shape != current.shape or not np.all(np.isfinite(qpos)):
             return
-        state = self.env.sim.get_state()
-        try:
+        with preserved_integration_state(self.env.sim):
             self.env.sim.data.qpos[right.qpos_index] = qpos
             self.env.sim.data.qvel[:] = 0.0
             self.env.sim.forward()
@@ -340,9 +347,6 @@ class PlannedStageExecutor:
             self._virtual_eef_site_in_base = pose_from_matrix(
                 np.linalg.inv(base_world) @ eef_world
             )
-        finally:
-            self.env.sim.set_state(state)
-            self.env.sim.forward()
 
     def _set_virtual_state_from_plan(
         self,
@@ -569,6 +573,8 @@ class PlannedStageExecutor:
         }
         if execution.get("collision") is not None:
             summary["collision_runtime"] = execution["collision"]
+        if execution.get("early_stop") is not None:
+            summary["execution"]["early_stop"] = execution["early_stop"]
         if not summary["pass"]:
             summary["failure_phase"] = "execution"
             summary["failure_reason"] = stage_failure_reason(summary)

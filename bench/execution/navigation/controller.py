@@ -185,6 +185,7 @@ class BaseDriverAdapter:
         )
         if manual_executor is not None:
             self.refresh_obs()
+            gripper_action_override = move_overrides.get("gripper_action")
             xy_tolerance_override = move_overrides.get("xy_tolerance")
             yaw_tolerance_override = move_overrides.get("yaw_tolerance")
             terminal_tolerance_only = bool(
@@ -203,6 +204,11 @@ class BaseDriverAdapter:
                     station_name,
                     purpose=purpose,
                     holding=holding,
+                    gripper_action=(
+                        None
+                        if gripper_action_override is None
+                        else float(gripper_action_override)
+                    ),
                     force_terminal_settle=bool(
                         move_overrides.get("force_terminal_settle", False)
                     ),
@@ -272,6 +278,21 @@ class BaseDriverAdapter:
                 if key in kwargs and value is not None
             }
         )
+        # Workflow stages use the same ``xy_tolerance`` metadata key for both
+        # manual-path and direct navigation.  The direct base primitive calls
+        # that argument ``tolerance``, so translate the public override here.
+        # Without this mapping a stage that explicitly requests tight docking
+        # silently keeps the configured default tolerance.
+        xy_tolerance_override = move_overrides.get("xy_tolerance")
+        if xy_tolerance_override is not None:
+            kwargs["tolerance"] = float(xy_tolerance_override)
+        yaw_tolerance_override = move_overrides.get("yaw_tolerance")
+        gripper_action_override = move_overrides.get("gripper_action")
+        resolved_gripper_action = (
+            float(gripper_action_override)
+            if gripper_action_override is not None
+            else (1.0 if holding else -1.0)
+        )
 
         arm_qpos = qpos_for_controller(self._env, right)
         path_monitor = self._base_path_monitor(holding)
@@ -287,7 +308,7 @@ class BaseDriverAdapter:
                 waypoints_xy=[np.array(point, dtype=float)[:2].tolist() for point in waypoints],
                 terminal_target_xy=terminal_target_xy,
                 target_yaw=target_yaw,
-                gripper_action=1.0 if holding else -1.0,
+                gripper_action=resolved_gripper_action,
                 arm_qpos=arm_qpos,
                 tolerance=float(kwargs["tolerance"]),
                 yaw_tolerance=float(kwargs["yaw_tolerance"]),
@@ -313,7 +334,7 @@ class BaseDriverAdapter:
                 self._obs,
                 target_xy=np.array(target_xy, dtype=float),
                 target_yaw=target_yaw,
-                gripper_action=1.0 if holding else -1.0,
+                gripper_action=resolved_gripper_action,
                 arm_qpos=arm_qpos,
                 translation_action_sign=translation_action_sign,
                 path_monitor=path_monitor,
@@ -349,6 +370,10 @@ class BaseDriverAdapter:
             }
         if planning_summary is not None:
             nav["station_path"] = planning_summary
+        if xy_tolerance_override is not None:
+            nav["xy_tolerance_override"] = float(xy_tolerance_override)
+        if yaw_tolerance_override is not None:
+            nav["yaw_tolerance_override"] = float(yaw_tolerance_override)
         if station_name:
             nav["station_name"] = station_name
         return StageResult(

@@ -15,6 +15,7 @@ import numpy as np
 
 
 PostStepCallback = Callable[[dict[str, Any]], dict[str, Any] | None]
+TrajectoryStopCheck = Callable[[], dict[str, Any] | bool]
 
 
 class ArmDriver(Protocol):
@@ -27,6 +28,7 @@ class ArmDriver(Protocol):
         gripper_action: float = 0.0,
         collision_monitor: dict[str, Any] | None = None,
         post_step_callback: PostStepCallback | None = None,
+        trajectory_stop_check: TrajectoryStopCheck | None = None,
     ) -> dict[str, Any]:
         ...
 
@@ -190,6 +192,7 @@ def execute_arm_trajectory(
     gripper_action: float = 0.0,
     collision_monitor: dict[str, Any] | None = None,
     post_step_callback: PostStepCallback | None = None,
+    trajectory_stop_check: TrajectoryStopCheck | None = None,
 ) -> dict[str, Any]:
     if not trajectory:
         raise ValueError("trajectory must contain at least one waypoint")
@@ -206,6 +209,27 @@ def execute_arm_trajectory(
     collision_summary = collision_monitor_summary(collision_monitor)
     checked_collision_steps = 0
     first_collision = None
+    early_stop = None
+
+    def maybe_stop_trajectory(phase: str) -> dict[str, Any] | None:
+        if trajectory_stop_check is None:
+            return None
+        try:
+            raw = trajectory_stop_check()
+            result = dict(raw) if isinstance(raw, dict) else {"stop": bool(raw)}
+        except Exception as exc:
+            return {
+                "stop": True,
+                "reason": f"trajectory_stop_check_error:{type(exc).__name__}: {exc}",
+                "phase": str(phase),
+                "executed_steps": int(executed_steps),
+            }
+        if not bool(result.get("stop", result.get("pass", False))):
+            return None
+        result["stop"] = True
+        result["phase"] = str(phase)
+        result["executed_steps"] = int(executed_steps)
+        return result
 
     def maybe_abort_on_collision(phase: str) -> dict[str, Any] | None:
         nonlocal checked_collision_steps, first_collision
@@ -255,10 +279,15 @@ def execute_arm_trajectory(
                 abort_result = maybe_abort_on_collision("trajectory")
                 if abort_result is not None:
                     return abort_result
+                early_stop = maybe_stop_trajectory("trajectory")
+                if early_stop is not None:
+                    break
+            if early_stop is not None:
+                break
             current = target_qpos
 
         final_target = np.array(trajectory[-1], dtype=float)
-        for _ in range(settle_steps):
+        for _ in range(0 if early_stop is not None else settle_steps):
             obs = step_arm_and_gripper(
                 env,
                 arm_qpos=final_target,
@@ -269,6 +298,9 @@ def execute_arm_trajectory(
             abort_result = maybe_abort_on_collision("settle")
             if abort_result is not None:
                 return abort_result
+            early_stop = maybe_stop_trajectory("settle")
+            if early_stop is not None:
+                break
 
     assert obs is not None
     final_qpos = qpos_for_controller(env, right)
@@ -299,6 +331,7 @@ def execute_arm_trajectory(
             "checked_collision_steps": int(checked_collision_steps),
         },
         "aborted_on_collision": False,
+        "early_stop": early_stop,
     }
 
 
@@ -362,6 +395,7 @@ class RoboCasaArmDriver:
         gripper_action: float = 0.0,
         collision_monitor: dict[str, Any] | None = None,
         post_step_callback: PostStepCallback | None = None,
+        trajectory_stop_check: TrajectoryStopCheck | None = None,
     ) -> dict[str, Any]:
         result = execute_arm_trajectory(
             self.env,
@@ -371,6 +405,7 @@ class RoboCasaArmDriver:
             gripper_action=gripper_action,
             collision_monitor=collision_monitor,
             post_step_callback=post_step_callback,
+            trajectory_stop_check=trajectory_stop_check,
         )
         self.obs = result["obs"]
         return result
@@ -398,6 +433,7 @@ __all__ = [
     "ArmDriver",
     "PostStepCallback",
     "RoboCasaArmDriver",
+    "TrajectoryStopCheck",
     "action_dict_for_arm_and_gripper",
     "check_monitor_collision",
     "collision_monitor_summary",

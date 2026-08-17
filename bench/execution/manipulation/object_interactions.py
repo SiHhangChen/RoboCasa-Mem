@@ -188,6 +188,46 @@ def is_object_released(
     return bool(OU.gripper_obj_far(env, object_name, th=float(distance)))
 
 
+def validate_gripper_force_limit(
+    value: float,
+    name: str = "gripper force limit",
+) -> None:
+    """Reject values that cannot be written to the MuJoCo actuator force range."""
+    if not np.isfinite(float(value)) or float(value) <= 0.0:
+        raise ValueError(f"{name} must be positive and finite")
+
+
+def configure_right_gripper_force_limit(
+    env: Any,
+    force_limit: float,
+) -> dict[str, Any]:
+    """Limit the right-gripper per-finger actuator force without editing shared assets.
+
+    Writes the per-episode MuJoCo model in place and returns the previous force
+    ranges so callers can restore them after the fragile object is released.
+    """
+    validate_gripper_force_limit(force_limit)
+    model = env.sim.model
+    gripper = env.robots[0].gripper["right"]
+    actuator_names = list(gripper.actuators)
+    before: dict[str, list[float]] = {}
+    for actuator_name in actuator_names:
+        actuator_id = int(model.actuator_name2id(actuator_name))
+        before[str(actuator_name)] = [
+            float(value) for value in model.actuator_forcerange[actuator_id]
+        ]
+        model.actuator_forcelimited[actuator_id] = 1
+        model.actuator_forcerange[actuator_id] = [
+            -float(force_limit),
+            float(force_limit),
+        ]
+    return {
+        "actuator_names": [str(name) for name in actuator_names],
+        "before": before,
+        "force_limit": float(force_limit),
+    }
+
+
 def lift_held_object_for_transport(
     controller: Any,
     object_name: str,
@@ -236,10 +276,12 @@ def _finite_vec3(value: Any) -> np.ndarray:
 
 
 __all__ = [
+    "configure_right_gripper_force_limit",
     "evaluate_object_transport",
     "get_object_hold_status",
     "get_object_transport_snapshot",
     "get_object_world_position",
     "is_object_released",
     "lift_held_object_for_transport",
+    "validate_gripper_force_limit",
 ]

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
@@ -126,6 +128,56 @@ def test_translate_success_depends_only_on_xy(monkeypatch):
     assert result["final_dist"] == 0.0
     assert result["checks"] == {"final_xy": True}
     assert result["pass"] is True
+
+
+def test_target_indexes_choose_nearest_and_honor_explicit_route():
+    executor = _executor()
+    executor.samples = [
+        ManualBasePathSample(index=i, xy=np.zeros(2), yaw=0.0)
+        for i in range(15)
+    ]
+    executor.current_index = 14
+    executor.station_targets = {
+        "button": {"indexes": [0, 13], "routes": {"14": [14, 13]}}
+    }
+
+    target, resolution = executor.target_index_for("button")
+
+    assert target == 13
+    assert resolution["routes"]["14"] == [14, 13]
+
+
+def test_wa02_task_routes_avoid_slot_detour_and_reverse_service_return():
+    path = (
+        Path(__file__).parents[1]
+        / "bench/tasks/wa02/resources/navigation/manual_base_path_layout15_style34_seed0.json"
+    )
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    cup_a_pick = payload["station_targets"]["cup_A:pick"]
+    cup_b_pick = payload["station_targets"]["cup_B:pick"]
+    service = payload["station_targets"]["service_area:slot_1"]
+    target = payload["station_targets"]["service_area:slot_2"]
+    samples = {int(sample["index"]): sample for sample in payload["samples"]}
+
+    assert cup_a_pick["routes"]["13"] == [13, 0, 1, 2, 3, 4]
+    assert cup_b_pick["routes"]["13"] == [13, 0, 1, 2, 3, 4]
+    assert cup_a_pick["routes"]["10"] == [10, 11, 12, 2, 3, 4]
+    assert cup_b_pick["routes"]["10"] == [10, 11, 12, 2, 3, 4]
+    assert cup_a_pick["routes"]["14"] == [14, 10, 11, 12, 2, 3, 4]
+    assert cup_b_pick["routes"]["14"] == [14, 10, 11, 12, 2, 3, 4]
+    assert 8 not in cup_a_pick["routes"]["10"]
+    assert 8 not in cup_b_pick["routes"]["10"]
+    assert 14 not in cup_a_pick["routes"]["13"]
+    assert service["routes"]["13"] == [13, 15, 16, 10]
+    assert target["index"] == 14
+    assert target["routes"]["8"] == [8, 9, 14]
+    assert target["routes"]["13"] == [13, 15, 16, 10, 14]
+    assert samples[14]["name"] == "service_slot_2_ready"
+    assert samples[14]["xy"] == [1.476, -1.872]
+    assert samples[15]["name"] == "button_to_service_left_turn"
+    assert samples[15]["yaw"] > 1.5
+    assert samples[16]["name"] == "button_to_service_forward"
+    assert samples[16]["xy"][1] > samples[15]["xy"][1]
 
 
 def test_rotate_then_translate_continues_after_large_rotation_xy_drift(monkeypatch):

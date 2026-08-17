@@ -6,6 +6,8 @@ from typing import Any
 
 import numpy as np
 
+from bench.execution.planning.sim_state import preserved_integration_state
+
 from bench.execution.planning.static_scene_point_cloud import parse_keyword_csv
 
 
@@ -578,10 +580,9 @@ def preflight_arm_trajectory_collisions(
         return {"enabled": True, "collision": False, "checked_steps": 0}
 
     right = env.robots[0].composite_controller.part_controllers["right"]
-    state = env.sim.get_state()
     current = np.array(env.sim.data.qpos[right.qpos_index], dtype=float)
     checked_steps = 0
-    try:
+    with preserved_integration_state(env.sim):
         for waypoint_index, target in enumerate(trajectory):
             target_qpos = np.array(target, dtype=float)
             delta = target_qpos - current
@@ -605,9 +606,6 @@ def preflight_arm_trajectory_collisions(
                     return collision
             current = target_qpos
         return {"enabled": True, "collision": False, "checked_steps": int(checked_steps)}
-    finally:
-        env.sim.set_state(state)
-        env.sim.forward()
 
 
 __all__ = [

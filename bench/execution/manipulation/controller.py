@@ -8,7 +8,11 @@ from typing import Any
 
 import numpy as np
 
-from bench.execution.manipulation.drivers import ArmDriver, RoboCasaArmDriver
+from bench.execution.manipulation.drivers import (
+    ArmDriver,
+    RoboCasaArmDriver,
+    TrajectoryStopCheck,
+)
 from bench.execution.manipulation.pick_payloads import PickPayloadSelector, resolve_pick_payload
 from bench.execution.manipulation.planning_bridge import (
     ManipulationRuntimeConfig,
@@ -676,6 +680,31 @@ class ManipulationController:
         kwargs: dict[str, Any],
     ) -> bool:
         """Allow release when a place motion stops close enough to the target."""
+        checks = place_stage.get("checks") or {}
+        execution = place_stage.get("execution") or {}
+        early_stop = execution.get("early_stop") or {}
+        if (
+            _truthy(kwargs.get("allow_place_trajectory_early_stop"), default=False)
+            and bool(early_stop.get("stop", False))
+            and bool(checks.get("plan_success", False))
+            and bool(checks.get("runtime_collision_free", False))
+        ):
+            place_stage["accepted_trajectory_early_stop_for_release"] = {
+                "reason": str(
+                    early_stop.get("reason") or "place_trajectory_stop_check"
+                ),
+                "early_stop": dict(early_stop),
+            }
+            place_stage["pass"] = True
+            checks = dict(checks)
+            checks["final_position"] = True
+            checks["final_orientation"] = True
+            checks["final_qpos"] = True
+            checks["trajectory_early_stop_accepted"] = True
+            place_stage["checks"] = checks
+            place_stage["failure_phase"] = None
+            place_stage["failure_reason"] = None
+            return True
         if not _truthy(kwargs.get("allow_place_near_miss"), default=False):
             return False
         if bool(place_stage.get("pass", False)):
@@ -1380,9 +1409,24 @@ class ManipulationController:
                 "reason": "place_at requires target_pos_world or target_pos",
             }
         target_name = str(kwargs.get("target_name", object_name))
+        # A real grasp can settle or slip slightly after the planned grasp
+        # pose.  Placement must use the live EEF-to-object transform; reusing
+        # the planned attachment would command the gripper upright while
+        # leaving the physical object tilted.  This is a read-only planning
+        # input -- object motion still comes exclusively from env.step(action).
+        live_eef_world = None
+        live_object_pose = None
+        live_object_pos = None
+        if self.runtime_config.execute:
+            live_eef_world = self.stage_executor.current_eef_site_world()
+            live_object_pose = self._object_pose_world(object_name)
+            live_object_pos = live_object_pose[:3, 3]
         payload, selection = self._select_world_place_payload(
             object_name=object_name,
             target_pos_world=np.array(target_pos_world, dtype=float),
+            current_eef_world=live_eef_world,
+            current_object_pos_world=live_object_pos,
+            current_object_pose_world=live_object_pose,
             collision_options=kwargs.get("collision_options"),
             placement_reference=kwargs.get(
                 "placement_reference",
@@ -1445,6 +1489,7 @@ class ManipulationController:
             collision_options=kwargs.get("collision_options"),
             place_kwargs=kwargs,
             pre_release_check=kwargs.get("pre_release_check"),
+            place_trajectory_stop_check=kwargs.get("place_trajectory_stop_check"),
         )
         result["target_pos_world"] = np.array(target_pos_world, dtype=float).tolist()
         result["placement_orientation_selection"] = selection
@@ -1757,6 +1802,7 @@ class ManipulationController:
             place_kwargs=kwargs,
             prepared_stage_plans=selected["prepared_stage_plans"],
             pre_release_check=pre_release_check,
+            place_trajectory_stop_check=kwargs.get("place_trajectory_stop_check"),
         )
         result["target_pos_world"] = selected["target_pos_world"]
         result["placement_candidate_selection"] = selection
@@ -2092,6 +2138,7 @@ class ManipulationController:
         place_kwargs: dict[str, Any] | None = None,
         prepared_stage_plans: Mapping[str, dict[str, Any]] | None = None,
         pre_release_check: PreReleaseCheck | None = None,
+        place_trajectory_stop_check: TrajectoryStopCheck | None = None,
     ) -> dict[str, Any]:
         place_kwargs = dict(place_kwargs or {})
         prepared_mode = prepared_stage_plans is not None
@@ -2132,6 +2179,7 @@ class ManipulationController:
                         fallback_key="place_settle_steps",
                     ),
                     prepared_plan=prepared.get("place"),
+                    trajectory_stop_check=place_trajectory_stop_check,
                 )
                 if not prepared_mode or "place" in prepared
                 else skipped_stage("place", "selected_candidate_missing_prepared_plan")

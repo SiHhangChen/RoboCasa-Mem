@@ -136,7 +136,18 @@ class ManualBasePathExecutor:
             value = self.station_targets[key]
             explicit_routes = None
             if isinstance(value, dict):
-                index = int(value.get("index", value.get("target_index")))
+                raw_indexes = value.get("indexes")
+                if raw_indexes is not None:
+                    indexes = [int(item) for item in raw_indexes]
+                    if not indexes:
+                        raise ValueError("manual base station target indexes must be non-empty")
+                    current = self.current_index
+                    if current is None:
+                        index = indexes[0]
+                    else:
+                        index = min(indexes, key=lambda item: abs(int(item) - int(current)))
+                else:
+                    index = int(value.get("index", value.get("target_index")))
                 explicit_routes = value.get("routes")
             elif isinstance(value, list):
                 indexes = [int(item) for item in value]
