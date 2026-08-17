@@ -173,14 +173,16 @@ manipulation:
     nearest_ik_max_joint_delta: 2.0
   runtime:
     max_joint_step: 0.025
-    settle_steps: 80
+    settle_steps: 40
     position_threshold: 0.04
     orientation_threshold_deg: 10.0
     qpos_threshold: 0.50
-    open_steps: 20
-    close_steps: 90
-    release_steps: 40
-    release_settle_steps: 20
+    open_steps: 10
+    # The fingers reach the sugar in a few steps and then hold at the 5 N force
+    # cap, so closing longer only adds wall time.
+    close_steps: 20
+    release_steps: 20
+    release_settle_steps: 10
   static_scene:
     enabled: false
     validate_collisions: false
@@ -210,8 +212,8 @@ operations:
     allow_pregrasp_near_miss: true
     allow_grasp_near_miss: true
     # Let the arm controller converge at the pregrasp pose before descending.
-    pregrasp_settle_steps: 15
-    grasp_settle_steps: 10
+    pregrasp_settle_steps: 10
+    grasp_settle_steps: 8
     lift_settle_steps: 5
   sugar_delivery:
     place_height: 0.07
@@ -223,7 +225,7 @@ operations:
     entry_settle_steps: 0
     # Let the joint-position controller converge at the selected release pose
     # before evaluating the saucepan guard and opening the gripper.
-    place_settle_steps: 40
+    place_settle_steps: 10
     clearance_settle_steps: 0
     retreat_settle_steps: 0
     release_settle_steps: 0
@@ -248,10 +250,16 @@ operations:
     # The spring-loaded joint has 12 mm of travel; require a real 4 mm press.
     minimum_press_displacement_m: 0.004
   return_arm:
-    settle_steps: 80
+    settle_steps: 20
     gripper_action: -1.0
   handlers:
     accept_sugar_delivery: true
+    # Grasp the sugar with a reduced fingertip force (5 N vs the default 20 N)
+    # so the cube does not stick to the finger pads on release, then restore
+    # the default force for the completion-button press. Same calibration as
+    # WA01's sugar pick.
+    sugar_gripper_force_limit: 5.0
+    default_gripper_force_limit: 20.0
 
 recording:
   record_depth: true

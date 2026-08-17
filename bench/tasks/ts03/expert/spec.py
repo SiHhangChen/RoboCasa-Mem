@@ -19,7 +19,7 @@ def build_expert_plan(inputs: ExpertPlanInputs):
         metadata = dict(actions.sugar_delivery_metadata_by_index[index + 1])
         stages.extend([
             navigate("sugar_station", purpose="pick", name=f"navigate_{sugar}"),
-            operate("pick", sugar, name=f"pick_{sugar}", metadata=actions.sugar_pick_metadata),
+            operate("pick_sugar_limited_force", sugar, name=f"pick_{sugar}", metadata=actions.sugar_pick_metadata),
             operate(
                 "return_arm",
                 sugar,

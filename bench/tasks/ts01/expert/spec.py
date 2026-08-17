@@ -18,7 +18,7 @@ def build_expert_plan(inputs: ExpertPlanInputs):
         delivery = dict(actions.sugar_delivery_metadata_by_index[index])
         stages.extend([
             navigate("sugar_station", purpose="pick", name=f"navigate_{sugar}"),
-            operate("pick", sugar, name=f"pick_{sugar}", metadata=actions.sugar_pick_metadata),
+            operate("pick_sugar_limited_force", sugar, name=f"pick_{sugar}", metadata=actions.sugar_pick_metadata),
             operate("return_arm", sugar, name=f"retract_{sugar}_after_pick", metadata={**dict(actions.return_arm_metadata), "stage": f"retract_{sugar}_after_pick", "gripper_action": 1.0}),
             navigate("saucepan_station", purpose="place", holding=sugar, name=f"navigate_{sugar}_to_saucepan"),
             operate("place_sugar_in_live_saucepan", sugar, name=f"place_{sugar}_saucepan", metadata=delivery),

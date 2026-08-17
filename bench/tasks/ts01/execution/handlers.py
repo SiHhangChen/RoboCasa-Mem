@@ -7,6 +7,10 @@ from typing import Any
 
 import numpy as np
 
+from bench.execution.manipulation.object_interactions import (
+    configure_right_gripper_force_limit,
+    validate_gripper_force_limit,
+)
 from bench.tasks.ts01.execution.completion_button import (
     PRESS_COMPLETION_BUTTON_OPERATION,
     press_completion_button,
@@ -20,6 +24,7 @@ from bench.tasks.ts01.execution.geometry import (
 
 
 LIVE_SUGAR_PLACE_OPERATION = "place_sugar_in_live_saucepan"
+PICK_SUGAR_LIMITED_FORCE_OPERATION = "pick_sugar_limited_force"
 
 
 def build_stage_handlers(
@@ -28,6 +33,44 @@ def build_stage_handlers(
     handler_settings: Mapping[str, Any] | None = None,
 ) -> dict[str, Callable[..., dict[str, Any]]]:
     defaults = dict(handler_settings or {})
+    sugar_gripper_force_limit = float(
+        defaults.get("sugar_gripper_force_limit", 5.0)
+    )
+    default_gripper_force_limit = float(
+        defaults.get("default_gripper_force_limit", 20.0)
+    )
+    validate_gripper_force_limit(
+        sugar_gripper_force_limit, "sugar_gripper_force_limit"
+    )
+    validate_gripper_force_limit(
+        default_gripper_force_limit, "default_gripper_force_limit"
+    )
+
+    def pick_sugar_limited_force(target: str, **kwargs: Any) -> dict[str, Any]:
+        """Grasp the sugar with a reduced fingertip force so it releases cleanly."""
+        limited = configure_right_gripper_force_limit(
+            controller.env,
+            sugar_gripper_force_limit,
+        )
+        try:
+            result = controller.pick(target, **kwargs)
+        except BaseException:
+            configure_right_gripper_force_limit(
+                controller.env,
+                default_gripper_force_limit,
+            )
+            raise
+        restored = None
+        if not bool(result.get("pass", False)):
+            restored = configure_right_gripper_force_limit(
+                controller.env,
+                default_gripper_force_limit,
+            )
+        result["gripper_force_control"] = {
+            "limited_for_sugar": limited,
+            "restored_after_failed_pick": restored,
+        }
+        return result
 
     def place_live(sugar_name: str, **kwargs: Any) -> dict[str, Any]:
         values = dict(kwargs)
@@ -59,15 +102,23 @@ def build_stage_handlers(
                 max_tilt_deg=tilt_guard,
             )
 
-        result = controller.place_at_world_pose_candidates(
-            str(sugar_name),
-            candidate_groups=candidate_groups,
-            pre_release_check=check_saucepan_before_release,
-            **values,
-        )
+        restored = None
+        try:
+            result = controller.place_at_world_pose_candidates(
+                str(sugar_name),
+                candidate_groups=candidate_groups,
+                pre_release_check=check_saucepan_before_release,
+                **values,
+            )
+        finally:
+            restored = configure_right_gripper_force_limit(
+                controller.env,
+                default_gripper_force_limit,
+            )
         result.update(
             {
                 "primitive": LIVE_SUGAR_PLACE_OPERATION,
+                "gripper_force_control": {"restored_after_sugar": restored},
                 "live_receptacle_anchor_world": np.asarray(anchor, dtype=float).tolist(),
                 "live_receptacle_anchor_resolved": True,
                 "release_region_order": list(region_order),
@@ -96,6 +147,7 @@ def build_stage_handlers(
         return press_completion_button(controller, **values)
 
     return {
+        PICK_SUGAR_LIMITED_FORCE_OPERATION: pick_sugar_limited_force,
         LIVE_SUGAR_PLACE_OPERATION: place_live,
         PRESS_COMPLETION_BUTTON_OPERATION: press_finish,
     }
@@ -103,6 +155,7 @@ def build_stage_handlers(
 
 __all__ = [
     "LIVE_SUGAR_PLACE_OPERATION",
+    "PICK_SUGAR_LIMITED_FORCE_OPERATION",
     "PRESS_COMPLETION_BUTTON_OPERATION",
     "build_stage_handlers",
 ]

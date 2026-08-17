@@ -381,7 +381,11 @@ def load_task_config(path: str | Path = DEFAULT_TASK_CONFIG_FILE) -> TaskConfig:
     )
     _reject_unknown(
         _mapping(operations, "handlers", config_path),
-        {"accept_sugar_delivery"},
+        {
+            "accept_sugar_delivery",
+            "sugar_gripper_force_limit",
+            "default_gripper_force_limit",
+        },
         "operations.handlers fields",
     )
 
