@@ -28,12 +28,17 @@ def _actions(config: Any, plan: Any, resources: Mapping[str, Any]) -> Any:
 
 
 def _environment(config: Any, scene: Any, plan: Any, resources: Mapping[str, Any]) -> Mapping[str, Any]:
-    del config, plan, resources
+    del resources
+    button = dict(config.operations.get("completion_button", {}))
     return {
         "fixture_names": scene.fixture_names, "drawer_world_xyzs": scene.drawer_world_xyzs,
         "drawer_world_yaw_deg": scene.drawer_world_yaw_deg,
         "completion_button_world_xyz": scene.completion_button_world_xyz,
+        "target_fixture": plan.target_fixture,
         "open_threshold": scene.open_threshold, "closed_threshold": scene.closed_threshold,
+        "button_pressed_threshold_m": float(button.get("press_depth_threshold", 0.004)),
+        "button_released_threshold_m": float(button.get("release_depth_threshold", 0.001)),
+        "button_release_dwell_steps": int(button.get("release_dwell_steps", 2)),
     }
 
 

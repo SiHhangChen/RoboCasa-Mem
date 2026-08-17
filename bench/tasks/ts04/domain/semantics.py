@@ -1,4 +1,4 @@
-"""Authoritative, simulator-free TS04 inspection state machine."""
+"""Authoritative, simulator-free TS04 stop-on-target search state machine."""
 
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ class SemanticState:
     """History that cannot be recovered from the final closed-drawer image."""
 
     fixture_names: tuple[str, ...] = FIXTURE_NAMES
+    target_fixture: str = FIXTURE_NAMES[0]
     checked_fixture_set: set[str] = field(default_factory=set)
     completed_fixture_history: list[str] = field(default_factory=list)
     open_attempt_history: list[str] = field(default_factory=list)
@@ -25,35 +26,59 @@ class SemanticState:
     close_attempt_history: list[str] = field(default_factory=list)
     active_fixture: str | None = None
     inspected_active_fixture: bool = False
+    target_observed: bool = False
+    target_found: bool = False
     duplicate_fixture_check: bool = False
+    search_after_target_detected: bool = False
     invalid_open_detected: bool = False
     invalid_inspect_detected: bool = False
     invalid_close_detected: bool = False
     close_before_inspect_detected: bool = False
     completion_button_pressed: bool = False
     completion_button_attempted: bool = False
+    completion_button_attempt_count: int = 0
+    completion_button_press_count: int = 0
     invalid_completion_button_press: bool = False
     failure_reason: str | None = None
 
     def __post_init__(self) -> None:
         self.fixture_names = tuple(str(name) for name in self.fixture_names)
+        self.target_fixture = str(self.target_fixture)
         if len(self.fixture_names) < 2 or len(set(self.fixture_names)) != len(
             self.fixture_names
         ):
             raise ValueError("inspection semantic fixtures must contain unique names")
+        if self.target_fixture not in self.fixture_names:
+            raise ValueError("target_fixture must name one of the inspection fixtures")
 
     @property
     def num_checked(self) -> int:
         return len(self.checked_fixture_set)
 
     @property
+    def required_button_presses(self) -> int:
+        """TS04 uses one completion confirmation after the target is closed."""
+
+        return 1 if self.target_found else 0
+
+    @property
     def next_check_step(self) -> int | str:
         if self.failure_reason is not None:
             return "failed"
-        if self.num_checked == len(self.fixture_names) and not self.completion_button_pressed:
-            return "press_completion_button"
-        if self.completion_button_pressed:
-            return "done"
+        if self.active_fixture is not None:
+            return (
+                "close_target_fixture"
+                if self.target_observed
+                else "close_active_fixture"
+            )
+        if self.target_found:
+            if self.completion_button_pressed:
+                return "done"
+            return (
+                f"press_completion_button_"
+                f"{self.completion_button_press_count + 1}_of_"
+                f"{self.required_button_presses}"
+            )
         return self.num_checked + 1
 
 
@@ -85,8 +110,9 @@ class TransitionReport:
 
 @dataclass(frozen=True)
 class SuccessReport:
-    all_fixtures_checked: bool
-    completion_count: bool
+    target_found: bool
+    search_stopped_at_target: bool
+    at_least_one_fixture_checked: bool
     no_duplicate_completion: bool
     no_active_fixture: bool
     all_fixtures_closed: bool
@@ -95,7 +121,9 @@ class SuccessReport:
     no_invalid_close: bool
     no_duplicate_check: bool
     no_close_before_inspect: bool
+    no_search_after_target: bool
     completion_button_pressed: bool
+    completion_button_pressed_once: bool
     no_invalid_completion_button_press: bool
 
     @property
@@ -103,20 +131,7 @@ class SuccessReport:
         return bool(all(self.checks().values()))
 
     def checks(self) -> dict[str, bool]:
-        return {
-            "all_fixtures_checked": self.all_fixtures_checked,
-            "completion_count": self.completion_count,
-            "no_duplicate_completion": self.no_duplicate_completion,
-            "no_active_fixture": self.no_active_fixture,
-            "all_fixtures_closed": self.all_fixtures_closed,
-            "no_invalid_open": self.no_invalid_open,
-            "no_invalid_inspect": self.no_invalid_inspect,
-            "no_invalid_close": self.no_invalid_close,
-            "no_duplicate_check": self.no_duplicate_check,
-            "no_close_before_inspect": self.no_close_before_inspect,
-            "completion_button_pressed": self.completion_button_pressed,
-            "no_invalid_completion_button_press": self.no_invalid_completion_button_press,
-        }
+        return {name: bool(value) for name, value in self.__dict__.items()}
 
 
 def open_precondition_checks(state: SemanticState, fixture: str) -> dict[str, bool]:
@@ -125,6 +140,7 @@ def open_precondition_checks(state: SemanticState, fixture: str) -> dict[str, bo
         "fixture_known": name in state.fixture_names,
         "no_active_fixture": state.active_fixture is None,
         "not_previously_checked": name not in state.checked_fixture_set,
+        "target_not_previously_found": not state.target_found,
     }
 
 
@@ -142,17 +158,19 @@ def completion_button_precondition_checks(
     *,
     all_drawers_closed: bool,
 ) -> dict[str, bool]:
-    """Require the entire two-drawer workflow before accepting completion."""
+    """Accept one completion press after the target drawer is closed."""
 
     history = state.completed_fixture_history
     return {
-        "all_fixtures_checked": set(state.checked_fixture_set)
-        == set(state.fixture_names),
-        "completion_count": len(history) == len(state.fixture_names),
+        "target_found": state.target_found,
+        "target_is_last_checked": bool(history) and history[-1] == state.target_fixture,
+        "at_least_one_fixture_checked": bool(history),
         "no_duplicate_completion": len(set(history)) == len(history),
         "no_active_fixture": state.active_fixture is None,
         "all_fixtures_closed": bool(all_drawers_closed),
-        "not_previously_pressed": not state.completion_button_pressed,
+        "button_presses_remaining": (
+            state.completion_button_press_count < state.required_button_presses
+        ),
     }
 
 
@@ -175,10 +193,13 @@ def record_open_attempt(
     if all(checks.values()):
         state.active_fixture = name
         state.inspected_active_fixture = False
+        state.target_observed = False
     else:
         state.invalid_open_detected = True
         if not checks["not_previously_checked"]:
             state.duplicate_fixture_check = True
+        if not checks["target_not_previously_found"]:
+            state.search_after_target_detected = True
         _latch_failure(state, reason)
     return TransitionReport(
         "open_fixture", name, checks, None if all(checks.values()) else reason
@@ -196,6 +217,7 @@ def record_inspection_attempt(
         "fixture_known": name in state.fixture_names,
         "matches_active_fixture": state.active_fixture == name,
         "drawer_open": bool(drawer_open),
+        "target_not_previously_found": not state.target_found,
     }
     reason: str | None = None
     if not checks["fixture_known"]:
@@ -204,11 +226,17 @@ def record_inspection_attempt(
         reason = "inspect_without_matching_open"
     elif not checks["drawer_open"]:
         reason = "inspect_fixture_not_open"
+    elif not checks["target_not_previously_found"]:
+        reason = "search_continued_after_target_found"
     if all(checks.values()):
         state.inspect_history.append(name)
         state.inspected_active_fixture = True
+        if name == state.target_fixture:
+            state.target_observed = True
     else:
         state.invalid_inspect_detected = True
+        if not checks["target_not_previously_found"]:
+            state.search_after_target_detected = True
         _latch_failure(state, reason)
     return TransitionReport(
         "inspect_fixture",
@@ -245,8 +273,12 @@ def record_close_attempt(
     if all(checks.values()):
         state.checked_fixture_set.add(name)
         state.completed_fixture_history.append(name)
+        state.target_found = bool(
+            name == state.target_fixture and state.target_observed
+        )
         state.active_fixture = None
         state.inspected_active_fixture = False
+        state.target_observed = False
     else:
         state.invalid_close_detected = True
         if not checks["inspected_before_close"]:
@@ -267,9 +299,10 @@ def record_completion_button_attempt(
     button_physically_pressed: bool,
     failure_reason: str | None = None,
 ) -> TransitionReport:
-    """Latch completion only after a verified physical button displacement."""
+    """Record the single TS04 completion-button press."""
 
     state.completion_button_attempted = True
+    state.completion_button_attempt_count += 1
     checks = {
         **completion_button_precondition_checks(
             state,
@@ -277,21 +310,13 @@ def record_completion_button_attempt(
         ),
         "button_physically_pressed": bool(button_physically_pressed),
     }
-    reason: str | None = None
-    if not checks["all_fixtures_checked"] or not checks["completion_count"]:
-        reason = "completion_button_pressed_before_all_fixtures_checked"
-    elif not checks["no_duplicate_completion"]:
-        reason = "duplicate_fixture_completion_before_button"
-    elif not checks["no_active_fixture"]:
-        reason = "completion_button_pressed_while_fixture_active"
-    elif not checks["all_fixtures_closed"]:
-        reason = "completion_button_pressed_with_fixture_open"
-    elif not checks["not_previously_pressed"]:
-        reason = "completion_button_pressed_twice"
-    elif not checks["button_physically_pressed"]:
-        reason = failure_reason or "completion_button_not_physically_pressed"
+    reason = _completion_button_failure_reason(checks, failure_reason)
+    if button_physically_pressed:
+        state.completion_button_press_count += 1
     if all(checks.values()):
-        state.completion_button_pressed = True
+        state.completion_button_pressed = bool(
+            state.completion_button_press_count == state.required_button_presses
+        )
     else:
         state.invalid_completion_button_press = True
         _latch_failure(state, reason)
@@ -318,9 +343,15 @@ def evaluate_success(
         for name in state.fixture_names
     )
     history = state.completed_fixture_history
+    target_last = bool(history) and history[-1] == state.target_fixture
     return SuccessReport(
-        all_fixtures_checked=set(state.checked_fixture_set) == set(state.fixture_names),
-        completion_count=len(history) == len(state.fixture_names),
+        target_found=state.target_found,
+        search_stopped_at_target=(
+            state.target_found
+            and target_last
+            and not state.search_after_target_detected
+        ),
+        at_least_one_fixture_checked=bool(history),
         no_duplicate_completion=len(set(history)) == len(history),
         no_active_fixture=state.active_fixture is None,
         all_fixtures_closed=all_closed,
@@ -329,10 +360,12 @@ def evaluate_success(
         no_invalid_close=not state.invalid_close_detected,
         no_duplicate_check=not state.duplicate_fixture_check,
         no_close_before_inspect=not state.close_before_inspect_detected,
+        no_search_after_target=not state.search_after_target_detected,
         completion_button_pressed=state.completion_button_pressed,
-        no_invalid_completion_button_press=(
-            not state.invalid_completion_button_press
+        completion_button_pressed_once=(
+            state.target_found and state.completion_button_press_count == 1
         ),
+        no_invalid_completion_button_press=(not state.invalid_completion_button_press),
     )
 
 
@@ -347,12 +380,14 @@ def failure_attribution(
         return "success"
     if state.failure_reason is not None:
         return state.failure_reason
+    if not report.target_found:
+        return "target_not_found"
     if not report.all_fixtures_closed:
         return "fixture_left_open"
-    if not report.all_fixtures_checked:
-        return "not_all_fixtures_checked"
+    if not report.completion_button_pressed_once:
+        return "completion_button_was_not_pressed_exactly_once"
     if not report.completion_button_pressed:
-        return "completion_button_not_pressed"
+        return "completion_button_sequence_incomplete"
     return "low_level_or_unknown"
 
 
@@ -376,6 +411,9 @@ def diagnostics(
             if fixture_display_names is None
             else fixture_display_names
         ),
+        "target_fixture": state.target_fixture,
+        "target_observed": state.target_observed,
+        "target_found": state.target_found,
         "checked_fixture_set": sorted(state.checked_fixture_set),
         "completed_fixture_history": list(state.completed_fixture_history),
         "open_attempt_history": list(state.open_attempt_history),
@@ -385,14 +423,19 @@ def diagnostics(
         "inspected_active_fixture": bool(state.inspected_active_fixture),
         "current_slot_states": fractions,
         "num_checked": state.num_checked,
+        "search_count": len(state.completed_fixture_history),
+        "required_button_presses": state.required_button_presses,
         "next_check_step": state.next_check_step,
         "duplicate_fixture_check": state.duplicate_fixture_check,
+        "search_after_target_detected": state.search_after_target_detected,
         "invalid_open_detected": state.invalid_open_detected,
         "invalid_inspect_detected": state.invalid_inspect_detected,
         "invalid_close_detected": state.invalid_close_detected,
         "close_before_inspect_detected": state.close_before_inspect_detected,
         "completion_button_pressed": state.completion_button_pressed,
         "completion_button_attempted": state.completion_button_attempted,
+        "completion_button_attempt_count": state.completion_button_attempt_count,
+        "completion_button_press_count": state.completion_button_press_count,
         "invalid_completion_button_press": state.invalid_completion_button_press,
         "fixture_left_open": not report.all_fixtures_closed,
         "failure_reason": state.failure_reason,
@@ -416,7 +459,32 @@ def _open_failure_reason(
         return "open_while_fixture_active"
     if not checks["not_previously_checked"]:
         return "duplicate_fixture_check"
+    if not checks["target_not_previously_found"]:
+        return "search_continued_after_target_found"
     return supplied or "drawer_not_open"
+
+
+def _completion_button_failure_reason(
+    checks: Mapping[str, bool],
+    supplied: str | None,
+) -> str:
+    if not checks["target_found"]:
+        return "completion_button_pressed_before_target_found"
+    if not checks["target_is_last_checked"]:
+        return "target_not_last_checked"
+    if not checks["at_least_one_fixture_checked"]:
+        return "no_fixture_checked"
+    if not checks["no_duplicate_completion"]:
+        return "duplicate_fixture_completion_before_button"
+    if not checks["no_active_fixture"]:
+        return "completion_button_pressed_while_fixture_active"
+    if not checks["all_fixtures_closed"]:
+        return "completion_button_pressed_with_fixture_open"
+    if not checks["button_presses_remaining"]:
+        return "completion_button_pressed_too_many_times"
+    if not checks["button_physically_pressed"]:
+        return supplied or "completion_button_not_physically_pressed"
+    return supplied or "invalid_completion_button_press"
 
 
 def _latch_failure(state: SemanticState, reason: str | None) -> None:

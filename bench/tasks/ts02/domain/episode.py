@@ -24,6 +24,7 @@ from bench.tasks.ts02.domain.geometry import (
 
 
 DEMO_ORDER_SEED_SALT = 0x54533032
+TARGET_FIXTURE_SEED_SALT = 0x54534754
 DEFAULT_LAYOUT_ID = 24
 DEFAULT_STYLE_ID = 24
 DEFAULT_OPEN_THRESHOLD = 0.70
@@ -63,6 +64,30 @@ def sample_demo_fixture_order(seed: int) -> tuple[str, ...]:
     return tuple(str(value) for value in rng.permutation(FIXTURE_NAMES))
 
 
+def normalize_target_fixture(value: Any | None) -> str | None:
+    """Resolve an optional fixture name used for deterministic debugging."""
+
+    if value is None or value == "":
+        return None
+    name = str(value).strip().lower()
+    aliases = {display: fixture for fixture, display in FIXTURE_DISPLAY_NAMES.items()}
+    resolved = aliases.get(name, name)
+    if resolved not in FIXTURE_NAMES:
+        raise ValueError(
+            f"target_fixture must be one of {FIXTURE_NAMES}, got {value!r}"
+        )
+    return resolved
+
+
+def sample_target_fixture(seed: int) -> str:
+    """Sample the hidden red-cube location independently of expert order."""
+
+    rng = np.random.default_rng(
+        np.random.SeedSequence([int(seed), TARGET_FIXTURE_SEED_SALT])
+    )
+    return str(rng.choice(FIXTURE_NAMES))
+
+
 def resolve_task_definition(**values: Any) -> TaskDefinition:
     task_id = str(values.get("id", TASK_ID))
     if task_id != TASK_ID:
@@ -73,7 +98,7 @@ def resolve_task_definition(**values: Any) -> TaskDefinition:
         description=str(
             values.get(
                 "description",
-                "Inspect each of three spatially separated cabinets exactly once.",
+                "Search three drawers for a red cube and report the search length.",
             )
         ),
         success_conditions=tuple(
@@ -81,8 +106,9 @@ def resolve_task_definition(**values: Any) -> TaskDefinition:
             for item in values.get(
                 "success_conditions",
                 (
-                    "all_fixtures_checked",
-                    "completion_count",
+                    "target_found",
+                    "search_stopped_at_target",
+                    "at_least_one_fixture_checked",
                     "no_duplicate_completion",
                     "no_active_fixture",
                     "all_fixtures_closed",
@@ -91,7 +117,9 @@ def resolve_task_definition(**values: Any) -> TaskDefinition:
                     "no_invalid_close",
                     "no_duplicate_check",
                     "no_close_before_inspect",
+                    "no_search_after_target",
                     "completion_button_pressed",
+                    "completion_button_count_matches_search_count",
                     "no_invalid_completion_button_press",
                 ),
             )
@@ -151,6 +179,7 @@ def resolve_scene_config(*, seed: int, env_split: str, **values: Any) -> SceneCo
 
 def resolve_episode_plan(*, seed: int, **values: Any) -> EpisodePlan:
     configured = normalize_fixture_order(values.get("demo_fixture_order"))
+    configured_target = normalize_target_fixture(values.get("target_fixture"))
     max_horizon = int(values.get("max_horizon", 2200))
     if max_horizon <= 0:
         raise ValueError("TS02 episode.max_horizon must be positive")
@@ -158,6 +187,11 @@ def resolve_episode_plan(*, seed: int, **values: Any) -> EpisodePlan:
         seed=int(seed),
         demo_fixture_order=(
             sample_demo_fixture_order(seed) if configured is None else configured
+        ),
+        target_fixture=(
+            sample_target_fixture(seed)
+            if configured_target is None
+            else configured_target
         ),
         max_horizon=max_horizon,
     )
@@ -179,8 +213,10 @@ __all__ = [
     "DEFAULT_OPEN_THRESHOLD",
     "DEFAULT_STYLE_ID",
     "normalize_fixture_order",
+    "normalize_target_fixture",
     "resolve_episode_plan",
     "resolve_scene_config",
     "resolve_task_definition",
     "sample_demo_fixture_order",
+    "sample_target_fixture",
 ]

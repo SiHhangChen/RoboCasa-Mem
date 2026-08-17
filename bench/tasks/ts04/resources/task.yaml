@@ -4,10 +4,11 @@ schema_version: 1
 task:
   id: TS04
   display_name: Inspect Two Drawers
-  description: Inspect each of two drawers exactly once, close them, and press the completion button.
+  description: Search two drawers for a hidden red cube, closing each inspected drawer, then stop and press the completion button once.
   success_conditions:
-    - all_fixtures_checked
-    - completion_count
+    - target_found
+    - search_stopped_at_target
+    - at_least_one_fixture_checked
     - no_duplicate_completion
     - no_active_fixture
     - all_fixtures_closed
@@ -16,7 +17,9 @@ task:
     - no_invalid_close
     - no_duplicate_check
     - no_close_before_inspect
+    - no_search_after_target
     - completion_button_pressed
+    - completion_button_pressed_once
     - no_invalid_completion_button_press
 
 scene:
@@ -30,7 +33,7 @@ scene:
     - [4.10, -2.37, 1.1363333333333332]
     - [4.60, -2.37, 1.1363333333333332]
   drawer_world_yaw_deg: 180.0
-  # WA02-style spring-loaded green button on the front edge of the tabletop,
+  # TM01-style spring-loaded green button on the front edge of the tabletop,
   # centered in the free gap between the left and center cabinets.
   completion_button_world_xyz: [4.35, -2.06, 0.92]
   open_threshold: 0.70
@@ -40,6 +43,8 @@ episode:
   # Leave demo_fixture_order unset so each dataset seed deterministically
   # samples one permutation of the two drawers. The sampled order is expert
   # policy metadata, never a target-order success condition.
+  # target_fixture is intentionally unset so each seed deterministically places
+  # the red cube in exactly one drawer, independently of the search order.
   max_horizon: 1800
 
 initial_state:

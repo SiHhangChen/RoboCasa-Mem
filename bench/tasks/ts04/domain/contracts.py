@@ -14,6 +14,7 @@ PARENT_TASK_ID = ""
 ENV_NAME = "TS04InspectTwoDrawers"
 DISPLAY_NAME = "Inspect Two Drawers"
 AXIS = "TQ-S"
+TARGET_OBJECT_NAME = "red_cube"
 FIXTURE_NAMES = ("cabinet_slot_0", "cabinet_slot_1")
 FIXTURE_DISPLAY_NAMES = {
     "cabinet_slot_0": "left",
@@ -29,6 +30,7 @@ COMPLETION_BUTTON_WORLD_XYZ = (4.35, -2.06, 0.92)
 class EpisodePlan:
     seed: int
     demo_fixture_order: tuple[str, str]
+    target_fixture: str
     max_horizon: int
 
 @dataclass(frozen=True)
@@ -121,6 +123,7 @@ __all__ = [
     "FIXTURE_DISPLAY_NAMES",
     "FIXTURE_NAMES",
     "PARENT_TASK_ID",
+    "TARGET_OBJECT_NAME",
     "TASK_ID",
     "TASK_REVISION",
 ]

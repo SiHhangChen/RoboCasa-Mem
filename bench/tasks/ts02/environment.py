@@ -9,10 +9,15 @@ import numpy as np
 
 from robocasa.environments.kitchen.kitchen import FixtureType, Kitchen
 
+from bench.tasks.ts02.button_asset import (
+    TS02_BUTTON_MAX_TRAVEL_M,
+    add_ts02_button_asset,
+)
 from bench.tasks.ts02.domain.contracts import (
     AXIS,
     FIXTURE_DISPLAY_NAMES,
     FIXTURE_NAMES,
+    TARGET_OBJECT_NAME,
 )
 from bench.tasks.ts02.domain.geometry import (
     DEFAULT_DRAWER_WORLD_XYZS,
@@ -29,18 +34,23 @@ from bench.tasks.ts02.domain.semantics import (
     record_inspection_attempt,
     record_open_attempt,
 )
+from bench.tasks.ts02.physical_events import PhysicalSample, TS02PhysicalObserver
 from bench.tasks.ts02.single_drawer import SingleTabletopDrawer
+from bench.tasks.ts02.target_object import (
+    TARGET_OBJECT_GEOM_NAME,
+    add_target_red_cube,
+)
 
 
 DRAWER_FIXTURE_NAMES = {fixture: f"ts02_{fixture}_fixture" for fixture in FIXTURE_NAMES}
 COMPLETION_BUTTON_GEOM_NAME = "bench_ts02_completion_button"
 COMPLETION_BUTTON_JOINT_NAME = f"{COMPLETION_BUTTON_GEOM_NAME}_press_joint"
-COMPLETION_BUTTON_MAX_TRAVEL = 0.012
+COMPLETION_BUTTON_MAX_TRAVEL = TS02_BUTTON_MAX_TRAVEL_M
 DEFAULT_COMPLETION_BUTTON_WORLD_XYZ = (4.35, -2.06, 0.92)
 
 
 class TS02InspectThreeCabinets(Kitchen):
-    """Three independent drawers plus the one authoritative history state."""
+    """Search three drawers for a hidden red cube, then report search length."""
 
     EXCLUDE_LAYOUTS = Kitchen.DINING_COUNTER_EXCLUDED_LAYOUTS
     EXPECTED_FIXTURE_NAMES = FIXTURE_NAMES
@@ -48,15 +58,19 @@ class TS02InspectThreeCabinets(Kitchen):
     DRAWER_FIXTURE_PREFIX = "ts02"
     COMPLETION_BUTTON_GEOM_NAME = COMPLETION_BUTTON_GEOM_NAME
     COMPLETION_BUTTON_JOINT_NAME = COMPLETION_BUTTON_JOINT_NAME
+    TARGET_OBJECT_GEOM_NAME = TARGET_OBJECT_GEOM_NAME
     TASK_LABEL = "TS02"
     LANG = (
-        "Please inspect the three cabinets, close each drawer, then press "
-        "the completion button."
+        "Search the three drawers for the red cube. Close every drawer after "
+        "looking inside. Once you find the cube and close its drawer, press "
+        "the completion button once for each drawer you inspected."
     )
     INITIAL_PROMPT = (
-        "Inspect each cabinet exactly once, close it after inspection, and "
-        "remember which cabinets have already been checked. After all three "
-        "are closed, press the completion button."
+        "Exactly one of the three drawers contains a bright red cube. Search "
+        "without revisiting drawers, and close each inspected drawer. Stop "
+        "after finding and closing the target drawer. If finding it required "
+        "inspecting k drawers, press the completion button exactly k times, "
+        "releasing it between successive presses."
     )
 
     def __init__(
@@ -70,8 +84,12 @@ class TS02InspectThreeCabinets(Kitchen):
         completion_button_world_xyz: tuple[float, float, float] = (
             DEFAULT_COMPLETION_BUTTON_WORLD_XYZ
         ),
+        target_fixture: str = FIXTURE_NAMES[0],
         open_threshold: float = 0.70,
         closed_threshold: float = 0.08,
+        button_pressed_threshold_m: float = 0.004,
+        button_released_threshold_m: float = 0.001,
+        button_release_dwell_steps: int = 2,
         **kwargs: Any,
     ) -> None:
         names = tuple(str(name) for name in fixture_names)
@@ -91,15 +109,31 @@ class TS02InspectThreeCabinets(Kitchen):
             for fixture in names
         }
         self.drawer_world_yaw_deg = float(drawer_world_yaw_deg)
-        button_position = np.asarray(completion_button_world_xyz, dtype=float).reshape(-1)
+        button_position = np.asarray(completion_button_world_xyz, dtype=float).reshape(
+            -1
+        )
         if button_position.size != 3 or not np.all(np.isfinite(button_position)):
-            raise ValueError("TS02 completion_button_world_xyz must be a finite xyz value")
+            raise ValueError(
+                "TS02 completion_button_world_xyz must be a finite xyz value"
+            )
         self.completion_button_world_xyz = tuple(
             float(item) for item in button_position
         )
         self.open_threshold = float(open_threshold)
         self.closed_threshold = float(closed_threshold)
-        self._semantic_state = SemanticState(names)
+        self.target_fixture = str(target_fixture)
+        if self.target_fixture not in names:
+            raise ValueError("TS02 target_fixture must name one of the three drawers")
+        self._physical_observer = TS02PhysicalObserver(
+            fixture_names=names,
+            target_fixture=self.target_fixture,
+            drawer_open_threshold=self.open_threshold,
+            drawer_closed_threshold=self.closed_threshold,
+            button_pressed_threshold_m=float(button_pressed_threshold_m),
+            button_released_threshold_m=float(button_released_threshold_m),
+            button_release_dwell_steps=int(button_release_dwell_steps),
+        )
+        self._observer_armed = False
         super().__init__(**kwargs)
 
     # Scene construction -------------------------------------------------
@@ -130,9 +164,7 @@ class TS02InspectThreeCabinets(Kitchen):
         if worldbody is None:
             return xml_str
         existing = {
-            geom.get("name")
-            for geom in worldbody.iter("geom")
-            if geom.get("name")
+            geom.get("name") for geom in worldbody.iter("geom") if geom.get("name")
         }
         if self.COMPLETION_BUTTON_GEOM_NAME not in existing:
             _add_completion_button_asset(
@@ -141,6 +173,13 @@ class TS02InspectThreeCabinets(Kitchen):
                 geom_name=self.COMPLETION_BUTTON_GEOM_NAME,
                 joint_name=self.COMPLETION_BUTTON_JOINT_NAME,
             )
+        add_target_red_cube(
+            root,
+            drawer_body_name=(
+                f"{self.drawer_fixture_names[self.target_fixture]}_drawer"
+            ),
+            geom_name=self.TARGET_OBJECT_GEOM_NAME,
+        )
         return ET.tostring(root, encoding="utf8").decode("utf8")
 
     def _setup_kitchen_references(self) -> None:
@@ -173,33 +212,63 @@ class TS02InspectThreeCabinets(Kitchen):
 
     def _setup_scene(self) -> None:
         super()._setup_scene()
+        self._observer_armed = False
         self.close_all_drawers()
         self.reset_semantic_state()
+
+    def _reset_internal(self) -> None:
+        """Arm physical edge detection only after reset has settled."""
+
+        self._observer_armed = False
+        super()._reset_internal()
+        self.close_all_drawers()
+        self.sim.forward()
+        self._physical_observer.reset(self._physical_sample())
+        self._observer_armed = True
+
+    def update_state(self) -> None:
+        super().update_state()
+        if self._observer_armed:
+            self._physical_observer.observe(self._physical_sample())
+
+    def reward(self, action=None):
+        del action
+        if self._observer_armed:
+            self._physical_observer.observe(self._physical_sample())
+        return 1.0 if self._check_success() else 0.0
 
     # Semantic events ----------------------------------------------------
 
     @property
     def semantic_state(self) -> SemanticState:
-        return self._semantic_state
+        return self._physical_observer.state
+
+    @property
+    def physical_observer(self) -> TS02PhysicalObserver:
+        return self._physical_observer
 
     @property
     def checked_fixture_set(self) -> set[str]:
-        return self._semantic_state.checked_fixture_set
+        return self.semantic_state.checked_fixture_set
 
     @property
     def completed_fixture_history(self) -> list[str]:
-        return self._semantic_state.completed_fixture_history
+        return self.semantic_state.completed_fixture_history
 
     @property
     def active_fixture(self) -> str | None:
-        return self._semantic_state.active_fixture
+        return self.semantic_state.active_fixture
 
     @property
     def num_checked(self) -> int:
-        return self._semantic_state.num_checked
+        return self.semantic_state.num_checked
 
     def reset_semantic_state(self) -> None:
-        self._semantic_state = SemanticState(self.fixture_names)
+        try:
+            self._physical_observer.reset(self._physical_sample())
+            self._observer_armed = True
+        except Exception:
+            self._physical_observer.reset_state()
 
     def record_open_event(
         self,
@@ -209,7 +278,7 @@ class TS02InspectThreeCabinets(Kitchen):
         failure_reason: str | None = None,
     ) -> dict[str, Any]:
         result = record_open_attempt(
-            self._semantic_state,
+            self.semantic_state,
             fixture_name,
             drawer_open=drawer_open,
             failure_reason=failure_reason,
@@ -224,7 +293,7 @@ class TS02InspectThreeCabinets(Kitchen):
         drawer_open: bool,
     ) -> dict[str, Any]:
         result = record_inspection_attempt(
-            self._semantic_state,
+            self.semantic_state,
             fixture_name,
             drawer_open=drawer_open,
         ).as_dict()
@@ -239,7 +308,7 @@ class TS02InspectThreeCabinets(Kitchen):
         failure_reason: str | None = None,
     ) -> dict[str, Any]:
         result = record_close_attempt(
-            self._semantic_state,
+            self.semantic_state,
             fixture_name,
             drawer_closed=drawer_closed,
             failure_reason=failure_reason,
@@ -260,7 +329,7 @@ class TS02InspectThreeCabinets(Kitchen):
             else bool(all_drawers_closed)
         )
         result = record_completion_button_attempt(
-            self._semantic_state,
+            self.semantic_state,
             all_drawers_closed=closed,
             button_physically_pressed=button_physically_pressed,
             failure_reason=failure_reason,
@@ -304,6 +373,16 @@ class TS02InspectThreeCabinets(Kitchen):
             }
         )
 
+    def _physical_sample(self) -> PhysicalSample:
+        return PhysicalSample(
+            step_id=int(getattr(self, "timestep", 0)),
+            drawer_open_fraction={
+                fixture_name: self.slot_open_fraction(fixture_name)
+                for fixture_name in self.fixture_names
+            },
+            completion_button_press_depth_m=self.completion_button_press_depth(),
+        )
+
     def all_drawers_closed(self) -> bool:
         return all(
             self.slot_open_fraction(fixture_name) <= self.closed_threshold
@@ -314,14 +393,12 @@ class TS02InspectThreeCabinets(Kitchen):
         """Return the live center of the movable green plunger geom."""
 
         try:
-            geom_id = int(
-                self.sim.model.geom_name2id(self.COMPLETION_BUTTON_GEOM_NAME)
-            )
+            geom_id = int(self.sim.model.geom_name2id(self.COMPLETION_BUTTON_GEOM_NAME))
             return np.asarray(self.sim.data.geom_xpos[geom_id], dtype=float)
         except Exception:
-            return np.asarray(self.completion_button_world_xyz, dtype=float) + np.asarray(
-                [0.0, 0.0, 0.075], dtype=float
-            )
+            return np.asarray(
+                self.completion_button_world_xyz, dtype=float
+            ) + np.asarray([0.0, 0.0, 0.075], dtype=float)
 
     def completion_button_press_depth(self) -> float:
         """Return positive plunger travel in metres (0.012 m at the limit)."""
@@ -332,9 +409,7 @@ class TS02InspectThreeCabinets(Kitchen):
                 max(
                     0.0,
                     -float(
-                        self.sim.data.get_joint_qpos(
-                            self.COMPLETION_BUTTON_JOINT_NAME
-                        )
+                        self.sim.data.get_joint_qpos(self.COMPLETION_BUTTON_JOINT_NAME)
                     ),
                 ),
             )
@@ -373,8 +448,12 @@ class TS02InspectThreeCabinets(Kitchen):
                     "active_fixture",
                     "completed_fixture_history",
                     "num_checked",
+                    "target_found",
+                    "completion_button_press_count",
                     "completion_button_pressed",
                 ],
+                "target_object_name": TARGET_OBJECT_NAME,
+                "target_object_geom": self.TARGET_OBJECT_GEOM_NAME,
                 "completion_button_geom": self.COMPLETION_BUTTON_GEOM_NAME,
                 "completion_button_joint": self.COMPLETION_BUTTON_JOINT_NAME,
             }
@@ -388,14 +467,14 @@ class TS02InspectThreeCabinets(Kitchen):
 
     def _check_success(self) -> bool:
         return evaluate_success(
-            self._semantic_state,
+            self.semantic_state,
             self.physical_state(),
             closed_threshold=self.closed_threshold,
         ).success
 
     def inspection_diagnostics(self) -> dict[str, Any]:
         return diagnostics(
-            self._semantic_state,
+            self.semantic_state,
             self.physical_state(),
             closed_threshold=self.closed_threshold,
             fixture_display_names=self.FIXTURE_DISPLAY_NAMES,
@@ -416,77 +495,13 @@ def _add_completion_button_asset(
     geom_name: str = COMPLETION_BUTTON_GEOM_NAME,
     joint_name: str = COMPLETION_BUTTON_JOINT_NAME,
 ) -> None:
-    """Copy WA02's compact pressable primitive with a green completion cap."""
+    """Install the complete TM01-style button under TS02 identifiers."""
 
-    body = ET.SubElement(
+    add_ts02_button_asset(
         parent,
-        "body",
-        {
-            "name": f"{geom_name}_body",
-            "pos": " ".join(f"{item:.6f}" for item in pos),
-        },
-    )
-    visual = {"contype": "0", "conaffinity": "0", "group": "1"}
-    ET.SubElement(
-        body,
-        "geom",
-        {
-            "name": f"{geom_name}_base",
-            "type": "box",
-            "pos": "0 0 0.020",
-            "size": "0.060 0.060 0.020",
-            "rgba": "0.10 0.11 0.12 1",
-            **visual,
-        },
-    )
-    plunger = ET.SubElement(
-        body,
-        "body",
-        {
-            "name": f"{geom_name}_plunger",
-            "pos": "0 0 0",
-            # WA02's visual design is retained, but gravity compensation keeps
-            # this vertical spring from resting at its lower joint limit.
-            "gravcomp": "1",
-        },
-    )
-    ET.SubElement(
-        plunger,
-        "inertial",
-        {
-            "pos": "0 0 0.074",
-            "mass": "0.020",
-            "diaginertia": "0.00002 0.00002 0.00002",
-        },
-    )
-    ET.SubElement(
-        plunger,
-        "joint",
-        {
-            "name": joint_name,
-            "type": "slide",
-            "axis": "0 0 1",
-            "limited": "true",
-            "range": "-0.012 0",
-            "springref": "0",
-            "stiffness": "18",
-            "damping": "2",
-        },
-    )
-    ET.SubElement(
-        plunger,
-        "geom",
-        {
-            "name": geom_name,
-            "type": "cylinder",
-            "pos": "0 0 0.075",
-            "size": "0.029 0.008",
-            "rgba": "0.22 0.72 0.32 1",
-            "contype": "1",
-            "conaffinity": "1",
-            "group": "1",
-            "friction": "0.8 0.005 0.0001",
-        },
+        geom_name=geom_name,
+        pos=pos,
+        joint_name=joint_name,
     )
 
 

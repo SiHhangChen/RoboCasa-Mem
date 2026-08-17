@@ -80,7 +80,11 @@ def load_task_config(path: str | Path = DEFAULT_TASK_CONFIG_FILE) -> TaskConfig:
         "scene fields",
     )
     episode = dict(_mapping(payload, "episode", config_path))
-    _reject_unknown(episode, {"demo_fixture_order", "max_horizon"}, "episode fields")
+    _reject_unknown(
+        episode,
+        {"demo_fixture_order", "target_fixture", "max_horizon"},
+        "episode fields",
+    )
 
     initial = _mapping(payload, "initial_state", config_path)
     _reject_unknown(initial, {"robot_base", "drawers"}, "initial_state fields")
@@ -281,6 +285,8 @@ def load_task_config(path: str | Path = DEFAULT_TASK_CONFIG_FILE) -> TaskConfig:
             "gripper_action",
             "near_miss_position_tolerance",
             "press_depth_threshold",
+            "release_depth_threshold",
+            "release_dwell_steps",
             "require_physical_button_motion",
         },
         "operations.completion_button fields",
@@ -454,6 +460,10 @@ def resolve_action_config(*, operations: Mapping[str, Any]) -> ActionConfig:
         "press_depth_threshold": float(
             button_values.get("press_depth_threshold", 0.004)
         ),
+        "release_depth_threshold": float(
+            button_values.get("release_depth_threshold", 0.001)
+        ),
+        "release_dwell_steps": int(button_values.get("release_dwell_steps", 2)),
         "require_physical_button_motion": bool(
             button_values.get("require_physical_button_motion", True)
         ),
@@ -471,6 +481,18 @@ def resolve_action_config(*, operations: Mapping[str, Any]) -> ActionConfig:
     if not 0.0 < button_metadata["press_depth_threshold"] <= 0.012:
         raise ValueError(
             "TS02 completion-button press_depth_threshold must be in (0, 0.012]"
+        )
+    if not (
+        0.0
+        <= button_metadata["release_depth_threshold"]
+        < button_metadata["press_depth_threshold"]
+    ):
+        raise ValueError(
+            "TS02 completion-button release threshold must be below press threshold"
+        )
+    if button_metadata["release_dwell_steps"] < 1:
+        raise ValueError(
+            "TS02 completion-button release_dwell_steps must be positive"
         )
     return ActionConfig(
         drawer_open_metadata=open_metadata,

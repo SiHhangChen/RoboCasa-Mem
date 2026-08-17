@@ -18,6 +18,9 @@ from bench.tasks.ts04.domain.contracts import (
     TASK_ID,
 )
 
+
+TARGET_FIXTURE_SEED_SALT = 0x54533454
+
 def normalize_drawer_world_xyzs(value: Any, *, expected_count: int) -> tuple[tuple[float, float, float], ...]:
     rows = tuple(tuple(float(v) for v in row) for row in value)
     if len(rows) != expected_count or any(len(row) != 3 for row in rows):
@@ -48,6 +51,33 @@ def sample_demo_fixture_order(seed: int) -> tuple[str, str]:
     return FIXTURE_NAMES if episode_seed % 2 == 0 else tuple(reversed(FIXTURE_NAMES))
 
 
+def normalize_target_fixture(value: Any | None) -> str | None:
+    """Resolve an optional red-cube drawer for deterministic debugging."""
+
+    if value is None or value == "":
+        return None
+    name = str(value).strip().lower()
+    aliases = {display: fixture for fixture, display in FIXTURE_DISPLAY_NAMES.items()}
+    resolved = aliases.get(name, name)
+    if resolved not in FIXTURE_NAMES:
+        raise ValueError(
+            f"TS04 target_fixture must be one of {FIXTURE_NAMES}, got {value!r}"
+        )
+    return resolved
+
+
+def sample_target_fixture(seed: int) -> str:
+    """Sample the red-cube location from a stable seed stream."""
+
+    episode_seed = int(seed)
+    if episode_seed < 0:
+        raise ValueError("TS04 seed must be non-negative")
+    rng = np.random.default_rng(
+        np.random.SeedSequence([episode_seed, TARGET_FIXTURE_SEED_SALT])
+    )
+    return str(rng.choice(FIXTURE_NAMES))
+
+
 def resolve_task_definition(**values: Any) -> TaskDefinition:
     if str(values.get("id", TASK_ID)) != TASK_ID:
         raise ValueError(f"TS04 config must use task.id={TASK_ID!r}")
@@ -57,7 +87,12 @@ def resolve_task_definition(**values: Any) -> TaskDefinition:
     return TaskDefinition(
         task_id=TASK_ID,
         display_name=str(values.get("display_name", DISPLAY_NAME)),
-        description=str(values.get("description", "Inspect both drawers exactly once.")),
+        description=str(
+            values.get(
+                "description",
+                "Search two drawers for a red cube and stop when it is found.",
+            )
+        ),
         success_conditions=conditions,
     )
 
@@ -101,20 +136,24 @@ def resolve_scene_config(*, seed: int, env_split: str, **values: Any) -> SceneCo
 
 def resolve_episode_plan(*, seed: int, **values: Any) -> EpisodePlan:
     order = normalize_fixture_order(values.get("demo_fixture_order"))
+    target = normalize_target_fixture(values.get("target_fixture"))
     horizon = int(values.get("max_horizon", 1800))
     if horizon <= 0:
         raise ValueError("TS04 max_horizon must be positive")
     return EpisodePlan(
         seed=int(seed),
         demo_fixture_order=sample_demo_fixture_order(seed) if order is None else order,
+        target_fixture=sample_target_fixture(seed) if target is None else target,
         max_horizon=horizon,
     )
 
 
 __all__ = [
     "normalize_fixture_order",
+    "normalize_target_fixture",
     "resolve_episode_plan",
     "resolve_scene_config",
     "resolve_task_definition",
     "sample_demo_fixture_order",
+    "sample_target_fixture",
 ]

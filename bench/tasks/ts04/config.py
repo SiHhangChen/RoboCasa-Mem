@@ -80,7 +80,11 @@ def load_task_config(path: str | Path = DEFAULT_TASK_CONFIG_FILE) -> TaskConfig:
         "scene fields",
     )
     episode = dict(_mapping(payload, "episode", config_path))
-    _reject_unknown(episode, {"demo_fixture_order", "max_horizon"}, "episode fields")
+    _reject_unknown(
+        episode,
+        {"demo_fixture_order", "target_fixture", "max_horizon"},
+        "episode fields",
+    )
 
     initial = _mapping(payload, "initial_state", config_path)
     _reject_unknown(initial, {"robot_base", "drawers"}, "initial_state fields")

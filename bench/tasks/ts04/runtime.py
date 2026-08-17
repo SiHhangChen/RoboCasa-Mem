@@ -29,10 +29,11 @@ def _actions(config: Any, plan: Any, resources: Mapping[str, Any]) -> Any:
 
 
 def _environment(config: Any, scene: Any, plan: Any, resources: Mapping[str, Any]) -> Mapping[str, Any]:
-    del config, plan, resources
+    del config, resources
     return {"fixture_names": scene.fixture_names, "drawer_world_xyzs": scene.drawer_world_xyzs,
             "drawer_world_yaw_deg": scene.drawer_world_yaw_deg,
             "completion_button_world_xyz": scene.completion_button_world_xyz,
+            "target_fixture": plan.target_fixture,
             "open_threshold": scene.open_threshold, "closed_threshold": scene.closed_threshold}
 
 
@@ -46,6 +47,7 @@ _ADAPTER = TaskRuntimeAdapter(
     release_facts=lambda config, episode, resources, options: {
         "task_revision": TASK_REVISION,
         "task_id": episode.task_id,
+        "target_fixture": episode.facts["target_fixture"],
         "order_profile_id": "left_right" if episode.facts.get("demo_fixture_order", ("",))[0] == "cabinet_slot_0" else "right_left",
     },
     expert_runtime=build_operation_handlers,

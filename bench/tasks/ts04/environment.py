@@ -9,10 +9,15 @@ import numpy as np
 
 from robocasa.environments.kitchen.kitchen import FixtureType, Kitchen
 
+from bench.tasks.ts04.button_asset import (
+    TS04_BUTTON_MAX_TRAVEL_M,
+    add_ts04_button_asset,
+)
 from bench.tasks.ts04.domain.contracts import (
     AXIS,
     FIXTURE_DISPLAY_NAMES,
     FIXTURE_NAMES,
+    TARGET_OBJECT_NAME,
 )
 from bench.tasks.ts04.domain.geometry import (
     DEFAULT_DRAWER_WORLD_XYZS,
@@ -30,17 +35,21 @@ from bench.tasks.ts04.domain.semantics import (
     record_open_attempt,
 )
 from bench.tasks.ts04.single_drawer import SingleTabletopDrawer
+from bench.tasks.ts04.target_object import (
+    TARGET_OBJECT_GEOM_NAME,
+    add_target_red_cube,
+)
 
 
 DRAWER_FIXTURE_NAMES = {fixture: f"ts04_{fixture}_fixture" for fixture in FIXTURE_NAMES}
 COMPLETION_BUTTON_GEOM_NAME = "bench_ts04_completion_button"
 COMPLETION_BUTTON_JOINT_NAME = f"{COMPLETION_BUTTON_GEOM_NAME}_press_joint"
-COMPLETION_BUTTON_MAX_TRAVEL = 0.012
+COMPLETION_BUTTON_MAX_TRAVEL = TS04_BUTTON_MAX_TRAVEL_M
 DEFAULT_COMPLETION_BUTTON_WORLD_XYZ = (4.35, -2.06, 0.92)
 
 
 class TS04InspectTwoDrawers(Kitchen):
-    """Two independent drawers plus the one authoritative history state."""
+    """Inspect two drawers, one containing a high-visibility red cube."""
 
     EXCLUDE_LAYOUTS = Kitchen.DINING_COUNTER_EXCLUDED_LAYOUTS
     EXPECTED_FIXTURE_NAMES = FIXTURE_NAMES
@@ -48,15 +57,18 @@ class TS04InspectTwoDrawers(Kitchen):
     DRAWER_FIXTURE_PREFIX = "ts04"
     COMPLETION_BUTTON_GEOM_NAME = COMPLETION_BUTTON_GEOM_NAME
     COMPLETION_BUTTON_JOINT_NAME = COMPLETION_BUTTON_JOINT_NAME
+    TARGET_OBJECT_GEOM_NAME = TARGET_OBJECT_GEOM_NAME
     TASK_LABEL = "TS04"
     LANG = (
-        "Please inspect the two drawers, close each drawer, then press "
-        "the completion button."
+        "Search the drawers for the red cube, closing each drawer after "
+        "inspection. Stop after finding and closing its drawer, then press "
+        "the completion button once."
     )
     INITIAL_PROMPT = (
-        "Inspect each drawer exactly once, close it after inspection, and "
-        "remember which drawers have already been checked. After both "
-        "are closed, press the completion button."
+        "Exactly one drawer contains a bright red cube. Search without "
+        "revisiting drawers and close every inspected drawer. After finding "
+        "and closing the target drawer, stop searching and press the "
+        "completion button once."
     )
 
     def __init__(
@@ -70,6 +82,7 @@ class TS04InspectTwoDrawers(Kitchen):
         completion_button_world_xyz: tuple[float, float, float] = (
             DEFAULT_COMPLETION_BUTTON_WORLD_XYZ
         ),
+        target_fixture: str = FIXTURE_NAMES[0],
         open_threshold: float = 0.70,
         closed_threshold: float = 0.08,
         **kwargs: Any,
@@ -97,9 +110,12 @@ class TS04InspectTwoDrawers(Kitchen):
         self.completion_button_world_xyz = tuple(
             float(item) for item in button_position
         )
+        self.target_fixture = str(target_fixture)
+        if self.target_fixture not in names:
+            raise ValueError("TS04 target_fixture must name one of the two drawers")
         self.open_threshold = float(open_threshold)
         self.closed_threshold = float(closed_threshold)
-        self._semantic_state = SemanticState(names)
+        self._semantic_state = SemanticState(names, self.target_fixture)
         super().__init__(**kwargs)
 
     # Scene construction -------------------------------------------------
@@ -122,7 +138,7 @@ class TS04InspectTwoDrawers(Kitchen):
         self.model.merge_objects(list(self.storage_cabinets.values()))
 
     def edit_model_xml(self, xml_str: str) -> str:
-        """Install the WA02-style spring-loaded completion button."""
+        """Install the TM01-style spring-loaded completion button."""
 
         xml_str = super().edit_model_xml(xml_str)
         root = ET.fromstring(xml_str)
@@ -141,6 +157,13 @@ class TS04InspectTwoDrawers(Kitchen):
                 geom_name=self.COMPLETION_BUTTON_GEOM_NAME,
                 joint_name=self.COMPLETION_BUTTON_JOINT_NAME,
             )
+        add_target_red_cube(
+            root,
+            drawer_body_name=(
+                f"{self.drawer_fixture_names[self.target_fixture]}_drawer"
+            ),
+            geom_name=self.TARGET_OBJECT_GEOM_NAME,
+        )
         return ET.tostring(root, encoding="utf8").decode("utf8")
 
     def _setup_kitchen_references(self) -> None:
@@ -199,7 +222,10 @@ class TS04InspectTwoDrawers(Kitchen):
         return self._semantic_state.num_checked
 
     def reset_semantic_state(self) -> None:
-        self._semantic_state = SemanticState(self.fixture_names)
+        self._semantic_state = SemanticState(
+            self.fixture_names,
+            self.target_fixture,
+        )
 
     def record_open_event(
         self,
@@ -373,10 +399,14 @@ class TS04InspectTwoDrawers(Kitchen):
                     "active_fixture",
                     "completed_fixture_history",
                     "num_checked",
+                    "target_found",
                     "completion_button_pressed",
                 ],
                 "completion_button_geom": self.COMPLETION_BUTTON_GEOM_NAME,
                 "completion_button_joint": self.COMPLETION_BUTTON_JOINT_NAME,
+                "target_fixture": self.target_fixture,
+                "target_object_name": TARGET_OBJECT_NAME,
+                "target_object_geom": self.TARGET_OBJECT_GEOM_NAME,
             }
         )
         from bench.tasks.ts04.domain.contracts import PARENT_TASK_ID, TASK_ID, TASK_REVISION
@@ -426,77 +456,13 @@ def _add_completion_button_asset(
     geom_name: str = COMPLETION_BUTTON_GEOM_NAME,
     joint_name: str = COMPLETION_BUTTON_JOINT_NAME,
 ) -> None:
-    """Copy WA02's compact pressable primitive with a green completion cap."""
+    """Install the complete TM01-style button under TS04 identifiers."""
 
-    body = ET.SubElement(
+    add_ts04_button_asset(
         parent,
-        "body",
-        {
-            "name": f"{geom_name}_body",
-            "pos": " ".join(f"{item:.6f}" for item in pos),
-        },
-    )
-    visual = {"contype": "0", "conaffinity": "0", "group": "1"}
-    ET.SubElement(
-        body,
-        "geom",
-        {
-            "name": f"{geom_name}_base",
-            "type": "box",
-            "pos": "0 0 0.020",
-            "size": "0.060 0.060 0.020",
-            "rgba": "0.10 0.11 0.12 1",
-            **visual,
-        },
-    )
-    plunger = ET.SubElement(
-        body,
-        "body",
-        {
-            "name": f"{geom_name}_plunger",
-            "pos": "0 0 0",
-            # WA02's visual design is retained, but gravity compensation keeps
-            # this vertical spring from resting at its lower joint limit.
-            "gravcomp": "1",
-        },
-    )
-    ET.SubElement(
-        plunger,
-        "inertial",
-        {
-            "pos": "0 0 0.074",
-            "mass": "0.020",
-            "diaginertia": "0.00002 0.00002 0.00002",
-        },
-    )
-    ET.SubElement(
-        plunger,
-        "joint",
-        {
-            "name": joint_name,
-            "type": "slide",
-            "axis": "0 0 1",
-            "limited": "true",
-            "range": "-0.012 0",
-            "springref": "0",
-            "stiffness": "18",
-            "damping": "2",
-        },
-    )
-    ET.SubElement(
-        plunger,
-        "geom",
-        {
-            "name": geom_name,
-            "type": "cylinder",
-            "pos": "0 0 0.075",
-            "size": "0.029 0.008",
-            "rgba": "0.22 0.72 0.32 1",
-            "contype": "1",
-            "conaffinity": "1",
-            "group": "1",
-            "friction": "0.8 0.005 0.0001",
-        },
+        geom_name=geom_name,
+        pos=pos,
+        joint_name=joint_name,
     )
 
 

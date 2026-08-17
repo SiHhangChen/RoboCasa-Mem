@@ -12,6 +12,7 @@ from typing import Any
 TASK_ID = "TS02"
 ENV_NAME = "TS02InspectThreeCabinets"
 AXIS = "TQ-S"
+TARGET_OBJECT_NAME = "red_cube"
 FIXTURE_NAMES = (
     "cabinet_slot_0",
     "cabinet_slot_1",
@@ -101,6 +102,7 @@ class EpisodePlan:
 
     seed: int
     demo_fixture_order: tuple[str, ...]
+    target_fixture: str
     max_horizon: int
 
 
@@ -134,6 +136,7 @@ __all__ = [
     "RunContext",
     "SceneConfig",
     "TASK_ID",
+    "TARGET_OBJECT_NAME",
     "TaskConfig",
     "TaskDefinition",
 ]

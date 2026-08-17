@@ -3,11 +3,12 @@ schema_version: 1
 
 task:
   id: TS02
-  display_name: Inspect Three Cabinets
-  description: Inspect each of three spatially separated cabinets exactly once, close them, and press the completion button.
+  display_name: Find the Red Cube and Report Search Length
+  description: Search three drawers for a bright red cube, close every inspected drawer, then press the completion button once per inspected drawer.
   success_conditions:
-    - all_fixtures_checked
-    - completion_count
+    - target_found
+    - search_stopped_at_target
+    - at_least_one_fixture_checked
     - no_duplicate_completion
     - no_active_fixture
     - all_fixtures_closed
@@ -16,7 +17,9 @@ task:
     - no_invalid_close
     - no_duplicate_check
     - no_close_before_inspect
+    - no_search_after_target
     - completion_button_pressed
+    - completion_button_count_matches_search_count
     - no_invalid_completion_button_press
 
 scene:
@@ -41,6 +44,8 @@ episode:
   # Leave demo_fixture_order unset so each dataset seed deterministically
   # samples one permutation of the three cabinets. The sampled order is expert
   # policy metadata, never a target-order success condition.
+  # target_fixture is intentionally unset. It is sampled from a separate RNG
+  # stream so the expert order cannot leak the red cube's hidden location.
   max_horizon: 2200
 
 initial_state:
@@ -167,6 +172,10 @@ operations:
     near_miss_position_tolerance: 0.09
     # The plunger has 12 mm of travel; require at least 4 mm of measured motion.
     press_depth_threshold: 0.004
+    # A long hold counts once. The plunger must return below this threshold for
+    # two consecutive control steps before another press can be counted.
+    release_depth_threshold: 0.001
+    release_dwell_steps: 2
     require_physical_button_motion: true
 
 recording:
