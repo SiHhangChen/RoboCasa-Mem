@@ -32,6 +32,7 @@ from bench.tasks.wr01.domain.semantics import (
     record_retrieval_pick,
     record_storage,
 )
+from bench.tasks.wr01.physical_events import PhysicalSample, WR01PhysicalObserver
 from bench.tasks.wr01.prompts import resolve_prompt_spec
 
 
@@ -154,6 +155,9 @@ class WR01RetrieveRememberedCan(Kitchen):
         item_placement_seed: int = 0,
         final_closed_threshold: float = 0.08,
         cabinet_contains_margin: float = 0.04,
+        physical_event_dwell_steps: int = 3,
+        gripper_force_limit: float = 20.0,
+        gripper_pad_friction: tuple[float, float, float] = (2.0, 0.05, 0.0001),
         **kwargs: Any,
     ) -> None:
         self._cabinet_world_xyz = tuple(float(value) for value in cabinet_world_xyz)
@@ -163,7 +167,27 @@ class WR01RetrieveRememberedCan(Kitchen):
         self._item_placement_seed = int(item_placement_seed)
         self.final_closed_threshold = float(final_closed_threshold)
         self.cabinet_contains_margin = float(cabinet_contains_margin)
+        self.physical_event_dwell_steps = int(physical_event_dwell_steps)
+        if self.physical_event_dwell_steps < 1:
+            raise ValueError("WR-01 physical-event dwell must be positive")
+        self.gripper_force_limit = float(gripper_force_limit)
+        self.gripper_pad_friction = tuple(
+            float(value) for value in gripper_pad_friction
+        )
+        if (
+            not np.isfinite(self.gripper_force_limit)
+            or self.gripper_force_limit <= 0.0
+        ):
+            raise ValueError("WR-01 gripper force limit must be positive and finite")
+        if (
+            len(self.gripper_pad_friction) != 3
+            or not np.all(np.isfinite(self.gripper_pad_friction))
+            or any(value <= 0.0 for value in self.gripper_pad_friction)
+        ):
+            raise ValueError("WR-01 gripper pad friction must contain 3 positive values")
         self._semantic_state = SemanticState("red_can", "lower")
+        self._physical_observer: WR01PhysicalObserver | None = None
+        self._physical_event_diagnostics: dict[str, Any] = {}
         self.item_by_level = {"lower": "red_can", "upper": "blue_can"}
         self.level_by_item = {
             item: level for level, item in self.item_by_level.items()
@@ -275,6 +299,8 @@ class WR01RetrieveRememberedCan(Kitchen):
 
     def _setup_scene(self) -> None:
         super()._setup_scene()
+        self._physical_observer = None
+        self._physical_event_diagnostics = {}
         self._semantic_state = SemanticState("red_can", "lower")
         self.item_by_level = {"lower": "red_can", "upper": "blue_can"}
         self.level_by_item = {
@@ -310,7 +336,50 @@ class WR01RetrieveRememberedCan(Kitchen):
         self.item_by_level = assignment
         self.level_by_item = {item: level for level, item in assignment.items()}
         self._semantic_state = SemanticState(target, self.level_by_item[target])
+        self._physical_observer = None
+        self._physical_event_diagnostics = {}
         self._ep_meta.setdefault("refs", {})["requested_item_id"] = target
+
+    def configure_canonical_physics(self) -> None:
+        """Apply collision-enabled contact physics to every execution mode."""
+
+        gripper = self.robots[0].gripper["right"]
+        for actuator_name in list(gripper.actuators):
+            actuator_id = int(self.sim.model.actuator_name2id(actuator_name))
+            self.sim.model.actuator_forcelimited[actuator_id] = 1
+            self.sim.model.actuator_forcerange[actuator_id] = [
+                -self.gripper_force_limit,
+                self.gripper_force_limit,
+            ]
+        contact_names = {
+            *gripper.important_geoms["left_finger"],
+            *gripper.important_geoms["right_finger"],
+        }
+        for geom_name in contact_names:
+            geom_id = int(self.sim.model.geom_name2id(geom_name))
+            self.sim.model.geom_friction[geom_id] = self.gripper_pad_friction
+            self.sim.model.geom_condim[geom_id] = 4
+            self.sim.model.geom_solref[geom_id] = (0.001, 1.0)
+            self.sim.model.geom_solimp[geom_id] = (
+                0.999,
+                0.999,
+                0.001,
+                0.5,
+                2.0,
+            )
+        for item_id in ITEM_IDS:
+            for geom_name in self.objects[item_id].contact_geoms or ():
+                geom_id = int(self.sim.model.geom_name2id(geom_name))
+                self.sim.model.geom_friction[geom_id] = (1.0, 0.005, 0.0001)
+                self.sim.model.geom_condim[geom_id] = 4
+                self.sim.model.geom_solref[geom_id] = (0.001, 1.0)
+                self.sim.model.geom_solimp[geom_id] = (
+                    0.999,
+                    0.999,
+                    0.001,
+                    0.5,
+                    2.0,
+                )
 
     def record_storage(self, item_id: str, level: str) -> bool:
         return record_storage(self._semantic_state, item_id, level)
@@ -330,6 +399,39 @@ class WR01RetrieveRememberedCan(Kitchen):
 
     def record_retrieval_pick(self, item_id: str) -> bool:
         return record_retrieval_pick(self._semantic_state, item_id)
+
+    def start_physical_observer(self) -> None:
+        self._physical_observer = WR01PhysicalObserver(
+            self._semantic_state,
+            dwell_steps=self.physical_event_dwell_steps,
+        )
+        update = self._physical_observer.reset(self._physical_event_sample())
+        self._physical_event_diagnostics = dict(update.diagnostics)
+
+    def _update_task_state(self) -> None:
+        observer = self._physical_observer
+        if observer is None:
+            return
+        update = observer.observe(self._physical_event_sample())
+        self._physical_event_diagnostics = {
+            **dict(update.diagnostics),
+            "last_step": int(update.step_id),
+            "last_events": list(update.semantic_events),
+            "duplicate_step": bool(update.duplicate_step),
+        }
+
+    def _physical_event_sample(self) -> PhysicalSample:
+        return PhysicalSample(
+            step_id=int(getattr(self, "timestep", 0)),
+            red_can_in_lower=self.is_item_in_level("red_can", "lower"),
+            red_can_in_upper=self.is_item_in_level("red_can", "upper"),
+            blue_can_in_lower=self.is_item_in_level("blue_can", "lower"),
+            blue_can_in_upper=self.is_item_in_level("blue_can", "upper"),
+            lower_door_closed=self.is_door_closed("lower"),
+            upper_door_closed=self.is_door_closed("upper"),
+            lower_door_open=self.is_door_open("lower"),
+            upper_door_open=self.is_door_open("upper"),
+        )
 
     # Physical observation boundary -------------------------------------
 
@@ -409,7 +511,7 @@ class WR01RetrieveRememberedCan(Kitchen):
         position: Any,
         quat_xyzw: Any | None = None,
     ) -> None:
-        """Task-owned pose helper used by reset and validated transport following."""
+        """Task-owned pose helper reserved for explicit initialization tooling."""
 
         obj = self.objects[str(object_name)]
         qpos = np.asarray(self.sim.data.get_joint_qpos(obj.joints[0]), dtype=float).reshape(-1)
@@ -429,6 +531,20 @@ class WR01RetrieveRememberedCan(Kitchen):
             updated[3:7] = quat[[3, 0, 1, 2]]
         self.sim.data.set_joint_qpos(obj.joints[0], updated)
         self.sim.forward()
+
+    # Action-only stepping ----------------------------------------------
+
+    def step(self, action: Any):
+        # Pass the recorded action through unchanged. WR-01 deliberately has
+        # no attachment, pose following, collision masking, velocity reset, or
+        # command rewrite; transport depends only on physical finger contacts.
+        result = super().step(action)
+        self._update_task_state()
+        return result
+
+    def update_state(self) -> None:
+        super().update_state()
+        self._update_task_state()
 
     # Metadata and final predicate --------------------------------------
 
@@ -450,12 +566,21 @@ class WR01RetrieveRememberedCan(Kitchen):
         return metadata
 
     def _check_success(self) -> bool:
+        self._update_task_state()
         return evaluate_success(self._semantic_state, self.physical_state()).success
 
     def task_diagnostics(self) -> dict[str, Any]:
+        self._update_task_state()
         report = evaluate_success(self._semantic_state, self.physical_state())
+        collision_state = self._object_collision_diagnostics()
         return {
             "success": report.success,
+            "terminal": bool(report.success or self._semantic_state.wrong_retrieval_level_opened),
+            "failure_code": (
+                "wrong_retrieval_door"
+                if self._semantic_state.wrong_retrieval_level_opened
+                else None
+            ),
             "success_checks": report.checks(),
             "storage": {
                 "stored_levels_by_item": dict(
@@ -473,8 +598,42 @@ class WR01RetrieveRememberedCan(Kitchen):
             },
             "physical": {
                 "distractor_still_stored": self.physical_state().distractor_still_stored,
+                "item_world_positions": {
+                    item_id: self.get_object_world_position(item_id)
+                    .astype(float)
+                    .tolist()
+                    for item_id in ITEM_IDS
+                },
+                "object_collisions_enabled": all(
+                    entry["enabled"]
+                    for entries in collision_state.values()
+                    for entry in entries
+                ),
+                "object_collision_geoms": collision_state,
             },
+            "physical_events": dict(self._physical_event_diagnostics),
+            "collision_policy": "all_object_collisions_enabled",
+            "execution_mode": "action_only_physics",
         }
+
+    def _object_collision_diagnostics(self) -> dict[str, list[dict[str, Any]]]:
+        result: dict[str, list[dict[str, Any]]] = {}
+        for item_id in ITEM_IDS:
+            entries: list[dict[str, Any]] = []
+            for geom_name in self.objects[item_id].contact_geoms or ():
+                geom_id = int(self.sim.model.geom_name2id(geom_name))
+                contype = int(self.sim.model.geom_contype[geom_id])
+                conaffinity = int(self.sim.model.geom_conaffinity[geom_id])
+                entries.append(
+                    {
+                        "geom": str(geom_name),
+                        "contype": contype,
+                        "conaffinity": conaffinity,
+                        "enabled": bool(contype != 0 and conaffinity != 0),
+                    }
+                )
+            result[item_id] = entries
+        return result
 
 
 __all__ = ["WR01RetrieveRememberedCan"]

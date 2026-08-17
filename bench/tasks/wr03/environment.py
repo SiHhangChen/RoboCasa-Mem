@@ -20,6 +20,7 @@ from bench.tasks.wr03.domain.semantics import (
     record_storage_door_closed,
 )
 from bench.tasks.wr03.domain.episode import validate_level
+from bench.tasks.wr03.physical_events import PhysicalSample, WR03PhysicalObserver
 RED_CAN_XML = f"{assets_root}/objects/objaverse/canned_food/canned_food_15/model.xml"
 ITEM_COUNTER_NAME = "counter_1_main_group"
 LOWER_CABINET_NAME = "wr01_lower_storage_cabinet"
@@ -102,6 +103,9 @@ class WR03StoreAndRetrieveRememberedCan(Kitchen):
         item_placement_seed: int = 0,
         final_closed_threshold: float = 0.08,
         cabinet_contains_margin: float = 0.04,
+        physical_event_dwell_steps: int = 3,
+        gripper_force_limit: float = 20.0,
+        gripper_pad_friction: tuple[float, float, float] = (2.0, 0.05, 0.0001),
         **kwargs: Any,
     ) -> None:
         self._cabinet_world_xyz = tuple(float(value) for value in cabinet_world_xyz)
@@ -111,8 +115,28 @@ class WR03StoreAndRetrieveRememberedCan(Kitchen):
         self._item_placement_seed = int(item_placement_seed)
         self.final_closed_threshold = float(final_closed_threshold)
         self.cabinet_contains_margin = float(cabinet_contains_margin)
+        self.physical_event_dwell_steps = int(physical_event_dwell_steps)
+        self.gripper_force_limit = float(gripper_force_limit)
+        self.gripper_pad_friction = tuple(
+            float(value) for value in gripper_pad_friction
+        )
+        if self.physical_event_dwell_steps < 1:
+            raise ValueError("WR-03 physical-event dwell must be positive")
+        if (
+            not np.isfinite(self.gripper_force_limit)
+            or self.gripper_force_limit <= 0.0
+        ):
+            raise ValueError("WR-03 gripper force limit must be positive and finite")
+        if (
+            len(self.gripper_pad_friction) != 3
+            or not np.all(np.isfinite(self.gripper_pad_friction))
+            or any(value <= 0.0 for value in self.gripper_pad_friction)
+        ):
+            raise ValueError("WR-03 gripper pad friction must contain 3 positive values")
         self._demo_storage_level = "lower"
         self._semantic_state = SemanticState()
+        self._physical_observer: WR03PhysicalObserver | None = None
+        self._physical_event_diagnostics: dict[str, Any] = {}
         self.level_by_item = {CAN_ID: self._demo_storage_level}
         kwargs.setdefault("obj_registries", ("objaverse", "aigen", "lightwheel"))
         super().__init__(*args, **kwargs)
@@ -214,6 +238,7 @@ class WR03StoreAndRetrieveRememberedCan(Kitchen):
         self.object_placements = placements
 
     def _setup_scene(self) -> None:
+        self._physical_observer = None
         super()._setup_scene()
         self._demo_storage_level = "lower"
         self._semantic_state = SemanticState()
@@ -235,7 +260,58 @@ class WR03StoreAndRetrieveRememberedCan(Kitchen):
         self._demo_storage_level = validate_level(demo_storage_level)
         self.level_by_item = {CAN_ID: self._demo_storage_level}
         self._semantic_state = SemanticState()
+        self._physical_observer = None
+        self._physical_event_diagnostics = {}
         self._ep_meta.setdefault("refs", {})["item_id"] = CAN_ID
+
+    def configure_canonical_physics(self) -> None:
+        """Apply task physics shared by expert, policy, and action replay."""
+        gripper = self.robots[0].gripper["right"]
+        for actuator_name in list(gripper.actuators):
+            actuator_id = int(self.sim.model.actuator_name2id(actuator_name))
+            self.sim.model.actuator_forcelimited[actuator_id] = 1
+            self.sim.model.actuator_forcerange[actuator_id] = [
+                -self.gripper_force_limit,
+                self.gripper_force_limit,
+            ]
+        contact_names = set(
+            [
+                *gripper.important_geoms["left_finger"],
+                *gripper.important_geoms["right_finger"],
+            ]
+        )
+        for geom_name in contact_names:
+            geom_id = int(self.sim.model.geom_name2id(geom_name))
+            self.sim.model.geom_friction[geom_id] = self.gripper_pad_friction
+            self.sim.model.geom_condim[geom_id] = 4
+            self.sim.model.geom_solref[geom_id] = (0.001, 1.0)
+            self.sim.model.geom_solimp[geom_id] = (
+                0.999,
+                0.999,
+                0.001,
+                0.5,
+                2.0,
+            )
+        for geom_name in self.objects[CAN_ID].contact_geoms or ():
+            geom_id = int(self.sim.model.geom_name2id(geom_name))
+            self.sim.model.geom_friction[geom_id] = (1.0, 0.005, 0.0001)
+            self.sim.model.geom_condim[geom_id] = 4
+            self.sim.model.geom_solref[geom_id] = (0.001, 1.0)
+            self.sim.model.geom_solimp[geom_id] = (
+                0.999,
+                0.999,
+                0.001,
+                0.5,
+                2.0,
+            )
+
+    def start_physical_observer(self) -> None:
+        self._physical_observer = WR03PhysicalObserver(
+            self._semantic_state,
+            dwell_steps=self.physical_event_dwell_steps,
+        )
+        update = self._physical_observer.reset(self._physical_event_sample())
+        self._physical_event_diagnostics = dict(update.diagnostics)
 
     def record_storage(self, item_id: str, level: str) -> bool:
         committed = record_storage(self._semantic_state, item_id, level)
@@ -244,7 +320,14 @@ class WR03StoreAndRetrieveRememberedCan(Kitchen):
         return committed
 
     def record_storage_door_closed(self, level: str) -> bool:
-        return record_storage_door_closed(self._semantic_state, level)
+        resolved = validate_level(level)
+        # The per-step physical observer can see the completed close on the
+        # final action before the expert stage reports that same event. Treat
+        # this same-level acknowledgement as idempotent, including after the
+        # observer has atomically latched the memory barrier.
+        if resolved in self._semantic_state.closed_levels_after_storage:
+            return True
+        return record_storage_door_closed(self._semantic_state, resolved)
 
     def latch_storage_hidden(self) -> bool:
         stored = self.stored_level
@@ -365,6 +448,46 @@ class WR03StoreAndRetrieveRememberedCan(Kitchen):
         self.sim.data.set_joint_qpos(obj.joints[0], updated)
         self.sim.forward()
 
+    # Action-only stepping ----------------------------------------------
+
+    def step(self, action: Any):
+        # The action is passed through byte-for-byte (modulo the base class'
+        # normal ndarray conversion).  WR-03 deliberately has no attachment,
+        # pose following, collision masking, velocity reset, or command rewrite.
+        result = super().step(action)
+        self._update_task_state()
+        return result
+
+    def update_state(self) -> None:
+        super().update_state()
+        self._update_task_state()
+
+    # Physical event observation ---------------------------------------
+
+    def _update_task_state(self) -> None:
+        observer = self._physical_observer
+        if observer is None:
+            return
+        update = observer.observe(self._physical_event_sample())
+        self._physical_event_diagnostics = {
+            **dict(update.diagnostics),
+            "last_step": int(update.step_id),
+            "last_events": list(update.semantic_events),
+            "duplicate_step": bool(update.duplicate_step),
+        }
+
+    def _physical_event_sample(self) -> PhysicalSample:
+        physical = self.physical_state()
+        return PhysicalSample(
+            step_id=int(getattr(self, "timestep", 0)),
+            can_in_lower=physical.can_in_lower,
+            can_in_upper=physical.can_in_upper,
+            lower_door_closed=physical.lower_door_closed,
+            upper_door_closed=physical.upper_door_closed,
+            lower_door_open=self.is_door_open("lower"),
+            upper_door_open=self.is_door_open("upper"),
+        )
+
     # Metadata and final predicate --------------------------------------
 
     def get_ep_meta(self) -> dict[str, Any]:
@@ -380,13 +503,29 @@ class WR03StoreAndRetrieveRememberedCan(Kitchen):
         return metadata
 
     def _check_success(self) -> bool:
+        self._update_task_state()
         return evaluate_success(self._semantic_state, self.physical_state()).success
 
     def task_diagnostics(self) -> dict[str, Any]:
+        self._update_task_state()
         physical = self.physical_state()
         report = evaluate_success(self._semantic_state, physical)
         return {
             "success": report.success,
+            "terminal": bool(
+                report.success
+                or self._semantic_state.protocol_violation
+                or self._semantic_state.wrong_retrieval_level_opened
+            ),
+            "failure_code": (
+                "protocol_violation"
+                if self._semantic_state.protocol_violation
+                else (
+                    "wrong_retrieval_door"
+                    if self._semantic_state.wrong_retrieval_level_opened
+                    else None
+                )
+            ),
             "success_checks": report.checks(),
             "storage": {
                 "stored_level": self.stored_level,
@@ -412,9 +551,14 @@ class WR03StoreAndRetrieveRememberedCan(Kitchen):
             "physical": {
                 "can_in_lower": physical.can_in_lower,
                 "can_in_upper": physical.can_in_upper,
+                "can_world_position": self.get_object_world_position(CAN_ID)
+                .astype(float)
+                .tolist(),
                 "lower_door_closed": physical.lower_door_closed,
                 "upper_door_closed": physical.upper_door_closed,
             },
+            "physical_events": dict(self._physical_event_diagnostics),
+            "execution_mode": "action_only_physics",
         }
 
 

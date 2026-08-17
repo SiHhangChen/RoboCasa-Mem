@@ -43,9 +43,6 @@ def build_stage_handlers(
         if not controller.runtime_config.execute:
             return _dry("pick_colored_item", str(target))
         mode = str(kwargs.pop("mode", "manual_side"))
-        disable_collisions = bool(
-            kwargs.pop("disable_collisions_during_transport", True)
-        )
         if mode == "cabinet_front_corridor":
             return retrieve_item_from_cabinet(
                 controller,
@@ -72,7 +69,6 @@ def build_stage_handlers(
                 close_gripper_steps=int(kwargs.pop("close_gripper_steps", 6)),
                 post_close_hold_steps=int(kwargs.pop("post_close_hold_steps", 25)),
                 held_gripper_action=float(kwargs.pop("held_gripper_action", 0.0)),
-                disable_collisions_during_transport=disable_collisions,
             )
         if mode != "manual_side":
             raise ValueError(f"unsupported WR-01 item pick mode: {mode!r}")
@@ -82,7 +78,6 @@ def build_stage_handlers(
             adopt_picked_item(
                 controller,
                 str(target),
-                disable_collisions=disable_collisions,
             )
             if bool(result.get("pass", False))
             else {"pass": False, "reason": "pick_failed"}

@@ -10,7 +10,7 @@ from typing import Any
 
 
 TASK_ID = "WR-03"
-TASK_REVISION = "WR03-v1"
+TASK_REVISION = "WR03-v2"
 PARENT_TASK_ID = "WR-01"
 ENV_NAME = "WR03StoreAndRetrieveRememberedCan"
 DISPLAY_NAME = "Store and retrieve remembered can"

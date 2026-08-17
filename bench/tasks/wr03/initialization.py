@@ -109,6 +109,7 @@ def initialize_episode_state(
     """Install the private demo route while preserving the sampled can pose."""
 
     env.configure_episode(demo_storage_level=episode.demo_storage_level)
+    env.configure_canonical_physics()
     position = np.asarray(env.get_object_world_position(CAN_ID), dtype=float).reshape(-1)
     quat_xyzw = np.asarray(
         env.get_object_world_quaternion_xyzw(CAN_ID), dtype=float
@@ -128,6 +129,7 @@ def initialize_episode_state(
     for level in CABINET_LEVELS:
         env.set_level_door_open_fraction(level, initial_fraction)
     env.sim.forward()
+    env.start_physical_observer()
     obs = env._get_observations(force_update=True)
     return obs, {
         "episode_seed": episode.seed,

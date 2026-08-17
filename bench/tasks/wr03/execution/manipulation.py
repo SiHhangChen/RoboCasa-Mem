@@ -7,12 +7,9 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
-import numpy as np
-
 from bench.execution.manipulation import ManipulationController, ManipulationRuntimeConfig
 from bench.execution.planning import MplibPlannerConfig, PickPlaceConfig
 from bench.execution.planning.mplib_planner import run_mplib_planner_subprocess
-from bench.tasks.wr03.execution.storage import install_held_item_follow_assist
 
 
 @dataclass(frozen=True)
@@ -49,31 +46,22 @@ def build_manipulation_assembly(
         ),
     )
     force_limit = float(gripper_settings.get("force_limit", 10.0))
-    if set(gripper_settings) - {"force_limit"}:
-        unknown = sorted(set(gripper_settings) - {"force_limit"})
+    if set(gripper_settings) - {"force_limit", "pad_friction"}:
+        unknown = sorted(set(gripper_settings) - {"force_limit", "pad_friction"})
         raise ValueError("unknown WR-01 gripper settings: " + ", ".join(unknown))
-    _configure_right_gripper_force_limit(env, force_limit)
-    install_held_item_follow_assist(env, controller)
     return ManipulationAssembly(
         controller=controller,
         planner_settings=planner_settings,
-        gripper_settings={"force_limit": force_limit},
+        gripper_settings={
+            "force_limit": force_limit,
+            "pad_friction": tuple(
+                float(value)
+                for value in gripper_settings.get(
+                    "pad_friction", (2.0, 0.05, 0.0001)
+                )
+            ),
+        },
     )
-
-
-def _configure_right_gripper_force_limit(env: Any, force_limit: float) -> None:
-    """Apply the validated per-finger force cap without changing shared robot assets."""
-
-    if not np.isfinite(force_limit) or force_limit <= 0.0:
-        raise ValueError("WR-01 gripper.force_limit must be positive and finite")
-    gripper = env.robots[0].gripper["right"]
-    for actuator_name in list(gripper.actuators):
-        actuator_id = int(env.sim.model.actuator_name2id(actuator_name))
-        env.sim.model.actuator_forcelimited[actuator_id] = 1
-        env.sim.model.actuator_forcerange[actuator_id] = [
-            -float(force_limit),
-            float(force_limit),
-        ]
 
 
 def _pick_place_config(values: Mapping[str, Any]) -> PickPlaceConfig:

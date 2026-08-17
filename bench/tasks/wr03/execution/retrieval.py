@@ -31,7 +31,6 @@ def retrieve_item_from_cabinet(
     close_gripper_steps: int,
     post_close_hold_steps: int,
     held_gripper_action: float,
-    disable_collisions_during_transport: bool,
 ) -> dict[str, Any]:
     """Approach the live stored item collinearly from the cabinet front and extract it."""
 
@@ -135,7 +134,6 @@ def retrieve_item_from_cabinet(
             adoption = adopt_picked_item(
                 controller,
                 str(item_id),
-                disable_collisions=bool(disable_collisions_during_transport),
             )
             if bool(adoption.get("pass", False)):
                 retreat = _reverse_approach(

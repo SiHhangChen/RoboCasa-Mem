@@ -20,13 +20,21 @@ def _environment(config: Any, scene: Any, plan: Any, resources: Mapping[str, Any
     del scene, resources
     cabinet = dict(config.initial_state.cabinets)
     semantics = dict(config.semantics)
+    manipulation = dict(config.manipulation)
+    gripper = dict(manipulation.get("gripper", {}))
     return {"cabinet_world_xyz": tuple(float(v) for v in cabinet["world_xyz"]),
             "cabinet_yaw_deg": float(cabinet.get("yaw_deg", 0.0)),
             "upper_cabinet_z_offset": float(cabinet["upper_z_offset"]),
             "object_scale": float(config.initial_state.objects.get("object_scale", 0.90)),
             "item_placement_seed": int(plan.placement_pair_seed),
             "final_closed_threshold": float(semantics.get("final_closed_threshold", 0.08)),
-            "cabinet_contains_margin": float(semantics.get("cabinet_contains_margin", 0.04))}
+            "cabinet_contains_margin": float(semantics.get("cabinet_contains_margin", 0.04)),
+            "physical_event_dwell_steps": int(semantics.get("physical_event_dwell_steps", 3)),
+            "gripper_force_limit": float(gripper.get("force_limit", 20.0)),
+            "gripper_pad_friction": tuple(
+                float(value)
+                for value in gripper.get("pad_friction", (2.0, 0.05, 0.0001))
+            )}
 
 
 _ADAPTER = TaskRuntimeAdapter(

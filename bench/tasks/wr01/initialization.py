@@ -112,6 +112,7 @@ def initialize_episode_state(
         item_by_level=episode.item_by_level,
         target_item_id=episode.target_item_id,
     )
+    env.configure_canonical_physics()
     placements: dict[str, Any] = {}
     for item_id in ITEM_IDS:
         position = np.asarray(env.get_object_world_position(item_id), dtype=float).reshape(-1)
@@ -136,6 +137,7 @@ def initialize_episode_state(
     for level in CABINET_LEVELS:
         env.set_level_door_open_fraction(level, initial_fraction if doors_initially_open else 0.0)
     env.sim.forward()
+    env.start_physical_observer()
     obs = env._get_observations(force_update=True)
     return obs, {
         "seed": episode.seed,

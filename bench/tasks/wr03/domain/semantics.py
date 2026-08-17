@@ -90,6 +90,8 @@ def record_storage_door_closed(state: SemanticState, level: str) -> bool:
     """Record a successful physical close only after storage was verified."""
 
     resolved = _level(level)
+    if resolved in state.closed_levels_after_storage:
+        return True
     if state.stored_level is None or state.storage_hidden:
         state.protocol_violation = True
         return False

@@ -89,6 +89,14 @@ def build_navigation_config(
         manual_base_path_yaw_tolerance=float(
             values.pop("manual_base_path_yaw_tolerance", 0.08)
         ),
+        base_profile_v_max=float(values.pop("base_profile_v_max", 0.30)),
+        base_profile_a_max=float(values.pop("base_profile_a_max", 0.45)),
+        base_profile_a_dec=float(values.pop("base_profile_a_dec", 0.45)),
+        base_profile_v_min=float(values.pop("base_profile_v_min", 0.08)),
+        base_profile_w_max=float(values.pop("base_profile_w_max", 0.50)),
+        base_profile_alpha_max=float(values.pop("base_profile_alpha_max", 0.80)),
+        base_profile_alpha_dec=float(values.pop("base_profile_alpha_dec", 0.80)),
+        base_profile_w_min=float(values.pop("base_profile_w_min", 0.08)),
         use_station_astar_paths=bool(values.pop("use_station_astar_paths", False)),
         station_nav_use_docking=bool(values.pop("station_nav_use_docking", False)),
         station_nav_dock_standoff=float(values.pop("station_nav_dock_standoff", 0.0)),

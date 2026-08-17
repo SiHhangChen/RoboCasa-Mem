@@ -74,6 +74,16 @@ navigation:
   manual_base_path_start_index: 0
   manual_base_path_xy_tolerance: 0.04
   manual_base_path_yaw_tolerance: 0.08
+  # Carrying motion is acceleration-limited so the physical finger contacts,
+  # rather than an attachment, retain the can during base transport.
+  base_profile_v_max: 0.45
+  base_profile_a_max: 0.80
+  base_profile_a_dec: 0.80
+  base_profile_v_min: 0.12
+  base_profile_w_max: 0.70
+  base_profile_alpha_max: 1.20
+  base_profile_alpha_dec: 1.20
+  base_profile_w_min: 0.10
   use_station_astar_paths: false
   station_nav_use_docking: false
   station_nav_dock_standoff: 0.0
@@ -81,7 +91,11 @@ navigation:
 
 manipulation:
   gripper:
-    force_limit: 10.0
+    # Use the Panda gripper asset's rated per-finger force limit.
+    force_limit: 20.0
+    # Physical contact parameters for the rubber-coated finger contact surfaces.
+    # No attachment or collision masking is used; the can remains a free body.
+    pad_friction: [2.0, 0.05, 0.0001]
   pick_place:
     orientation_mode: object-y-topdown
     mug_orientation_mode: mug-body-side
@@ -106,7 +120,9 @@ manipulation:
     orientation_threshold_deg: 12.0
     qpos_threshold: 0.24
     open_steps: 10
-    close_steps: 3
+    # PandaGripper integrates binary commands by 0.2 per control step. Starting
+    # fully open therefore needs 10 positive steps to reach the closed target.
+    close_steps: 10
     release_steps: 10
     release_settle_steps: 4
   static_scene:
@@ -127,8 +143,7 @@ operations:
     manual_grasp_pregrasp_distance: 0.075
     lift_height: 0.025
     post_close_hold_steps: 8
-    held_gripper_action: 1.0
-    disable_collisions_during_transport: true
+    held_gripper_action: 0.0
   storage_place:
     insertion_plan_attempts: 3
     release_settle_steps: 4
@@ -140,10 +155,9 @@ operations:
     grasp_z_offset: 0.010
     grasp_lateral_offset: -0.0067
     grasp_inward_offset: 0.0042
-    close_gripper_steps: 6
+    close_gripper_steps: 10
     post_close_hold_steps: 12
-    held_gripper_action: 1.0
-    disable_collisions_during_transport: false
+    held_gripper_action: 0.0
   door:
     open_fraction: 1.0
     opened_threshold: 0.70
@@ -165,6 +179,7 @@ operations:
 semantics:
   cabinet_contains_margin: 0.04
   final_closed_threshold: 0.08
+  physical_event_dwell_steps: 3
 
 recording:
   record_depth: true

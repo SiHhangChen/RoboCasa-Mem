@@ -174,6 +174,10 @@ def resolve_task_options(task_options: Mapping[str, Any] | None) -> dict[str, An
 
 
 def _pick_metadata(values: Mapping[str, Any], *, default_lift: float) -> dict[str, Any]:
+    if bool(values.get("disable_collisions_during_transport", False)):
+        raise ValueError(
+            "WR-03 is action-only; collision masking during transport is forbidden"
+        )
     return {
         "orientation_mode": str(values.get("orientation_mode", "object-y-topdown")),
         "pregrasp_height": float(values.get("pregrasp_height", 0.15)),
@@ -186,7 +190,6 @@ def _pick_metadata(values: Mapping[str, Any], *, default_lift: float) -> dict[st
         "manual_grasp_pregrasp_distance": float(values.get("manual_grasp_pregrasp_distance", 0.075)),
         "post_close_hold_steps": int(values.get("post_close_hold_steps", 25)),
         "held_gripper_action": float(values.get("held_gripper_action", 0.0)),
-        "disable_collisions_during_transport": bool(values.get("disable_collisions_during_transport", True)),
     }
 
 
