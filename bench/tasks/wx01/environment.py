@@ -21,7 +21,7 @@ from bench.tasks.wx01.prompts import resolve_prompt_spec
 
 
 CLEANING_TOOL_XML = f"{assets_root}/objects/objaverse/sponge/sponge_0/model.xml"
-BLOCKING_OBJECT_XML = f"{assets_root}/objects/objaverse/cup/cup_2/model.xml"
+BLOCKING_OBJECT_XML = f"{assets_root}/objects/objaverse/cup/cup_5/model.xml"
 
 
 class WX01ReturnObjectToOriginalPlace(Kitchen):
@@ -38,7 +38,7 @@ class WX01ReturnObjectToOriginalPlace(Kitchen):
         minimum_contact_count: int = 2,
         minimum_wipe_sweep: float = 0.07,
         release_distance: float = 0.15,
-        blocking_object_scale: float = 0.85,
+        blocking_object_scale: float = 0.9,
         blocking_object_placement_size: tuple[float, float] = (0.16, 0.20),
         blocking_object_placement_pos: tuple[float, float] = (1.0, 1.0),
         blocking_object_rotation: tuple[float, float] = (0.0, 0.0),

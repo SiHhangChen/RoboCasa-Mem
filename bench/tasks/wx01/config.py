@@ -179,6 +179,7 @@ def load_task_config(path: str | Path = DEFAULT_TASK_CONFIG_FILE) -> TaskConfig:
             "manual_base_path",
             "planner_script",
             "cleaning_tool_grasp_pose",
+            "blocking_cup_grasp_candidates",
         },
         "resource fields",
     )
@@ -326,8 +327,7 @@ def resolve_action_config(
         operations,
         "blocking_pick",
         {
-            "orientation_mode",
-            "grasp_clearance",
+            "grasp_strategy",
             "lift_height",
             "blocking_object_max_base_x",
         },
@@ -340,6 +340,22 @@ def resolve_action_config(
             "retreat_height",
             "retreat_x",
             "retreat_y",
+            "placement_object_upright",
+            "placement_approach_angles_deg",
+            "placement_entry_standoff",
+            "placement_entry_z_offset",
+            "placement_exit_standoff",
+            "placement_exit_z_offset",
+            "post_release_clearance_distance",
+            "post_release_clearance_z_offset",
+            "entry_settle_steps",
+            "place_settle_steps",
+            "clearance_settle_steps",
+            "retreat_settle_steps",
+            "require_pre_release_check",
+            "pre_release_xy_tolerance",
+            "pre_release_z_tolerance",
+            "pre_release_upright_threshold_deg",
             "target_max_base_x",
         },
     )
@@ -399,6 +415,7 @@ def _validate_resources(config: TaskConfig) -> None:
         "manual_base_path",
         "planner_script",
         "cleaning_tool_grasp_pose",
+        "blocking_cup_grasp_candidates",
     }
     missing = required - set(config.resources)
     if missing:

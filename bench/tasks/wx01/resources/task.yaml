@@ -18,7 +18,7 @@ scene:
   layout_id: 38
   style_id: 38
   scene_seed: 0
-  blocking_object_scale: 0.85
+  blocking_object_scale: 0.9
   blocking_object_placement_size: [0.16, 0.20]
   blocking_object_placement_pos: [1.0, 1.0]
   blocking_object_rotation_deg: [0.0, 0.0]
@@ -86,6 +86,7 @@ resources:
   manual_base_path: navigation/manual_base_path_layout38_style38_seed0.json
   planner_script: ../../../execution/planning/mplib_planner.py
   cleaning_tool_grasp_pose: poses/cleaning_tool_grasp.json
+  blocking_cup_grasp_candidates: poses/blocking_cup_single_wall_grasp_candidates.json
 
 navigation:
   kinematic_base_navigation: false
@@ -180,15 +181,30 @@ operations:
     settle_steps: 10
     gripper_action: -1.0
   blocking_pick:
-    orientation_mode: object-y-topdown
-    grasp_clearance: -0.03
-    lift_height: 0.08
+    grasp_strategy: single-wall-topdown
+    lift_height: 0.12
     blocking_object_max_base_x: 0.66
   blocking_origin_place:
     place_height: 0.0
-    retreat_height: 0.08
-    retreat_x: -0.04
-    retreat_y: -0.04
+    placement_object_upright: true
+    placement_approach_angles_deg: [0.0]
+    placement_entry_standoff: 0.0
+    placement_entry_z_offset: 0.12
+    placement_exit_standoff: 0.0
+    placement_exit_z_offset: 0.18
+    post_release_clearance_distance: 0.0
+    post_release_clearance_z_offset: 0.12
+    retreat_height: 0.18
+    retreat_x: 0.0
+    retreat_y: 0.0
+    entry_settle_steps: 4
+    place_settle_steps: 6
+    clearance_settle_steps: 4
+    retreat_settle_steps: 2
+    require_pre_release_check: true
+    pre_release_xy_tolerance: 0.015
+    pre_release_z_tolerance: 0.03
+    pre_release_upright_threshold_deg: 15.0
     target_max_base_x: 0.60
   handlers:
     dry_run_wipe_semantic_proxy: true

@@ -58,7 +58,7 @@ def resolve_scene_config(*, seed: int, env_split: str, **values: Any) -> SceneCo
         style_id=38 if fixed_scene else _optional_int(values.get("style_id")),
         scene_seed=int(values.get("scene_seed", 0)) if fixed_scene else int(seed),
         fixed_scene=fixed_scene,
-        blocking_object_scale=float(values.get("blocking_object_scale", 0.85)),
+        blocking_object_scale=float(values.get("blocking_object_scale", 0.9)),
         blocking_object_placement_size=_pair(
             values.get("blocking_object_placement_size", (0.16, 0.20)),
             "blocking_object_placement_size",

@@ -10,13 +10,12 @@ def resolve_prompt_spec(*, variant: str) -> PromptSpec:
         raise ValueError("WX-01 currently supports variant='memory' only")
     return PromptSpec(
         initial_prompt=(
-            "The cup has been moved away from its remembered dining-table spot. "
-            "Clean that spot and return the cup to it."
+            "The dining-table spot is dirty. Wipe it clean with the sponge, "
+            "then place the cup onto the cleaned spot."
         ),
         policy_prompt=(
-            "Start with the sponge already grasped and the cup displaced. "
-            "Wipe the remembered cup spot, put down the sponge, then return "
-            "the cup to that original spot."
+            "Start with the sponge already grasped. Wipe the dirty dining-table "
+            "spot, then place the cup onto the cleaned spot."
         ),
         variant=variant,
     )

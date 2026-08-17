@@ -25,6 +25,7 @@ def build_operation_handlers(descriptor: Any, env: Any, observation: dict[str, A
     )
     manipulation.controller.pick_payload_selector = make_blocking_pick_payload_selector(
         manipulation.controller,
+        manual_candidates_file=descriptor.resources["blocking_cup_grasp_candidates"],
         maximum_base_x=float(descriptor.actions.pick_proxy_settings.get("blocking_object_max_base_x", 0.66)),
         dry_run_only=bool(descriptor.actions.pick_proxy_settings.get("dry_run_only", True)),
     )

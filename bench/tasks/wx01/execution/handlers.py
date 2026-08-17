@@ -108,6 +108,17 @@ def place_at_accessible_target(
         object_name,
         target_pos_world=adjusted,
         target_name=target_name or object_name,
+        pre_release_check=_make_blocking_origin_pre_release_check(
+            controller,
+            object_name=object_name,
+            intended_target=intended[:3],
+            enabled=bool(kwargs.pop("require_pre_release_check", False)),
+            xy_tolerance=float(kwargs.pop("pre_release_xy_tolerance", 0.015)),
+            z_tolerance=float(kwargs.pop("pre_release_z_tolerance", 0.03)),
+            upright_threshold_deg=float(
+                kwargs.pop("pre_release_upright_threshold_deg", 15.0)
+            ),
+        ),
         **kwargs,
     )
     result.update(
@@ -122,6 +133,71 @@ def place_at_accessible_target(
         }
     )
     return result
+
+
+def _make_blocking_origin_pre_release_check(
+    controller: Any,
+    *,
+    object_name: str,
+    intended_target: np.ndarray,
+    enabled: bool,
+    xy_tolerance: float,
+    z_tolerance: float,
+    upright_threshold_deg: float,
+) -> Callable[[], dict[str, Any]] | None:
+    """Prevent release until the single-wall-held cup is aligned and upright."""
+
+    if not enabled or object_name != "blocking_object":
+        return None
+    if xy_tolerance <= 0.0 or z_tolerance <= 0.0:
+        raise ValueError("WX-01 pre-release tolerances must be positive")
+    if not 0.0 < upright_threshold_deg < 90.0:
+        raise ValueError("WX-01 upright threshold must be in (0, 90) degrees")
+
+    def check() -> dict[str, Any]:
+        if not bool(controller.runtime_config.execute):
+            return {
+                "pass": True,
+                "deferred_to_execute": True,
+                "reason": "dry_run_physical_check_deferred",
+            }
+        env = controller.env
+        controller.refresh_obs()
+        position = np.asarray(
+            env.sim.data.body_xpos[env.obj_body_id[object_name]], dtype=float
+        ).reshape(3)
+        rotation = np.asarray(
+            env.sim.data.body_xmat[env.obj_body_id[object_name]], dtype=float
+        ).reshape(3, 3)
+        xy_error = float(np.linalg.norm(position[:2] - intended_target[:2]))
+        z_error = float(abs(position[2] - intended_target[2]))
+        upright_axis = float(rotation[2, 2])
+        upright_minimum = float(np.cos(np.deg2rad(upright_threshold_deg)))
+        checks = {
+            "blocking_cup_xy_at_origin": bool(xy_error <= xy_tolerance),
+            "blocking_cup_near_origin_height": bool(z_error <= z_tolerance),
+            "blocking_cup_upright": bool(upright_axis >= upright_minimum),
+        }
+        return {
+            "pass": bool(all(checks.values())),
+            "reason": (
+                None
+                if all(checks.values())
+                else "blocking_cup_origin_pre_release_check_failed"
+            ),
+            "checks": checks,
+            "object_position_world": position.tolist(),
+            "intended_target_world": intended_target.tolist(),
+            "xy_error_m": xy_error,
+            "xy_tolerance_m": xy_tolerance,
+            "z_error_m": z_error,
+            "z_tolerance_m": z_tolerance,
+            "upright_axis": upright_axis,
+            "upright_minimum": upright_minimum,
+            "upright_threshold_deg": upright_threshold_deg,
+        }
+
+    return check
 
 
 def wipe_remembered_area(
