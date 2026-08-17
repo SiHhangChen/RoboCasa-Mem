@@ -28,6 +28,7 @@ from bench.tasks.wr04.domain.semantics import (
     record_return_completion,
     record_transport_posture_normalized,
 )
+from bench.tasks.wr04.physical_events import PhysicalSample, WR04PhysicalObserver
 
 
 STORAGE_FIXTURE_NAME = "opencabinet_1_main_group_1"
@@ -69,7 +70,8 @@ class WR04ReturnSingleObjectToOriginalLevel(Kitchen):
         sink_stage_threshold: float = 0.20,
         return_region_xy_margin: float = 0.04,
         return_region_height_tolerance: float = 0.10,
-        release_distance: float = 0.15,
+        physical_event_dwell_steps: int = 3,
+        terminal_verification_steps: int = 100,
         **kwargs: Any,
     ) -> None:
         self.demo_original_level = validate_level(original_level)
@@ -80,8 +82,15 @@ class WR04ReturnSingleObjectToOriginalLevel(Kitchen):
         self.sink_stage_threshold = float(sink_stage_threshold)
         self.return_region_xy_margin = float(return_region_xy_margin)
         self.return_region_height_tolerance = float(return_region_height_tolerance)
-        self.release_distance = float(release_distance)
+        self.physical_event_dwell_steps = int(physical_event_dwell_steps)
+        self.terminal_verification_steps = int(terminal_verification_steps)
+        if self.physical_event_dwell_steps < 1:
+            raise ValueError("WR-04 physical-event dwell must be positive")
+        if self.terminal_verification_steps < 1:
+            raise ValueError("WR-04 terminal verification must be positive")
         self._semantic_state = SemanticState()
+        self._physical_observer: WR04PhysicalObserver | None = None
+        self._physical_event_diagnostics: dict[str, Any] = {}
         self._object_center_surface_offset_z = 0.0
         kwargs.setdefault("obj_registries", ("objaverse", "aigen", "lightwheel"))
         super().__init__(*args, **kwargs)
@@ -153,6 +162,9 @@ class WR04ReturnSingleObjectToOriginalLevel(Kitchen):
         self.object_placements = placements
 
     def _setup_scene(self) -> None:
+        # A reset may reuse the same environment instance.  Do not let the
+        # previous episode's observer consume partially reset physics.
+        self._physical_observer = None
         super()._setup_scene()
         self._semantic_state = SemanticState()
         placement = getattr(self, "object_placements", {}).get(ITEM_ID)
@@ -185,6 +197,13 @@ class WR04ReturnSingleObjectToOriginalLevel(Kitchen):
                 f"sampled_pos={sampled_pos.tolist()}, "
                 f"surface_offset={self._object_center_surface_offset_z}"
             )
+        self._physical_observer = WR04PhysicalObserver(
+            self._semantic_state,
+            dwell_steps=self.physical_event_dwell_steps,
+            terminal_verification_steps=self.terminal_verification_steps,
+        )
+        update = self._physical_observer.reset(self._physical_event_sample())
+        self._physical_event_diagnostics = dict(update.diagnostics)
         self._sync_diagnostics()
 
     def get_ep_meta(self) -> dict[str, Any]:
@@ -206,6 +225,7 @@ class WR04ReturnSingleObjectToOriginalLevel(Kitchen):
 
     def update_state(self) -> None:
         super().update_state()
+        self._update_task_state()
         self._sync_diagnostics()
 
     def configure_episode(self, *, original_level: str) -> None:
@@ -228,9 +248,7 @@ class WR04ReturnSingleObjectToOriginalLevel(Kitchen):
         return latch_memory_barrier(
             self._semantic_state,
             item_at_fixed_sink=physical.item_at_fixed_sink,
-            item_released=physical.item_released,
             item_outside_shelves=physical.item_outside_shelves,
-            posture_normalized=self._semantic_state.transport_posture_normalized,
         )
 
     def record_return_attempt(self, level: str) -> bool:
@@ -244,7 +262,6 @@ class WR04ReturnSingleObjectToOriginalLevel(Kitchen):
             item_in_original_level=bool(
                 original is not None and self.item_in_level(original) and self._item_supported_by_shelf()
             ),
-            item_released=self.item_released(),
         )
 
     # Physical observation boundary -----------------------------------
@@ -331,16 +348,14 @@ class WR04ReturnSingleObjectToOriginalLevel(Kitchen):
         distance = float(np.linalg.norm(self._obj_pos(ITEM_ID)[:2] - self.sink_stage_pose()[:2]))
         return bool(distance <= self.sink_stage_threshold and supported)
 
-    def item_released(self) -> bool:
-        return bool(OU.gripper_obj_far(self, ITEM_ID, th=self.release_distance))
-
     def _item_supported_by_shelf(self) -> bool:
         level = self._semantic_state.initial_level
         if level is None:
             return False
-        shelf_index = int(
-            self.home_region_placements[validate_level(level)]["shelf_level"]
-        )
+        return self._item_supported_by_level(level)
+
+    def _item_supported_by_level(self, level: str) -> bool:
+        shelf_index = int(self.home_region_placements[validate_level(level)]["shelf_level"])
         # RoboCasa's OpenCabinet does not register its dynamically created
         # level shelves in ``fixture.contact_geoms``.  Check the actual level
         # geom explicitly; the generic fixture-contact helper is therefore
@@ -353,30 +368,63 @@ class WR04ReturnSingleObjectToOriginalLevel(Kitchen):
             item_at_fixed_sink=self.item_at_fixed_sink(),
             item_in_lower=self.item_in_level("shelf_lower"),
             item_in_upper=self.item_in_level("shelf_upper"),
-            item_released=self.item_released(),
-            item_supported_by_shelf=self._item_supported_by_shelf(),
+            item_supported_by_lower=self._item_supported_by_level("shelf_lower"),
+            item_supported_by_upper=self._item_supported_by_level("shelf_upper"),
         )
 
     def _check_success(self) -> bool:
+        self._update_task_state()
         return self._success_report().success
 
     def _success_report(self):
         return evaluate_success(self._semantic_state, self.physical_state())
 
     def task_diagnostics(self) -> dict[str, Any]:
+        self._update_task_state()
         report = self._success_report()
         physical = self.physical_state()
+        violation_reason = self._physical_event_diagnostics.get("violation_reason")
         return {
             "success": report.success,
+            "terminal": bool(report.success or self._semantic_state.protocol_violation),
+            "failure_code": (
+                None
+                if not self._semantic_state.protocol_violation
+                else str(violation_reason or "protocol_violation")
+            ),
             **report.checks(),
             "current_item_position": self._obj_pos(ITEM_ID).astype(float).tolist(),
             "current_item_at_fixed_sink": physical.item_at_fixed_sink,
             "current_item_in_lower": physical.item_in_lower,
             "current_item_in_upper": physical.item_in_upper,
-            "transport_posture_normalized": self._semantic_state.transport_posture_normalized,
             "wrong_return_level_attempted": self._semantic_state.wrong_return_level_attempted,
             "protocol_violation": self._semantic_state.protocol_violation,
+            "stage_regressions": list(self._semantic_state.stage_regressions),
+            "physical_events": dict(self._physical_event_diagnostics),
         }
+
+    def _update_task_state(self) -> None:
+        observer = self._physical_observer
+        if observer is None:
+            return
+        update = observer.observe(self._physical_event_sample())
+        self._physical_event_diagnostics = {
+            **dict(update.diagnostics),
+            "last_step": int(update.step_id),
+            "last_events": list(update.semantic_events),
+            "duplicate_step": bool(update.duplicate_step),
+        }
+
+    def _physical_event_sample(self) -> PhysicalSample:
+        physical = self.physical_state()
+        return PhysicalSample(
+            step_id=int(getattr(self, "timestep", 0)),
+            item_at_fixed_sink=physical.item_at_fixed_sink,
+            item_in_lower=physical.item_in_lower,
+            item_in_upper=physical.item_in_upper,
+            item_supported_by_lower=physical.item_supported_by_lower,
+            item_supported_by_upper=physical.item_supported_by_upper,
+        )
 
     def _sync_diagnostics(self) -> None:
         state = self._semantic_state
@@ -385,6 +433,7 @@ class WR04ReturnSingleObjectToOriginalLevel(Kitchen):
         self.memory_barrier_latched = state.memory_barrier_latched
         self.wrong_return_level_attempted = state.wrong_return_level_attempted
         self.protocol_violation = state.protocol_violation
+        self.stage_regressions = list(state.stage_regressions)
 
     def _home_region_xy_geometry(self, level: str) -> tuple[np.ndarray, np.ndarray]:
         settings = self.home_region_placements[validate_level(level)]

@@ -25,7 +25,8 @@ def _environment(config: Any, scene: Any, plan: Any, resources: Mapping[str, Any
             "sink_stage_threshold": float(semantics.get("sink_stage_threshold", 0.20)),
             "return_region_xy_margin": float(semantics.get("return_region_xy_margin", 0.04)),
             "return_region_height_tolerance": float(semantics.get("return_region_height_tolerance", 0.10)),
-            "release_distance": float(semantics.get("release_distance", 0.15))}
+            "physical_event_dwell_steps": int(semantics.get("physical_event_dwell_steps", 3)),
+            "terminal_verification_steps": int(semantics.get("terminal_verification_steps", 100))}
 
 
 _ADAPTER = TaskRuntimeAdapter(

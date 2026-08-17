@@ -7,7 +7,6 @@ task:
   description: Deliver all three coffees and select the one that received sugar.
   success_conditions:
     - sugar_consumed
-    - sugar_assignment_correct
     - all_cups_ready_before_selection
     - correct_sugared_selection
 
@@ -20,7 +19,7 @@ scene:
   sugar_name: sugar_cube
 
 episode:
-  target_sugared_coffee_id: null
+  sugar_target_mode: unmarked
   delivery_order: null
   max_horizon: 6500
 
@@ -31,7 +30,7 @@ initial_state:
   objects:
     enabled: true
     coffee_initial_z: 0.97748
-    coffee_mug_sliding_friction: 30.0
+    coffee_mug_sliding_friction: 0.95
     coffee_mug_mass_scale: 0.35
     sugar_plate_initial_region_center_xy: [-0.14, -4.76]
     sugar_plate_initial_region_size_xy: [0.0, 0.0]

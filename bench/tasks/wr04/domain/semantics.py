@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from bench.tasks.wr04.domain.contracts import HOME_LEVELS, ITEM_ID
 from bench.tasks.wr04.domain.episode import validate_level
@@ -20,6 +20,7 @@ class SemanticState:
     wrong_return_level_attempted: bool = False
     returned_item_id: str | None = None
     protocol_violation: bool = False
+    stage_regressions: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -27,11 +28,18 @@ class PhysicalState:
     item_at_fixed_sink: bool
     item_in_lower: bool
     item_in_upper: bool
-    item_released: bool
-    item_supported_by_shelf: bool
+    item_supported_by_lower: bool
+    item_supported_by_upper: bool
 
     def item_in_level(self, level: str) -> bool:
         return self.item_in_lower if validate_level(level) == "shelf_lower" else self.item_in_upper
+
+    def item_supported_in_level(self, level: str) -> bool:
+        return (
+            self.item_supported_by_lower
+            if validate_level(level) == "shelf_lower"
+            else self.item_supported_by_upper
+        )
 
     @property
     def item_outside_shelves(self) -> bool:
@@ -49,7 +57,7 @@ class SuccessReport:
     same_item_returned: bool
     item_in_original_level: bool
     item_not_in_other_level: bool
-    item_released: bool
+    no_stage_regression: bool
     no_protocol_violation: bool
 
     @property
@@ -67,7 +75,7 @@ class SuccessReport:
             "same_item_returned": self.same_item_returned,
             "item_in_original_level": self.item_in_original_level,
             "item_not_in_other_level": self.item_not_in_other_level,
-            "item_released": self.item_released,
+            "no_stage_regression": self.no_stage_regression,
             "no_protocol_violation": self.no_protocol_violation,
         }
 
@@ -99,26 +107,58 @@ def record_transport_posture_normalized(
     return True
 
 
+def record_item_removed(
+    state: SemanticState,
+    *,
+    physically_removed: bool,
+) -> bool:
+    """Latch that the item physically left both home shelf regions."""
+
+    if state.item_removed_from_home:
+        return True
+    if not (
+        state.initial_level_physically_verified
+        and physically_removed
+        and not state.protocol_violation
+    ):
+        return False
+    state.item_removed_from_home = True
+    return True
+
+
+def record_sink_stage(
+    state: SemanticState,
+    *,
+    item_at_fixed_sink: bool,
+    item_outside_shelves: bool,
+) -> bool:
+    """Latch physical sink staging independently from later barrier checks."""
+
+    if state.item_staged_at_sink:
+        return True
+    if item_at_fixed_sink and item_outside_shelves:
+        state.item_staged_at_sink = True
+    return state.item_staged_at_sink
+
+
 def latch_memory_barrier(
     state: SemanticState,
     *,
     item_at_fixed_sink: bool,
-    item_released: bool,
     item_outside_shelves: bool,
-    posture_normalized: bool,
 ) -> bool:
+    record_sink_stage(
+        state,
+        item_at_fixed_sink=item_at_fixed_sink,
+        item_outside_shelves=item_outside_shelves,
+    )
     ready = bool(
         state.initial_level_physically_verified
-        and item_at_fixed_sink
-        and item_released
-        and item_outside_shelves
-        and posture_normalized
-        and state.transport_posture_normalized
+        and state.item_removed_from_home
+        and state.item_staged_at_sink
         and not state.protocol_violation
     )
     if ready:
-        state.item_removed_from_home = True
-        state.item_staged_at_sink = True
         state.memory_barrier_latched = True
     return state.memory_barrier_latched
 
@@ -144,7 +184,6 @@ def record_return_completion(
     item_id: str,
     *,
     item_in_original_level: bool,
-    item_released: bool,
 ) -> bool:
     item = str(item_id)
     if item != ITEM_ID:
@@ -155,13 +194,29 @@ def record_return_completion(
         and state.first_return_level == state.initial_level
         and not state.wrong_return_level_attempted
         and item_in_original_level
-        and item_released
         and not state.protocol_violation
     )
     if not valid:
         state.protocol_violation = True
         return False
     state.returned_item_id = item
+    return True
+
+
+def record_stage_regression(state: SemanticState, *, kind: str) -> bool:
+    """Record a regression to an already-completed WR-04 stage.
+
+    Stages must be experienced exactly once: once the item has been returned,
+    taking it back out, or returning to the sink after a return attempt has
+    started, violates monotonic forward progress.  The first occurrence for a
+    given kind is latched and also marks the episode as a protocol violation.
+    """
+
+    resolved = str(kind)
+    if resolved in state.stage_regressions:
+        return False
+    state.stage_regressions.append(resolved)
+    state.protocol_violation = True
     return True
 
 
@@ -184,9 +239,13 @@ def evaluate_success(state: SemanticState, physical: PhysicalState) -> SuccessRe
         ),
         no_wrong_return_level_attempt=not state.wrong_return_level_attempted,
         same_item_returned=state.returned_item_id == ITEM_ID,
-        item_in_original_level=bool(in_original and physical.item_supported_by_shelf),
+        item_in_original_level=bool(
+            original is not None
+            and in_original
+            and physical.item_supported_in_level(original)
+        ),
         item_not_in_other_level=not in_other,
-        item_released=bool(physical.item_released),
+        no_stage_regression=not state.stage_regressions,
         no_protocol_violation=not state.protocol_violation,
     )
 
@@ -203,7 +262,10 @@ __all__ = [
     "evaluate_success",
     "latch_memory_barrier",
     "record_initial_level",
+    "record_item_removed",
     "record_return_attempt",
     "record_return_completion",
+    "record_sink_stage",
+    "record_stage_regression",
     "record_transport_posture_normalized",
 ]

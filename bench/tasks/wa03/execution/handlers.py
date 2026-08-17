@@ -64,11 +64,13 @@ def build_stage_handlers(
     def record_sugar(target: str, **kwargs: Any) -> dict[str, Any]:
         """在糖块物理投递完成后触发加糖语义事件。"""
 
-        del kwargs
+        coffee_id = kwargs.get("coffee_id")
+        if coffee_id is None:
+            raise ValueError("record_sugar_delivery requires coffee_id metadata")
         return apply_sugar_delivery_event(
             controller,
             target,
-            coffee_id=controller.env.target_sugared_coffee_id,
+            coffee_id=str(coffee_id),
             accept=accept_sugar_delivery,
         )
 

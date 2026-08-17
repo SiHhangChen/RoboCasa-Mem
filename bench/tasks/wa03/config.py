@@ -32,6 +32,30 @@ from bench.tasks.wa03.domain.geometry import (
 PACKAGE_ROOT = Path(__file__).resolve().parent
 DEFAULT_TASK_CONFIG_FILE = PACKAGE_ROOT / "resources" / "task.yaml"
 DEFAULT_INITIAL_STATION_ID = "coffee_machine_station"
+SUGAR_TARGET_MODES = frozenset({"unmarked", "marked"})
+
+
+def resolve_task_options(values: Mapping[str, Any] | None) -> dict[str, Any]:
+    """Validate the optional WA-03 marked compatibility mode."""
+
+    options = dict(values or {})
+    _reject_unknown(
+        options,
+        {"sugar_target_mode", "target_sugared_coffee_id"},
+        "WA-03 task options",
+    )
+    resolved: dict[str, Any] = {}
+    if "sugar_target_mode" in options:
+        mode = str(options["sugar_target_mode"]).strip().lower()
+        if mode not in SUGAR_TARGET_MODES:
+            raise ValueError(f"unsupported WA-03 sugar_target_mode: {mode!r}")
+        resolved["sugar_target_mode"] = mode
+    if "target_sugared_coffee_id" in options:
+        target = str(options["target_sugared_coffee_id"])
+        if target not in COFFEE_IDS:
+            raise ValueError(f"invalid WA-03 target coffee id: {target!r}")
+        resolved["target_sugared_coffee_id"] = target
+    return resolved
 
 
 def load_task_config(path: str | Path = DEFAULT_TASK_CONFIG_FILE) -> TaskConfig:

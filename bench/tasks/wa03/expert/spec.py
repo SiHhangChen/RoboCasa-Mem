@@ -18,10 +18,16 @@ def build_expert_plan(inputs: ExpertPlanInputs) -> ExpertPlan:
         raise ValueError(f"WA-03 cannot build a plan for {episode.task_id!r}")
     facts = dict(episode.facts)
     actions = inputs.action_config
-    target = str(facts["target_sugared_coffee_id"])
     delivery_order = tuple(str(value) for value in facts["delivery_order"])
     if len(delivery_order) != 3:
         raise ValueError("WA-03 expert plan requires exactly three coffee deliveries")
+    sugar_target_mode = str(facts.get("sugar_target_mode", "unmarked"))
+    if sugar_target_mode == "marked":
+        sugared = str(facts["target_sugared_coffee_id"])
+    else:
+        # The unmarked task accepts any cup. Sugar the first delivery so the
+        # expert demonstrations remain deterministic for each episode seed.
+        sugared = delivery_order[0]
     slots = dict(facts["final_slot_assignment"])
     sugar = str(getattr(inputs.scene, "sugar_name", "sugar_cube"))
 
@@ -80,21 +86,24 @@ def build_expert_plan(inputs: ExpertPlanInputs) -> ExpertPlan:
                  fallback_if_unreachable=True),
         operate("pick", sugar, name="pick_sugar", metadata=actions.sugar_pick_metadata),
         return_arm(sugar, "return_picked_sugar_to_regular_pose", 1.0),
-        navigate(target, purpose="place", holding=sugar, name="navigate_place_sugar",
+        navigate(sugared, purpose="place", holding=sugar, name="navigate_place_sugar",
                  skip_if_reachable=True, fallback_if_unreachable=True,
                  metadata=actions.sugar_delivery_metadata),
         operate("place", sugar, name="place_sugar",
-                metadata={**dict(actions.sugar_delivery_metadata), "receptacle": target}),
-        operate("record_sugar_delivery", sugar, name="record_sugar_delivery"),
+                metadata={**dict(actions.sugar_delivery_metadata), "receptacle": sugared}),
+        operate("record_sugar_delivery", sugar, name="record_sugar_delivery",
+                metadata={"coffee_id": sugared}),
         return_arm(sugar, "return_after_place_sugar_to_regular_pose", -1.0),
         *delivery_stages,
-        operate("pick", target, name="pick_sugared_coffee_topdown",
+        operate("pick", sugared, name="pick_sugared_coffee_topdown",
                 metadata=actions.final_selection_pick_metadata),
-        operate("verify_transport_hold", target, name="verify_sugared_coffee_held_after_topdown_pick"),
-        operate("select", target, name="select_sugared_coffee"),
+        operate("verify_transport_hold", sugared, name="verify_sugared_coffee_held_after_topdown_pick"),
+        operate("select", sugared, name="select_sugared_coffee"),
     ]
     return finish_plan(episode, stages, metadata={
-        "target_sugared_coffee_id": target,
+        "sugar_target_mode": sugar_target_mode,
+        "target_sugared_coffee_id": facts.get("target_sugared_coffee_id"),
+        "sugared_coffee_id": sugared,
         "delivery_order": list(delivery_order),
         "final_slot_assignment": slots,
         "dining_region_config": dining_region_config_summary(actions.dining_region_config),

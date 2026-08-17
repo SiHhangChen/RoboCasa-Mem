@@ -26,17 +26,22 @@ from bench.tasks.wa03.domain.semantics import (
     latch_all_cups_ready,
     record_selection,
     record_sugar_delivery,
-    set_target,
 )
+from bench.tasks.wa03.evaluation import WA03EvaluationSnapshot, WA03Evaluator
 
 
 COFFEE_MUG_XML = f"{assets_root}/objects/objaverse/cup/cup_2/model.xml"
 SUGAR_PLATE_XML = f"{assets_root}/objects/objaverse/plate/plate_3/model.xml"
 SUGAR_CUBE_XML = f"{assets_root}/objects/lightwheel/sugar_cube/SugarCube003/model.xml"
+COFFEE_MUG_OBJECT_SCALE = (0.75, 0.75, 0.85)
 NORMAL_COFFEE_RGBA = (0.65, 0.45, 0.25, 0.8)
 TARGET_MARKER_RGBA = (0.20, 0.85, 0.25, 0.95)
 OVERHEAD_CABINET_FIXTURES = ("cab_1_left_group", "cab_2_left_group")
 MIN_FINAL_CUP_XY_SEPARATION = 0.10
+SUGAR_RELEASE_DISTANCE = 0.15
+FINAL_SELECTION_MAX_EEF_DISTANCE = 0.18
+FINAL_SELECTION_MIN_LIFT = 0.02
+FINAL_SELECTION_RELEASE_DISTANCE = 0.18
 
 
 class WA03SortSugaredAndUnsugaredCoffee(Kitchen):
@@ -46,6 +51,8 @@ class WA03SortSugaredAndUnsugaredCoffee(Kitchen):
         self,
         minimum_cup_xy_separation: float = MIN_FINAL_CUP_XY_SEPARATION,
         cup_upright_threshold_deg: float = 15.0,
+        sugar_target_mode: str = "unmarked",
+        target_sugared_coffee_id: str | None = None,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -53,7 +60,14 @@ class WA03SortSugaredAndUnsugaredCoffee(Kitchen):
 
         self.minimum_cup_xy_separation = float(minimum_cup_xy_separation)
         self.cup_upright_threshold_deg = float(cup_upright_threshold_deg)
-        self._semantic_state = SemanticState("coffee_A")
+        self._semantic_state = SemanticState(
+            sugar_target_mode=sugar_target_mode,
+            target_sugared_coffee_id=target_sugared_coffee_id,
+        )
+        self._configured_sugar_target_mode = self._semantic_state.sugar_target_mode
+        self._configured_target_sugared_coffee_id = (
+            self._semantic_state.target_sugared_coffee_id
+        )
         super().__init__(*args, **kwargs)
 
     # Scene construction -------------------------------------------------
@@ -123,17 +137,17 @@ class WA03SortSugaredAndUnsugaredCoffee(Kitchen):
             dict(id=FixtureType.DINING_COUNTER, ref=self.stool),
         )
         self.init_robot_base_ref = self.counter
-        refs = self._ep_meta.setdefault("refs", {})
-        self.set_target_sugared_coffee_id(
-            str(refs.get("target_sugared_coffee_id", "coffee_A"))
-        )
 
     def _setup_scene(self) -> None:
         """重置语义状态、餐桌区域、物理缓存和目标视觉标记。"""
 
+        self._last_task_event_timestep = -1
         super()._setup_scene()
         self.coffee_machine._turned_on = False
-        self._semantic_state = SemanticState(self.target_sugared_coffee_id)
+        self._semantic_state = SemanticState(
+            sugar_target_mode=self._configured_sugar_target_mode,
+            target_sugared_coffee_id=self._configured_target_sugared_coffee_id,
+        )
         default_regions = DiningPlacementRegionConfig()
         self.dining_region_config = dining_region_config_summary(default_regions)
         self.dining_regions_by_slot = compute_dining_regions(default_regions)
@@ -148,10 +162,22 @@ class WA03SortSugaredAndUnsugaredCoffee(Kitchen):
             setattr(self, f"{coffee_id}_upright", False)
         self.dining_regions_occupied = False
         self.all_cups_ready = False
-        self.target_marker_visible = True
+        self._selection_ready_positions_by_coffee: dict[str, list[float]] = {}
+        self._selection_armed = False
+        self._physical_event_diagnostics: dict[str, Any] = {
+            "sugar_delivery": None,
+            "cups_ready_latched": False,
+            "cups_ready_released": False,
+            "selection_armed": False,
+            "selection": None,
+        }
+        self._wa03_evaluator: WA03Evaluator | None = None
+        self.target_marker_visible = False
         for coffee_id in COFFEE_IDS:
             self._set_coffee_liquid_visual(coffee_id, visible=True)
-        self._set_target_coffee_marker_visibility(True)
+        self._set_target_coffee_marker_visibility(
+            self.sugar_target_mode == "marked"
+        )
 
     def _get_obj_cfgs(self) -> list[dict[str, Any]]:
         """定义三只同款杯子、糖碟和糖块的 RoboCasa 物品配置。"""
@@ -160,6 +186,7 @@ class WA03SortSugaredAndUnsugaredCoffee(Kitchen):
             dict(
                 name="coffee_A",
                 obj_groups=COFFEE_MUG_XML,
+                object_scale=COFFEE_MUG_OBJECT_SCALE,
                 graspable=True,
                 init_robot_here=True,
                 placement=dict(
@@ -173,6 +200,7 @@ class WA03SortSugaredAndUnsugaredCoffee(Kitchen):
             dict(
                 name="coffee_B",
                 obj_groups=COFFEE_MUG_XML,
+                object_scale=COFFEE_MUG_OBJECT_SCALE,
                 graspable=True,
                 placement=dict(
                     fixture=self.counter,
@@ -185,6 +213,7 @@ class WA03SortSugaredAndUnsugaredCoffee(Kitchen):
             dict(
                 name="coffee_C",
                 obj_groups=COFFEE_MUG_XML,
+                object_scale=COFFEE_MUG_OBJECT_SCALE,
                 graspable=True,
                 placement=dict(
                     fixture=self.counter,
@@ -216,8 +245,14 @@ class WA03SortSugaredAndUnsugaredCoffee(Kitchen):
     # Semantic events ----------------------------------------------------
 
     @property
-    def target_sugared_coffee_id(self) -> str:
-        """返回本 episode 指定的加糖目标杯。"""
+    def sugar_target_mode(self) -> str:
+        """返回当前 episode 使用的 unmarked 或 marked 模式。"""
+
+        return self._semantic_state.sugar_target_mode
+
+    @property
+    def target_sugared_coffee_id(self) -> str | None:
+        """返回 marked 模式的目标杯；unmarked 模式返回 None。"""
 
         return self._semantic_state.target_sugared_coffee_id
 
@@ -253,9 +288,10 @@ class WA03SortSugaredAndUnsugaredCoffee(Kitchen):
 
     @property
     def sugar_assignment_correct(self) -> bool:
-        """返回实际加糖杯是否与 episode 目标一致。"""
+        """返回 marked 目标是否满足；unmarked 模式不施加该约束。"""
 
-        return evaluate_success(self._semantic_state).sugar_assignment_correct
+        value = evaluate_success(self._semantic_state).sugar_assignment_correct
+        return True if value is None else bool(value)
 
     @property
     def correct_sugared_selection(self) -> bool:
@@ -263,21 +299,12 @@ class WA03SortSugaredAndUnsugaredCoffee(Kitchen):
 
         return evaluate_success(self._semantic_state).correct_sugared_selection
 
-    def set_target_sugared_coffee_id(self, coffee_id: str) -> None:
-        """设置加糖目标，并同步 episode metadata 与视觉标记。"""
-
-        set_target(self._semantic_state, coffee_id)
-        self._ep_meta.setdefault("refs", {})["target_sugared_coffee_id"] = coffee_id
-        if getattr(self, "sim", None) is not None:
-            self._set_target_coffee_marker_visibility(True)
-
     def record_sugar_delivery(self, coffee_id: str) -> None:
         """记录糖投递事件，并隐藏糖块和目标提示颜色。"""
 
-        if record_sugar_delivery(self._semantic_state, coffee_id):
-            self._hide_consumed_sugar_cube()
-            self._set_target_coffee_marker_visibility(False)
+        self._commit_sugar_delivery(coffee_id, source="expert_handler")
         self.update_state()
+        self._note_evaluator_event("sugar_delivery")
 
     def record_all_cups_ready_before_selection(self) -> bool:
         """刷新物理状态并锁存三杯已正确放好的历史条件。"""
@@ -293,11 +320,12 @@ class WA03SortSugaredAndUnsugaredCoffee(Kitchen):
 
         record_selection(self._semantic_state, coffee_id)
         self.update_state()
+        self._note_evaluator_event("selection")
 
     # Physical observations ---------------------------------------------
 
     def update_state(self) -> None:
-        """从 MuJoCo 当前状态刷新接触、倾角、区域占用和三杯条件。"""
+        """刷新物理状态，并把已验证的物理变化提交为共享任务事件。"""
 
         super().update_state()
         for coffee_id in COFFEE_IDS:
@@ -309,6 +337,10 @@ class WA03SortSugaredAndUnsugaredCoffee(Kitchen):
             setattr(self, f"{coffee_id}_upright", self._is_cup_upright(coffee_id))
         self.dining_regions_occupied = self._are_all_dining_regions_occupied()
         self.all_cups_ready = self._are_cups_correctly_arranged()
+        step_id = int(getattr(self, "timestep", 0))
+        if step_id > self._last_task_event_timestep:
+            self._update_task_events_from_physics()
+            self._last_task_event_timestep = step_id
 
     def is_coffee_cup_correctly_placed_on_dining_counter(self, coffee_id: str) -> bool:
         """检查指定杯子是否接触餐桌且保持竖直。"""
@@ -386,45 +418,82 @@ class WA03SortSugaredAndUnsugaredCoffee(Kitchen):
         from bench.tasks.wa03.prompts import resolve_prompt_spec
 
         metadata = super().get_ep_meta()
-        prompt = resolve_prompt_spec(variant="memory")
+        prompt = resolve_prompt_spec(
+            sugar_target_mode=self.sugar_target_mode,
+            variant="memory",
+        )
         metadata["lang"] = prompt.policy_prompt
         metadata["initial_prompt"] = prompt.initial_prompt
-        metadata.setdefault("refs", {})["target_sugared_coffee_id"] = (
-            self.target_sugared_coffee_id
-        )
+        if self.target_sugared_coffee_id is not None:
+            metadata.setdefault("refs", {})["target_sugared_coffee_id"] = (
+                self.target_sugared_coffee_id
+            )
         return metadata
 
     # Authoritative task result -----------------------------------------
 
     def _check_success(self) -> bool:
-        """刷新状态并委托语义层给出唯一最终成功结果。"""
+        """Use the attached evaluator after runtime initialization."""
 
+        evaluator = self._wa03_evaluator
+        if evaluator is not None:
+            return evaluator.observe(self.evaluation_snapshot()).success
         self.update_state()
         return evaluate_success(self._semantic_state).success
 
     def task_diagnostics(self) -> dict[str, object]:
-        """输出成功条件、杯子物理状态、区域占用和最终选择诊断。"""
+        """Return evaluator diagnostics, with a construction-time fallback."""
+
+        snapshot = self.evaluation_snapshot()
+        evaluator = self._wa03_evaluator
+        if evaluator is not None:
+            return evaluator.observe(snapshot).to_diagnostics()
+        report = evaluate_success(self._semantic_state)
+        return {
+            **dict(snapshot.details),
+            "success": report.success,
+            "terminal": report.success,
+            "failure_code": None,
+            "success_checks": report.checks(),
+        }
+
+    def evaluation_snapshot(self) -> WA03EvaluationSnapshot:
+        """Expose raw physical and detected-event facts to the evaluator."""
 
         self.update_state()
         report = evaluate_success(self._semantic_state)
         occupancy = self._dining_region_occupancy()
-        return {
-            "success": report.success,
-            "success_checks": report.checks(),
+        slot_by_coffee = {
+            coffee_id: next(
+                (slot for slot, values in occupancy.items() if coffee_id in values),
+                None,
+            )
+            for coffee_id in COFFEE_IDS
+        }
+        on_counter = {
+            coffee_id: bool(
+                getattr(self, f"{coffee_id}_on_dining_counter", False)
+            )
+            for coffee_id in COFFEE_IDS
+        }
+        upright = {
+            coffee_id: bool(getattr(self, f"{coffee_id}_upright", False))
+            for coffee_id in COFFEE_IDS
+        }
+        details: dict[str, object] = {
             "sugar": {
-                "consumed": self.sugar_consumed,
+                "target_mode": self.sugar_target_mode,
                 "target_coffee_id": self.target_sugared_coffee_id,
+                "consumed": self.sugar_consumed,
                 "sugared_coffee_id": self.sugared_coffee_id,
                 "unsugared_coffee_ids": list(self.unsugared_coffee_ids),
                 "assignment_correct": report.sugar_assignment_correct,
             },
             **{
                 coffee_id: {
-                    "on_dining_counter": bool(
-                        getattr(self, f"{coffee_id}_on_dining_counter", False)
-                    ),
+                    "on_dining_counter": on_counter[coffee_id],
                     "tilt_degrees": self._cup_tilt_degrees(coffee_id),
-                    "upright": bool(getattr(self, f"{coffee_id}_upright", False)),
+                    "upright": upright[coffee_id],
                     "dining_regions": [
                         slot for slot, values in occupancy.items() if coffee_id in values
                     ],
@@ -437,7 +506,7 @@ class WA03SortSugaredAndUnsugaredCoffee(Kitchen):
                 "separate_regions_occupied": bool(self.dining_regions_occupied),
                 "all_ready": bool(self.all_cups_ready),
                 "currently_all_ready": bool(self.all_cups_ready),
-                "all_ready_before_selection": self.all_cups_ready_before_selection,
+                "together_before_selection": self.all_cups_ready_before_selection,
             },
             "dining_placement": {
                 "region_config": dict(self.dining_region_config),
@@ -450,9 +519,175 @@ class WA03SortSugaredAndUnsugaredCoffee(Kitchen):
                 "selected_coffee_id": self.selected_sugared_coffee_id,
                 "correct": report.correct_sugared_selection,
             },
+            "physical_events": {
+                **dict(self._physical_event_diagnostics),
+                "selection_ready_positions_by_coffee": dict(
+                    self._selection_ready_positions_by_coffee
+                ),
+            },
         }
+        return WA03EvaluationSnapshot(
+            step_id=int(getattr(self, "timestep", 0)),
+            sugar_target_mode=self.sugar_target_mode,
+            target_sugared_coffee_id=self.target_sugared_coffee_id,
+            sugar_delivery_coffee_id=self.sugared_coffee_id,
+            coffee_on_dining_counter=on_counter,
+            coffee_upright=upright,
+            coffee_in_dining_region=slot_by_coffee,
+            selected_coffee_id=self.selected_sugared_coffee_id,
+            details=details,
+        )
 
     # Private physical and visual helpers -------------------------------
+
+    def _update_task_events_from_physics(self) -> None:
+        """为 expert 和纯动作重放共同锁存可由物理状态验证的事件。"""
+
+        delivered_to = self._physically_delivered_sugar_coffee_id()
+        if delivered_to is not None:
+            self._commit_sugar_delivery(delivered_to, source="physical_detection")
+
+        just_latched = False
+        if self.sugar_consumed and self.all_cups_ready:
+            was_latched = self.all_cups_ready_before_selection
+            latch_all_cups_ready(self._semantic_state, currently_ready=True)
+            just_latched = not was_latched and self.all_cups_ready_before_selection
+            if just_latched:
+                self._selection_ready_positions_by_coffee = {
+                    coffee_id: self.get_object_world_position(coffee_id)
+                    .astype(float)
+                    .tolist()
+                    for coffee_id in COFFEE_IDS
+                }
+                self._physical_event_diagnostics["cups_ready_latched"] = True
+
+        if not self.all_cups_ready_before_selection:
+            return
+        if self.selected_sugared_coffee_id is not None:
+            return
+
+        if not self._selection_armed:
+            if (
+                just_latched
+                or not self.all_cups_ready
+                or not self._are_all_cups_released_for_selection()
+            ):
+                return
+            self._selection_armed = True
+            self._physical_event_diagnostics["cups_ready_released"] = True
+            self._physical_event_diagnostics["selection_armed"] = True
+            return
+
+        selected = self._physically_selected_coffee_id()
+        if selected is not None:
+            record_selection(self._semantic_state, selected)
+            self._physical_event_diagnostics["selection"] = {
+                "coffee_id": selected,
+                "source": "physical_detection",
+            }
+
+    def _commit_sugar_delivery(self, coffee_id: str, *, source: str) -> bool:
+        """提交一次投糖事件，并撤销目标杯的临时视觉提示。"""
+
+        self._validate_coffee_id(coffee_id)
+        if not record_sugar_delivery(self._semantic_state, coffee_id):
+            return False
+        self._physical_event_diagnostics["sugar_delivery"] = {
+            "coffee_id": coffee_id,
+            "source": str(source),
+        }
+        self._hide_consumed_sugar_cube()
+        if self.sugar_target_mode == "marked":
+            self._set_target_coffee_marker_visibility(False)
+        return True
+
+    def _note_evaluator_event(self, name: str) -> None:
+        """在专家手动提交事件后推进 evaluator,使步骤级诊断立即可用。
+
+        学习策略复用同一 evaluator,其事件经 ``update_state`` 里的物理检测
+        触发;此处仅补上专家执行路径在事件提交时缺失的 observe 推进。
+        """
+
+        evaluator = self._wa03_evaluator
+        if evaluator is not None:
+            evaluator.observe(self.evaluation_snapshot())
+
+    def _physically_delivered_sugar_coffee_id(self) -> str | None:
+        """返回唯一包含已释放糖块的杯子，否则不产生投糖事件。"""
+
+        if self.sugar_consumed:
+            return None
+        if not OU.gripper_obj_far(self, "sugar_cube", th=SUGAR_RELEASE_DISTANCE):
+            return None
+        containing = [
+            coffee_id
+            for coffee_id in COFFEE_IDS
+            if OU.check_obj_in_receptacle(self, "sugar_cube", coffee_id)
+        ]
+        return containing[0] if len(containing) == 1 else None
+
+    def _physically_selected_coffee_id(self) -> str | None:
+        """检测三杯就位后第一次被可靠抓持并抬起的唯一杯子。"""
+
+        selected = [
+            coffee_id
+            for coffee_id in COFFEE_IDS
+            if self._is_coffee_held_after_ready(coffee_id)
+        ]
+        return selected[0] if len(selected) == 1 else None
+
+    def _are_all_cups_released_for_selection(self) -> bool:
+        """确认夹爪已离开全部三杯，后续抓取才可视为最终选择。"""
+
+        return all(
+            OU.gripper_obj_far(
+                self,
+                coffee_id,
+                th=FINAL_SELECTION_RELEASE_DISTANCE,
+            )
+            for coffee_id in COFFEE_IDS
+        )
+
+    def _is_coffee_held_after_ready(self, coffee_id: str) -> bool:
+        """要求杯子被夹爪持有，且已离开就位表面或产生明确抬升。"""
+
+        ready_position = self._selection_ready_positions_by_coffee.get(coffee_id)
+        if ready_position is None:
+            return False
+        object_position = self.get_object_world_position(coffee_id)
+        end_effector_position = np.asarray(
+            self.sim.data.site_xpos[self.robots[0].eef_site_id["right"]],
+            dtype=float,
+        )
+        near_end_effector = bool(
+            np.linalg.norm(object_position - end_effector_position)
+            <= FINAL_SELECTION_MAX_EEF_DISTANCE
+        )
+        try:
+            gripper_contact = bool(
+                self.check_contact(
+                    self.robots[0].gripper["right"],
+                    self.objects[coffee_id],
+                )
+            )
+        except Exception:
+            gripper_contact = False
+        try:
+            grasped = bool(OU.check_obj_grasped(self, coffee_id, threshold=0.6))
+        except Exception:
+            grasped = False
+        lifted = bool(
+            object_position[2]
+            >= float(ready_position[2]) + FINAL_SELECTION_MIN_LIFT
+        )
+        left_dining_surface = not bool(
+            getattr(self, f"{coffee_id}_on_dining_counter", False)
+        )
+        return bool(
+            near_end_effector
+            and (gripper_contact or grasped)
+            and (lifted or left_dining_surface)
+        )
 
     def _is_cup_on_dining_counter(self, coffee_id: str) -> bool:
         """检查杯子几何体当前是否与餐桌 fixture 接触。"""
@@ -496,7 +731,7 @@ class WA03SortSugaredAndUnsugaredCoffee(Kitchen):
         )
 
     def _are_cups_correctly_arranged(self) -> bool:
-        """综合接触、竖直、分区和最小两两间距判断当前三杯就位。"""
+        """判断三杯是否分别进入独立区域、接触餐桌并保持直立。"""
 
         return bool(
             all(
@@ -504,8 +739,6 @@ class WA03SortSugaredAndUnsugaredCoffee(Kitchen):
                 for coffee_id in COFFEE_IDS
             )
             and self._are_all_dining_regions_occupied()
-            and min(self._cup_pairwise_xy_distances().values())
-            >= self.minimum_cup_xy_separation
         )
 
     def _cup_pairwise_xy_distances(self) -> dict[str, float]:
@@ -532,13 +765,18 @@ class WA03SortSugaredAndUnsugaredCoffee(Kitchen):
         self.sim.forward()
 
     def _set_target_coffee_marker_visibility(self, visible: bool) -> None:
-        """控制目标杯提示颜色，并为非目标杯恢复普通颜色。"""
+        """仅在 marked 兼容模式下显示目标杯提示颜色。"""
 
-        self.target_marker_visible = bool(visible)
+        show_marker = bool(
+            visible
+            and self.sugar_target_mode == "marked"
+            and self.target_sugared_coffee_id is not None
+        )
+        self.target_marker_visible = show_marker
         for coffee_id in COFFEE_IDS:
             rgba = (
                 TARGET_MARKER_RGBA
-                if visible and coffee_id == self.target_sugared_coffee_id
+                if show_marker and coffee_id == self.target_sugared_coffee_id
                 else NORMAL_COFFEE_RGBA
             )
             self._set_coffee_liquid_visual(coffee_id, visible=True, rgba=rgba)

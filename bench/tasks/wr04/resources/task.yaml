@@ -3,7 +3,7 @@ schema_version: 1
 task:
   id: WR-04
   display_name: Return one item to its original shelf level
-  description: Stage one sponge beside the sink, normalize transport posture, then return it to its remembered shelf level.
+  description: Stage one sponge beside the sink, then return it to its remembered shelf level.
   success_conditions:
     - initial_level_physically_verified
     - item_removed_from_home
@@ -12,7 +12,7 @@ task:
     - first_return_level_correct
     - same_item_returned
     - item_in_original_level
-    - item_released
+    - no_stage_regression
     - no_protocol_violation
 
 scene:
@@ -192,7 +192,8 @@ semantics:
   sink_stage_threshold: 0.20
   return_region_xy_margin: 0.04
   return_region_height_tolerance: 0.10
-  release_distance: 0.15
+  physical_event_dwell_steps: 3
+  terminal_verification_steps: 100
 
 recording:
   record_depth: true
