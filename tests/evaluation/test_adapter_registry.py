@@ -75,8 +75,9 @@ def test_all_builtin_tasks_resolve_to_an_evaluation_adapter() -> None:
 @pytest.mark.parametrize(
     "task_id",
     [
-        "TM01", "TM02", "TS01", "TS02", "TS03", "TS04", "WA-01", "WA-02",
-        "WR-01", "WR-02", "WR-03", "WR-04", "WX-01",
+        "TM01", "TM02", "TM04", "TS01", "TS02", "TS03", "TS04",
+        "WA-01", "WA-02", "WA-03", "WA-04", "WR-01", "WR-02", "WR-03", "WR-04",
+        "WR-05", "WR-06", "WX-01",
     ],
 )
 def test_all_calibrated_preflights_consume_the_versioned_observation_profile(

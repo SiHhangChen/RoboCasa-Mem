@@ -24,9 +24,8 @@ from bench.runtime.data_contract import STATE_SCHEMA  # noqa: E402
 
 
 DEFAULT_PROMPT = (
-    "Start with the sponge already grasped and the cup displaced. "
-    "Wipe the remembered cup spot, put down the sponge, then return "
-    "the cup to that original spot."
+    "Start with the sponge already grasped. Wipe the dirty dining-table "
+    "spot, then place the cup onto the cleaned spot."
 )
 DATASET_CAMERA_FEATURES = {
     "agentview_right": "observation.images.robot0_agentview_right",

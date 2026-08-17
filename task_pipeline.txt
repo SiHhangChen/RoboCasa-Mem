@@ -139,3 +139,6 @@
   多窗口监控：会话里开两个窗口，一个跑训练，一个看 GPU：
   # 在训练窗口外，按 Ctrl-b c 新建窗口，然后：
   nvidia-smi --query-gpu=index,utilization.gpu,memory.used --format=csv -l 5
+
+
+"

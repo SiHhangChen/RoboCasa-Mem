@@ -73,6 +73,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--robot-type", default="mobile_manipulator")
     parser.add_argument("--write-mode", choices=["create", "append"], default="create")
     parser.add_argument("--overwrite", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument(
+        "--depth",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help=(
+            "Convert recorded depth maps to observation.depth.* features. "
+            "Disabled by default; pass --depth to enable."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -204,12 +213,14 @@ def camera_geometry_features(
     cameras: list[str],
     *,
     image_shapes: dict[str, tuple[int, int, int]],
+    include_depth: bool = False,
 ) -> dict[str, dict[str, Any]]:
     """Describe lossless RGB-D calibration fields present in one native episode."""
 
     metadata = episode_metadata(episode_dir)
-    depth_requested = bool(metadata.get("depth", {}).get("recorded", False)) or bool(
-        metadata.get("metadata", {}).get("depth_recorded", False)
+    depth_requested = include_depth and (
+        bool(metadata.get("depth", {}).get("recorded", False))
+        or bool(metadata.get("metadata", {}).get("depth_recorded", False))
     )
     calibration_requested = bool(
         metadata.get("camera_trajectory", {}).get("recorded", False)
@@ -241,23 +252,36 @@ def camera_geometry_features(
                 extrinsic_feature: extrinsic_path in demo,
             }
 
-            if depth_requested and not present[depth_feature]:
-                raise KeyError(f"required depth dataset missing: {depth_path}")
-            if (depth_requested or calibration_requested or any(present.values())) and not (
-                present[intrinsic_feature] and present[extrinsic_feature]
-            ):
-                raise KeyError(
-                    "camera calibration must contain both intrinsic and camera_to_world: "
-                    f"camera={camera}, present={present}"
-                )
-            if present[depth_feature] and not (
-                present[intrinsic_feature] and present[extrinsic_feature]
-            ):
-                raise KeyError(
-                    f"depth for {camera} cannot be exported without K and camera_to_world"
-                )
+            if include_depth:
+                if depth_requested and not present[depth_feature]:
+                    raise KeyError(f"required depth dataset missing: {depth_path}")
+                if present[depth_feature] and not (
+                    present[intrinsic_feature] and present[extrinsic_feature]
+                ):
+                    raise KeyError(
+                        f"depth for {camera} cannot be exported without K and camera_to_world"
+                    )
+                if (depth_requested or calibration_requested or any(present.values())) and not (
+                    present[intrinsic_feature] and present[extrinsic_feature]
+                ):
+                    raise KeyError(
+                        "camera calibration must contain both intrinsic and camera_to_world: "
+                        f"camera={camera}, present={present}"
+                    )
+            else:
+                # Depth is skipped, so only validate calibration when it is
+                # actually exported (present or requested by metadata).
+                if (
+                    calibration_requested
+                    or present[intrinsic_feature]
+                    or present[extrinsic_feature]
+                ) and not (present[intrinsic_feature] and present[extrinsic_feature]):
+                    raise KeyError(
+                        "camera calibration must contain both intrinsic and camera_to_world: "
+                        f"camera={camera}, present={present}"
+                    )
 
-            if present[depth_feature]:
+            if include_depth and present[depth_feature]:
                 depth = demo[depth_path]
                 expected_image_shape = image_shapes[camera]
                 expected_depth_shape = (
@@ -362,6 +386,8 @@ def camera_geometry_features(
 def dataset_features(
     episode_dir: Path,
     cameras: list[str],
+    *,
+    include_depth: bool = False,
 ) -> dict[str, dict[str, Any]]:
     features: dict[str, dict[str, Any]] = {
         "observation.state": {
@@ -398,6 +424,7 @@ def dataset_features(
             episode_dir,
             cameras,
             image_shapes=image_shapes,
+            include_depth=include_depth,
         )
     )
     return features
@@ -564,11 +591,12 @@ def validate_existing_schema(
     episode_dir: Path,
     cameras: list[str],
     fps: int,
+    include_depth: bool = False,
 ) -> None:
     info = json.loads((root / "meta" / "info.json").read_text())
     if int(info["fps"]) != int(fps):
         raise ValueError(f"FPS mismatch: existing={info['fps']} requested={fps}")
-    expected = dataset_features(episode_dir, cameras)
+    expected = dataset_features(episode_dir, cameras, include_depth=include_depth)
     existing_user_features = set(info["features"]) - AUTO_FEATURE_KEYS
     if existing_user_features != set(expected):
         missing = sorted(set(expected) - existing_user_features)
@@ -643,6 +671,7 @@ def write_episodes(
     fps: int,
     robot_type: str,
     registry: list[dict[str, Any]],
+    include_depth: bool = False,
 ) -> tuple[list[dict[str, Any]], int]:
     from lerobot.datasets.lerobot_dataset import LeRobotDataset
     from scripts.record.lerobot_seed_dataset import make_seed_record, write_seed_registry
@@ -663,7 +692,7 @@ def write_episodes(
                 root=root,
                 fps=int(fps),
                 robot_type=robot_type,
-                features=dataset_features(episode_dir, cameras),
+                features=dataset_features(episode_dir, cameras, include_depth=include_depth),
                 use_videos=True,
                 image_writer_threads=4,
                 metadata_buffer_size=1,
@@ -747,11 +776,11 @@ def main() -> int:
                 f"camera mismatch in {episode_dir}: {episode_cameras} != {cameras}"
             )
 
-    reference_features = dataset_features(episode_dirs[0], cameras)
+    reference_features = dataset_features(episode_dirs[0], cameras, include_depth=args.depth)
     for episode_dir in episode_dirs[1:]:
         validate_episode_schema(
             reference_features,
-            dataset_features(episode_dir, cameras),
+            dataset_features(episode_dir, cameras, include_depth=args.depth),
             episode_dir=episode_dir,
         )
 
@@ -775,6 +804,7 @@ def main() -> int:
                 episode_dir=episode_dirs[0],
                 cameras=cameras,
                 fps=int(args.fps),
+                include_depth=args.depth,
             )
 
         container, staged_root = make_staging_root(output_root)
@@ -789,6 +819,7 @@ def main() -> int:
                 fps=int(args.fps),
                 robot_type=args.robot_type,
                 registry=registry,
+                include_depth=args.depth,
             )
             canonicalize_seed_order(staged_root, registry)
             summary = validate_seed_dataset(staged_root)

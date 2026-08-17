@@ -12,7 +12,8 @@ seeds: [1000, 1001, 1002]
 rollout:
   replan_steps: 50
   action_repeat: 1
-  stop_on_success: true
+  # Validate that the returned object remains valid for the full rollout.
+  stop_on_success: false
   ignore_done: true
 
 artifacts:

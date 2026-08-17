@@ -61,6 +61,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--write-mode", choices=["create", "append"], default="create")
     parser.add_argument("--overwrite", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument(
+        "--depth",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help=(
+            "Convert recorded depth maps to depth-video features. "
+            "Disabled by default; pass --depth to enable."
+        ),
+    )
+    parser.add_argument(
         "--lerobot-src",
         type=Path,
         default=_initial_lerobot_src,
@@ -77,7 +86,7 @@ def parse_args() -> argparse.Namespace:
         action=argparse.BooleanOptionalAction,
         default=True,
     )
-    parser.add_argument("--depth-gop", type=int, default=2)
+    parser.add_argument("--depth-gop", type=int, default=16)
     parser.add_argument("--encoder-threads", type=int, default=4)
     parser.add_argument("--image-writer-threads", type=int, default=4)
     return parser.parse_args()
@@ -157,10 +166,16 @@ def _depth_video_feature(feature_name: str, feature: dict[str, Any]) -> dict[str
 def dataset_features(
     episode_dir: Path,
     cameras: list[str],
+    *,
+    include_depth: bool = False,
 ) -> dict[str, dict[str, Any]]:
     """Build a LeRobot 0.6.1 feature schema from one native episode."""
 
-    features = native_converter.dataset_features(episode_dir, cameras)
+    features = native_converter.dataset_features(
+        episode_dir, cameras, include_depth=include_depth
+    )
+    if not include_depth:
+        return features
     depth_keys = [key for key in features if key.startswith(DEPTH_FEATURE_PREFIX)]
     if not depth_keys:
         raise ValueError(
@@ -185,6 +200,7 @@ def validate_existing_schema(
     cameras: list[str],
     fps: int,
     depth_encoder: Any,
+    include_depth: bool = False,
 ) -> None:
     from lerobot.configs import DepthEncoderConfig
 
@@ -192,7 +208,7 @@ def validate_existing_schema(
     if int(info["fps"]) != int(fps):
         raise ValueError(f"FPS mismatch: existing={info['fps']} requested={fps}")
 
-    expected = dataset_features(episode_dir, cameras)
+    expected = dataset_features(episode_dir, cameras, include_depth=include_depth)
     existing_user_features = set(info["features"]) - native_converter.AUTO_FEATURE_KEYS
     if existing_user_features != set(expected):
         missing = sorted(set(expected) - existing_user_features)
@@ -277,6 +293,7 @@ def write_episodes(
     depth_encoder: Any,
     encoder_threads: int,
     image_writer_threads: int,
+    include_depth: bool = False,
 ) -> tuple[list[dict[str, Any]], int]:
     from lerobot.datasets.lerobot_dataset import LeRobotDataset
     from scripts.record.lerobot_seed_dataset import make_seed_record, write_seed_registry
@@ -299,7 +316,7 @@ def write_episodes(
                 root=root,
                 fps=int(fps),
                 robot_type=robot_type,
-                features=dataset_features(episode_dir, cameras),
+                features=dataset_features(episode_dir, cameras, include_depth=include_depth),
                 use_videos=True,
                 image_writer_threads=int(image_writer_threads),
                 metadata_buffer_size=1,
@@ -307,6 +324,7 @@ def write_episodes(
                 video_files_size_in_mb=1,
                 depth_encoder=depth_encoder,
                 encoder_threads=int(encoder_threads),
+                streaming_encoding=True,
             )
         else:
             dataset = LeRobotDataset.resume(
@@ -315,6 +333,7 @@ def write_episodes(
                 image_writer_threads=int(image_writer_threads),
                 depth_encoder=depth_encoder,
                 encoder_threads=int(encoder_threads),
+                streaming_encoding=True,
             )
             # LeRobot 0.6.1 aggregates the persisted global stats while saving
             # an appended episode.  MemBench deliberately rewrites those stats
@@ -362,7 +381,7 @@ def main() -> int:
     args = parse_args()
     lerobot_source = _activate_lerobot_source(args.lerobot_src)
     lerobot_version = require_lerobot_061(lerobot_source)
-    depth_encoder = make_depth_encoder(args)
+    depth_encoder = make_depth_encoder(args) if args.depth else None
 
     from scripts.record.lerobot_seed_dataset import (
         canonicalize_seed_order,
@@ -395,11 +414,11 @@ def main() -> int:
                 f"camera mismatch in {episode_dir}: {episode_cameras} != {cameras}"
             )
 
-    reference_features = dataset_features(episode_dirs[0], cameras)
+    reference_features = dataset_features(episode_dirs[0], cameras, include_depth=args.depth)
     for episode_dir in episode_dirs[1:]:
         native_converter.validate_episode_schema(
             reference_features,
-            dataset_features(episode_dir, cameras),
+            dataset_features(episode_dir, cameras, include_depth=args.depth),
             episode_dir=episode_dir,
         )
 
@@ -424,6 +443,7 @@ def main() -> int:
                 cameras=cameras,
                 fps=int(args.fps),
                 depth_encoder=depth_encoder,
+                include_depth=args.depth,
             )
 
         container, staged_root = make_staging_root(output_root)
@@ -441,6 +461,7 @@ def main() -> int:
                 depth_encoder=depth_encoder,
                 encoder_threads=int(args.encoder_threads),
                 image_writer_threads=int(args.image_writer_threads),
+                include_depth=args.depth,
             )
             canonicalize_seed_order(staged_root, registry)
             summary = validate_seed_dataset(staged_root)
@@ -461,7 +482,9 @@ def main() -> int:
                 "added_frames": frame_count,
                 "lerobot_version": lerobot_version,
                 "lerobot_source": str(lerobot_source),
-                "depth_encoder": dataclasses.asdict(depth_encoder),
+                "depth_encoder": (
+                    dataclasses.asdict(depth_encoder) if depth_encoder is not None else None
+                ),
             },
             sort_keys=True,
         )

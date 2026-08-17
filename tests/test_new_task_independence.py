@@ -12,32 +12,42 @@ TASK_NAMES = (
     "TM01",
     "TM02",
     "TM03",
+    "TM04",
     "TS01",
     "TS02",
     "TS03",
     "TS04",
     "WA01",
     "WA02",
+    "WA03",
+    "WA04",
     "WR01",
     "WR02",
     "WR03",
     "WR04",
+    "WR05",
+    "WR06",
     "WX01",
 )
 EXPECTED_TASK_IDS = {
     "TM01",
     "TM02",
     "TM03",
+    "TM04",
     "TS01",
     "TS02",
     "TS03",
     "TS04",
     "WA-01",
     "WA-02",
+    "WA-03",
+    "WA-04",
     "WR-01",
     "WR-02",
     "WR-03",
     "WR-04",
+    "WR-05",
+    "WR-06",
     "WX-01",
 }
 
@@ -66,7 +76,6 @@ print(json.dumps(TaskCatalog.ids()))
 def test_all_canonical_task_resources_resolve_without_legacy_paths() -> None:
     task_root = (ROOT / "bench" / "tasks").resolve()
     expected_missing = {
-        ("TM03", "toaster_oven_time_pinch_off_pose"),
         ("TM03", "toaster_oven_time_pinch_on_pose"),
         ("TM03", "toaster_oven_time_pinch_on_for_off_pose"),
     }

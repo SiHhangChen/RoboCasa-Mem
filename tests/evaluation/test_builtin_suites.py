@@ -57,7 +57,7 @@ def test_smoke_suites_cover_every_builtin_task_with_the_frozen_contract():
         assert RECORDING_SEEDS.isdisjoint(suite.seeds)
         assert suite.rollout.replan_steps == 50
         assert suite.rollout.action_repeat == 1
-        assert suite.rollout.stop_on_success is True
+        assert suite.rollout.stop_on_success is (suite.task_id not in {"WR-04", "WR-06"})
         assert suite.rollout.ignore_done is True
         assert suite.artifacts == wx_smoke.artifacts
         assert suite.transport == wx_smoke.transport

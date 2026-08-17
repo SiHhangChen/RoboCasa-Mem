@@ -322,6 +322,10 @@ python scripts/record/convert_bench_episodes_to_lerobot.py \
   --repo-id local/wa01_200seeds
 ```
 
+默认只转换 RGB 图像、状态与动作，不包含深度图；需要深度时加 `--depth` 参数（`--no-depth` 可显式关闭）。`--depth` 开启时要求原生 episode 录制了深度数据及其相机标定，并把深度保存为 `observation.depth.*` 特征。相机内参/外参（`observation.camera_intrinsics.*`、`observation.camera_extrinsics_c2w.*`）在原生 episode 中存在时始终导出，与 `--depth` 无关。
+
+v061 转换器（`scripts/record/convert_bench_episodes_to_lerobot_v061.py`）同样支持 `--depth` 开关，默认不转换深度；对应 shell 脚本用 `DEPTH=1` 环境变量开启。
+
 转换器会按 seed 排序并生成 LeRobot 自己的 `meta/info.json` 和 `meta/seeds.jsonl`。如果目标目录已存在，默认拒绝覆盖；追加新 seed 使用 `--write-mode append`，完全重建才使用 `--overwrite`。
 
 原始四个分片可以长期保留，无需先手动合并。若手动复制 episode 到同一目录，不能简单覆盖四份原生 `manifest.json`；这不影响 LeRobot 转换，但会使合并后的原生数据集 manifest 不完整。
