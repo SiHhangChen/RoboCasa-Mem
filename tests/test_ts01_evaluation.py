@@ -22,6 +22,7 @@ def _snapshot(
     step: int,
     *,
     target: int,
+    total: int = 5,
     count: int = 0,
     objects_released: bool = True,
     button_pressed: bool = False,
@@ -29,6 +30,7 @@ def _snapshot(
     return TS01EvaluationSnapshot(
         step_id=step,
         target_sugar_count=target,
+        total_sugar_count=total,
         confirmed_sugar_count=count,
         objects_released=objects_released,
         completion_button_pressed=button_pressed,
@@ -36,7 +38,7 @@ def _snapshot(
 
 
 def _evaluator(target: int) -> TS01Evaluator:
-    evaluator = TS01Evaluator(target_sugar_count=target)
+    evaluator = TS01Evaluator(target_sugar_count=target, total_sugar_count=5)
     evaluator.reset(_snapshot(0, target=target))
     return evaluator
 
@@ -332,3 +334,14 @@ def test_snapshot_target_cannot_change_during_an_episode() -> None:
     with pytest.raises(ValueError, match="target_sugar_count"):
         evaluator.observe(_snapshot(1, target=2, count=1))
 
+
+def test_snapshot_total_cannot_change_during_an_episode() -> None:
+    evaluator = _evaluator(1)
+
+    with pytest.raises(ValueError, match="total_sugar_count"):
+        evaluator.observe(_snapshot(1, target=1, total=4, count=1))
+
+
+def test_snapshot_rejects_confirmed_count_above_total() -> None:
+    with pytest.raises(ValueError, match="cannot exceed total_sugar_count"):
+        _snapshot(0, target=1, total=1, count=2)

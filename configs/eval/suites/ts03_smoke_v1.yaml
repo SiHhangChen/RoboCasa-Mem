@@ -7,7 +7,7 @@ task:
     task_config_file: bench/tasks/ts03/resources/task.yaml
     observation_profile_file: configs/benchmark/observation_profiles/rgbd_v3.yaml
 
-seeds: [1000, 1001, 1002]
+seeds: {start: 1050, stop: 1100}
 
 rollout:
   replan_steps: 50

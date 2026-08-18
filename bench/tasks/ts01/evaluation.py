@@ -13,7 +13,10 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
-from bench.tasks.ts01.domain.contracts import VALID_TARGET_SUGAR_COUNTS
+from bench.tasks.ts01.domain.contracts import (
+    MAX_SUPPORTED_TOTAL_SUGAR_COUNT,
+    VALID_TARGET_SUGAR_COUNTS,
+)
 
 
 SUGAR_STAGE_NAMES = ("sugar_1", "sugar_2", "sugar_3")
@@ -34,12 +37,26 @@ def _target_count(value: Any) -> int:
     return target
 
 
+def _total_count(value: Any, *, target_sugar_count: int) -> int:
+    try:
+        total = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"total_sugar_count must be an integer, got {value!r}") from exc
+    if total < target_sugar_count or total > MAX_SUPPORTED_TOTAL_SUGAR_COUNT:
+        raise ValueError(
+            "total_sugar_count must satisfy target_sugar_count <= N <= "
+            f"{MAX_SUPPORTED_TOTAL_SUGAR_COUNT}; got K={target_sugar_count}, N={value!r}"
+        )
+    return total
+
+
 @dataclass(frozen=True, slots=True)
 class TS01EvaluationSnapshot:
     """One debounced physical observation presented to the task evaluator."""
 
     step_id: int
     target_sugar_count: int
+    total_sugar_count: int
     confirmed_sugar_count: int
     objects_released: bool
     completion_button_pressed: bool
@@ -53,11 +70,15 @@ class TS01EvaluationSnapshot:
         if count < 0:
             raise ValueError("confirmed_sugar_count must be non-negative")
         object.__setattr__(self, "step_id", step)
-        object.__setattr__(
-            self,
-            "target_sugar_count",
-            _target_count(self.target_sugar_count),
-        )
+        target = _target_count(self.target_sugar_count)
+        total = _total_count(self.total_sugar_count, target_sugar_count=target)
+        if count > total:
+            raise ValueError(
+                "confirmed_sugar_count cannot exceed total_sugar_count; "
+                f"got {count} > {total}"
+            )
+        object.__setattr__(self, "target_sugar_count", target)
+        object.__setattr__(self, "total_sugar_count", total)
         object.__setattr__(self, "confirmed_sugar_count", count)
         object.__setattr__(self, "objects_released", bool(self.objects_released))
         object.__setattr__(
@@ -122,6 +143,7 @@ class TS01EvalResult:
     """Immutable verdict returned by the TS01 evaluator."""
 
     target_sugar_count: int
+    total_sugar_count: int
     success: bool
     terminal: bool
     failure_code: str | None
@@ -168,6 +190,10 @@ class TS01EvalResult:
                 "terminal": bool(self.terminal),
                 "failure_code": self.failure_code,
                 "target_sugar_count": int(self.target_sugar_count),
+                "total_sugar_count": int(self.total_sugar_count),
+                "distractor_count": int(
+                    self.total_sugar_count - self.target_sugar_count
+                ),
                 "stages": stages,
                 "stage_checks": {
                     name: bool(values["qualified"])
@@ -201,8 +227,17 @@ class _MutableStage:
 class TS01Evaluator:
     """Strict, history-aware evaluator for one seed-resolved TS01 episode."""
 
-    def __init__(self, *, target_sugar_count: int) -> None:
+    def __init__(
+        self,
+        *,
+        target_sugar_count: int,
+        total_sugar_count: int,
+    ) -> None:
         self.target_sugar_count = _target_count(target_sugar_count)
+        self.total_sugar_count = _total_count(
+            total_sugar_count,
+            target_sugar_count=self.target_sugar_count,
+        )
         self._stages = {name: _MutableStage() for name in STAGE_ORDER}
         self._rejected: dict[str, list[dict[str, Any]]] = {
             name: [] for name in STAGE_ORDER
@@ -319,11 +354,13 @@ class TS01Evaluator:
         return self._cached_result
 
     def _validate_configuration(self, snapshot: TS01EvaluationSnapshot) -> None:
-        if snapshot.target_sugar_count != self.target_sugar_count:
+        actual = (snapshot.target_sugar_count, snapshot.total_sugar_count)
+        expected = (self.target_sugar_count, self.total_sugar_count)
+        if actual != expected:
             raise ValueError(
-                "TS01 evaluation snapshot target_sugar_count changed within "
-                f"an episode: {snapshot.target_sugar_count} != "
-                f"{self.target_sugar_count}"
+                "TS01 evaluation snapshot target_sugar_count/total_sugar_count "
+                "configuration changed within "
+                f"an episode: {actual!r} != {expected!r}"
             )
 
     def _stage_applicable(self, name: str) -> bool:
@@ -407,6 +444,11 @@ class TS01Evaluator:
         details.update(
             {
                 "evaluation": evaluation,
+                "target_sugar_count": int(snapshot.target_sugar_count),
+                "total_sugar_count": int(snapshot.total_sugar_count),
+                "distractor_count": int(
+                    snapshot.total_sugar_count - snapshot.target_sugar_count
+                ),
                 "confirmed_sugar_count": int(snapshot.confirmed_sugar_count),
                 "objects_released": bool(snapshot.objects_released),
                 "completion_button_pressed": bool(
@@ -424,6 +466,7 @@ class TS01Evaluator:
         success = bool(stages["success"].qualified)
         return TS01EvalResult(
             target_sugar_count=self.target_sugar_count,
+            total_sugar_count=self.total_sugar_count,
             success=success,
             terminal=bool(success or self._terminal_failure_code is not None),
             failure_code=self._terminal_failure_code,

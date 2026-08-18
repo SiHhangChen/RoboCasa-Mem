@@ -25,7 +25,8 @@ from bench.tasks.ts03.domain.episode import (
     normalize_total_sugar_count,
 )
 from bench.tasks.ts03.domain.geometry import point_is_inside_cylindrical_region
-from bench.tasks.ts03.domain.semantics import PhysicalState, evaluate_success
+from bench.tasks.ts03.domain.semantics import PhysicalState, SuccessReport, evaluate_success
+from bench.tasks.ts03.evaluation import TS03EvaluationSnapshot
 
 
 SUGAR_CUBE_XML = f"{assets_root}/objects/lightwheel/sugar_cube/SugarCube003/model.xml"
@@ -63,6 +64,8 @@ class TS03HierarchicalAddKSugarToHotChocolate(Kitchen):
         receptacle_name: str = RECEPTACLE_NAME,
         completion_button_position_file: str | Path | None = None,
         target_threshold: float = 0.16,
+        confirmed_sugar_dwell_steps: int = 5,
+        minimum_press_displacement_m: float = 0.004,
         **kwargs: Any,
     ) -> None:
         target = normalize_target_sugar_count(target_sugar_count)
@@ -77,6 +80,10 @@ class TS03HierarchicalAddKSugarToHotChocolate(Kitchen):
             raise ValueError("TS03 target_sugar_names must contain exactly K unique names")
         if not set(targets).issubset(names):
             raise ValueError("TS03 target_sugar_names must be drawn from sugar_names")
+        if confirmed_sugar_dwell_steps < 1:
+            raise ValueError("TS03 confirmed-sugar dwell must be positive")
+        if minimum_press_displacement_m <= 0.0:
+            raise ValueError("TS03 button displacement threshold must be positive")
         self.target_sugar_count = target
         self.total_sugar_count = total
         self.sugar_names = names
@@ -89,7 +96,19 @@ class TS03HierarchicalAddKSugarToHotChocolate(Kitchen):
             else str(completion_button_position_file)
         )
         self.target_threshold = float(target_threshold)
+        self.confirmed_sugar_dwell_steps = int(confirmed_sugar_dwell_steps)
+        self.minimum_press_displacement_m = float(minimum_press_displacement_m)
         self._completion_button_press_latched = False
+        self._completion_button_peak_displacement_m = 0.0
+        self._completion_button_peak_step: int | None = None
+        self._completion_button_threshold_active = False
+        self._sugar_goal_complete_observed = False
+        self._sugar_confirmed = {name: False for name in names}
+        self._sugar_dwell = {name: 0 for name in names}
+        self._last_confirmed_update_step: int | None = None
+        self.confirmed_sugar_count = 0
+        self.objects_released = False
+        self._ts03_evaluator = None
         self.knob = "front_left"
         from bench.tasks.ts03.domain.contracts import profile_for_counts
 
@@ -118,6 +137,15 @@ class TS03HierarchicalAddKSugarToHotChocolate(Kitchen):
     def _setup_scene(self) -> None:
         super()._setup_scene()
         self._completion_button_press_latched = False
+        self._completion_button_peak_displacement_m = 0.0
+        self._completion_button_peak_step = None
+        self._completion_button_threshold_active = False
+        self._sugar_goal_complete_observed = False
+        self._sugar_confirmed = {name: False for name in self.sugar_names}
+        self._sugar_dwell = {name: 0 for name in self.sugar_names}
+        self._last_confirmed_update_step = None
+        self.confirmed_sugar_count = 0
+        self.objects_released = False
         self.stove.set_knob_state(env=self, rng=self.rng, knob=self.knob, mode="on")
         try:
             liquid = self.sim.model.geom_name2id("saucepan_liquid")
@@ -193,6 +221,30 @@ class TS03HierarchicalAddKSugarToHotChocolate(Kitchen):
     def update_state(self) -> None:
         super().update_state()
         self._update_task_state()
+        self._update_completion_button_state()
+
+    def _update_completion_button_state(self) -> None:
+        """Latch a free-policy press only on a post-sugar threshold crossing."""
+
+        displacement = float(self.completion_button_displacement())
+        step = int(getattr(self, "timestep", 0))
+        if displacement > self._completion_button_peak_displacement_m:
+            self._completion_button_peak_displacement_m = displacement
+            self._completion_button_peak_step = step
+
+        threshold_active = displacement >= self.minimum_press_displacement_m
+        rising_edge = threshold_active and not self._completion_button_threshold_active
+        if (
+            rising_edge
+            and self._sugar_goal_complete_observed
+            and not self._completion_button_press_latched
+        ):
+            self._completion_button_press_latched = True
+        self._completion_button_threshold_active = threshold_active
+        self._sugar_goal_complete_observed = (
+            self.confirmed_sugar_count == self.target_sugar_count
+            and self.objects_released
+        )
 
     def completion_button_position(self) -> np.ndarray:
         """Return the live plunger position used by the press controller."""
@@ -229,19 +281,31 @@ class TS03HierarchicalAddKSugarToHotChocolate(Kitchen):
     ) -> bool:
         """Latch completion only after the sugar goal and real plunger motion."""
 
-        report = evaluate_success(self._physical_state(), self.target_sugar_count)
-        if not bool(physical_motion_verified) or not report.sugar_goal_complete:
+        self._update_task_state()
+        if (
+            not bool(physical_motion_verified)
+            or self.confirmed_sugar_count != self.target_sugar_count
+            or not self.objects_released
+        ):
             return False
         self._completion_button_press_latched = True
+        self._completion_button_threshold_active = True
+        self._completion_button_peak_displacement_m = max(
+            self._completion_button_peak_displacement_m,
+            self.completion_button_displacement(),
+        )
+        self._completion_button_peak_step = int(getattr(self, "timestep", 0))
         self._update_task_state()
         return True
 
     def sugar_goal_complete(self) -> bool:
         """Return the pre-button physical goal used as the final-stage gate."""
 
-        return evaluate_success(
-            self._physical_state(), self.target_sugar_count
-        ).sugar_goal_complete
+        self._update_task_state()
+        return bool(
+            self.confirmed_sugar_count == self.target_sugar_count
+            and self.objects_released
+        )
 
     def _saucepan_interior_cylinder(self) -> dict[str, Any]:
         """Read the live world-space cylinder encoded by the saucepan asset."""
@@ -322,16 +386,109 @@ class TS03HierarchicalAddKSugarToHotChocolate(Kitchen):
             completion_button_pressed=self._completion_button_press_latched,
         )
 
-    def _update_task_state(self) -> None:
-        report = evaluate_success(self._physical_state(), self.target_sugar_count)
+    def _update_task_state(self, physical: PhysicalState | None = None) -> None:
+        state = self._physical_state() if physical is None else physical
+        report = evaluate_success(state, self.target_sugar_count)
         self.sugars_in_saucepan = dict(report.sugars_in_saucepan)
         self.num_sugar_added = report.num_sugar_added
         self.under_added = report.under_added
         self.over_added = report.over_added
         self.next_sugar_step = report.next_sugar_step
+        self.objects_released = bool(report.sugars_released)
+        step = int(getattr(self, "timestep", 0))
+        if self._last_confirmed_update_step != step:
+            self._update_confirmed_sugars(state)
+            self._last_confirmed_update_step = step
+
+    def _update_confirmed_sugars(self, physical: PhysicalState) -> None:
+        """Debounce the raw saucepan containment into a stable sugar count.
+
+        A cube is confirmed only after it sits inside the saucepan interior
+        while no gripper is holding it for ``confirmed_sugar_dwell_steps``
+        consecutive steps.  A cube that leaves the region is unconfirmed again,
+        so the confirmed count tracks the cubes the robot has actually placed.
+        """
+
+        dwell = int(self.confirmed_sugar_dwell_steps)
+        for name in self.sugar_names:
+            inside = bool(physical.sugars_in_saucepan.get(str(name), False))
+            released = bool(OU.gripper_obj_far(self, name, th=0.15))
+            if inside and released:
+                count = self._sugar_dwell[name] + 1
+                self._sugar_dwell[name] = count
+                if count >= dwell:
+                    self._sugar_confirmed[name] = True
+            elif not inside:
+                self._sugar_dwell[name] = 0
+                self._sugar_confirmed[name] = False
+        self.confirmed_sugar_count = int(sum(self._sugar_confirmed.values()))
 
     def _check_success(self) -> bool:
+        evaluator = self._ts03_evaluator
+        if evaluator is not None:
+            return evaluator.observe(self.evaluation_snapshot()).success
+        self._update_task_state()
         return evaluate_success(self._physical_state(), self.target_sugar_count).success
+
+    def evaluation_snapshot(self) -> TS03EvaluationSnapshot:
+        """Expose only physical facts to the task evaluator."""
+
+        physical = self._physical_state()
+        self._update_task_state(physical)
+        report = evaluate_success(physical, self.target_sugar_count)
+        return TS03EvaluationSnapshot(
+            step_id=int(getattr(self, "timestep", 0)),
+            profile_id=self.profile_id,
+            target_sugar_count=self.target_sugar_count,
+            total_sugar_count=self.total_sugar_count,
+            confirmed_sugar_count=int(self.confirmed_sugar_count),
+            objects_released=bool(self.objects_released),
+            completion_button_pressed=bool(self._completion_button_press_latched),
+            details=self._snapshot_details(physical, report),
+        )
+
+    def _snapshot_details(
+        self,
+        physical: PhysicalState,
+        report: SuccessReport,
+    ) -> dict[str, Any]:
+        cylinder = self._saucepan_interior_cylinder()
+        containment = {
+            name: self._sugar_saucepan_containment(name, cylinder=cylinder)
+            for name in self.sugar_names
+        }
+        return {
+            "axis": AXIS,
+            "target_sugar_names": list(self.target_sugar_names),
+            "distractor_sugar_names": list(self.distractor_sugar_names),
+            "sugar_plate_offsets_xy": [
+                list(row) for row in getattr(self, "sugar_plate_offsets_xy", ())
+            ],
+            "sugar_plate_safe_half_extents_xy": list(
+                getattr(self, "sugar_plate_safe_half_extents_xy", ())
+            ),
+            "completion_button": {
+                "geom_name": COMPLETION_BUTTON_GEOM_NAME,
+                "joint_name": COMPLETION_BUTTON_JOINT_NAME,
+                "position_world": self.completion_button_position().astype(float).tolist(),
+                "current_displacement_m": self.completion_button_displacement(),
+                "peak_displacement_m": self._completion_button_peak_displacement_m,
+                "peak_step": self._completion_button_peak_step,
+                "minimum_press_displacement_m": self.minimum_press_displacement_m,
+                "pressed": bool(report.completion_button_pressed),
+            },
+            "saucepan_containment": {
+                "method": SAUCEPAN_CONTAINMENT_METHOD,
+                "region_geom": str(cylinder["geom_name"]),
+                "center_world": np.asarray(
+                    cylinder["center_world"], dtype=float
+                ).tolist(),
+                "radius_m": float(cylinder["radius_m"]),
+                "half_height_m": float(cylinder["half_height_m"]),
+                "sugars": containment,
+            },
+            **report.as_dict(),
+        }
 
     def sugar_diagnostics(self) -> dict[str, Any]:
         report = evaluate_success(self._physical_state(), self.target_sugar_count)
@@ -353,6 +510,9 @@ class TS03HierarchicalAddKSugarToHotChocolate(Kitchen):
                 "joint_name": COMPLETION_BUTTON_JOINT_NAME,
                 "position_world": self.completion_button_position().astype(float).tolist(),
                 "current_displacement_m": self.completion_button_displacement(),
+                "peak_displacement_m": self._completion_button_peak_displacement_m,
+                "peak_step": self._completion_button_peak_step,
+                "minimum_press_displacement_m": self.minimum_press_displacement_m,
                 "pressed": bool(report.completion_button_pressed),
             },
             "saucepan_containment": {
@@ -369,6 +529,9 @@ class TS03HierarchicalAddKSugarToHotChocolate(Kitchen):
         }
 
     def task_diagnostics(self) -> dict[str, Any]:
+        evaluator = self._ts03_evaluator
+        if evaluator is not None:
+            return evaluator.observe(self.evaluation_snapshot()).to_diagnostics()
         result = self.sugar_diagnostics()
         if result["success"]:
             attribution = "success"
