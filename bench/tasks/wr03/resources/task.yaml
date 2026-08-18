@@ -24,7 +24,7 @@ scene:
 
 episode:
   demo_storage_level: null
-  max_horizon: 15000
+  max_horizon: 4800
 
 initial_state:
   robot_base:

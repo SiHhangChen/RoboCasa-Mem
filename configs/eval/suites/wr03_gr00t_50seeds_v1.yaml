@@ -15,10 +15,10 @@ task:
     task_config_file: bench/tasks/wr03/resources/task.yaml
     observation_profile_file: configs/benchmark/observation_profiles/rgbd_v3.yaml
 
-seeds: {start: 50, stop: 100}
+seeds: {start: 1050, stop: 1100}
 
 rollout:
-  replan_steps: 40
+  replan_steps: 20
   max_steps: 4800
   action_repeat: 1
   stop_on_success: false

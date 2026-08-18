@@ -32,6 +32,7 @@ from bench.tasks.wr01.domain.semantics import (
     record_retrieval_pick,
     record_storage,
 )
+from bench.tasks.wr01.evaluation import WR01EvaluationSnapshot, WR01Evaluator
 from bench.tasks.wr01.physical_events import PhysicalSample, WR01PhysicalObserver
 from bench.tasks.wr01.prompts import resolve_prompt_spec
 
@@ -187,7 +188,9 @@ class WR01RetrieveRememberedCan(Kitchen):
             raise ValueError("WR-01 gripper pad friction must contain 3 positive values")
         self._semantic_state = SemanticState("red_can", "lower")
         self._physical_observer: WR01PhysicalObserver | None = None
+        self._wr01_evaluator: WR01Evaluator | None = None
         self._physical_event_diagnostics: dict[str, Any] = {}
+        self._evaluation_initial_item_positions: dict[str, np.ndarray] = {}
         self.item_by_level = {"lower": "red_can", "upper": "blue_can"}
         self.level_by_item = {
             item: level for level, item in self.item_by_level.items()
@@ -300,7 +303,9 @@ class WR01RetrieveRememberedCan(Kitchen):
     def _setup_scene(self) -> None:
         super()._setup_scene()
         self._physical_observer = None
+        self._wr01_evaluator = None
         self._physical_event_diagnostics = {}
+        self._evaluation_initial_item_positions = {}
         self._semantic_state = SemanticState("red_can", "lower")
         self.item_by_level = {"lower": "red_can", "upper": "blue_can"}
         self.level_by_item = {
@@ -337,7 +342,9 @@ class WR01RetrieveRememberedCan(Kitchen):
         self.level_by_item = {item: level for level, item in assignment.items()}
         self._semantic_state = SemanticState(target, self.level_by_item[target])
         self._physical_observer = None
+        self._wr01_evaluator = None
         self._physical_event_diagnostics = {}
+        self._evaluation_initial_item_positions = {}
         self._ep_meta.setdefault("refs", {})["requested_item_id"] = target
 
     def configure_canonical_physics(self) -> None:
@@ -401,6 +408,10 @@ class WR01RetrieveRememberedCan(Kitchen):
         return record_retrieval_pick(self._semantic_state, item_id)
 
     def start_physical_observer(self) -> None:
+        self._evaluation_initial_item_positions = {
+            item_id: self.get_object_world_position(item_id).copy()
+            for item_id in ITEM_IDS
+        }
         self._physical_observer = WR01PhysicalObserver(
             self._semantic_state,
             dwell_steps=self.physical_event_dwell_steps,
@@ -566,22 +577,47 @@ class WR01RetrieveRememberedCan(Kitchen):
         return metadata
 
     def _check_success(self) -> bool:
+        evaluator = self._wr01_evaluator
+        if evaluator is not None:
+            return evaluator.observe(self.evaluation_snapshot()).success
         self._update_task_state()
         return evaluate_success(self._semantic_state, self.physical_state()).success
 
     def task_diagnostics(self) -> dict[str, Any]:
-        self._update_task_state()
+        snapshot = self.evaluation_snapshot()
+        evaluator = self._wr01_evaluator
+        if evaluator is not None:
+            return evaluator.observe(snapshot).to_diagnostics()
         report = evaluate_success(self._semantic_state, self.physical_state())
-        collision_state = self._object_collision_diagnostics()
         return {
+            **dict(snapshot.details),
             "success": report.success,
-            "terminal": bool(report.success or self._semantic_state.wrong_retrieval_level_opened),
+            "terminal": bool(
+                report.success or self._semantic_state.wrong_retrieval_level_opened
+            ),
             "failure_code": (
                 "wrong_retrieval_door"
                 if self._semantic_state.wrong_retrieval_level_opened
                 else None
             ),
             "success_checks": report.checks(),
+        }
+
+    def evaluation_snapshot(self) -> WR01EvaluationSnapshot:
+        """Expose only physical and detected-event facts to the evaluator."""
+
+        self._update_task_state()
+        report = evaluate_success(self._semantic_state, self.physical_state())
+        collision_state = self._object_collision_diagnostics()
+        grasp_evidence = {
+            item_id: self._item_physical_grasp_evidence(item_id)
+            for item_id in ITEM_IDS
+        }
+        grasped = {
+            item_id: bool(values["picked_up"])
+            for item_id, values in grasp_evidence.items()
+        }
+        details = {
             "storage": {
                 "stored_levels_by_item": dict(
                     self._semantic_state.stored_levels_by_item
@@ -604,6 +640,8 @@ class WR01RetrieveRememberedCan(Kitchen):
                     .tolist()
                     for item_id in ITEM_IDS
                 },
+                "item_grasped": dict(grasped),
+                "item_grasp_evidence": grasp_evidence,
                 "object_collisions_enabled": all(
                     entry["enabled"]
                     for entries in collision_state.values()
@@ -615,6 +653,85 @@ class WR01RetrieveRememberedCan(Kitchen):
             "collision_policy": "all_object_collisions_enabled",
             "execution_mode": "action_only_physics",
         }
+        return WR01EvaluationSnapshot(
+            step_id=int(getattr(self, "timestep", 0)),
+            storage_order=(
+                self.item_by_level["lower"],
+                self.item_by_level["upper"],
+            ),
+            target_item_id=self.target_item_id,
+            target_level=self.target_level,
+            item_grasped=grasped,
+            stored_levels_by_item=self._semantic_state.stored_levels_by_item,
+            upper_door_closed=self.is_door_closed("upper"),
+            lower_door_closed=self.is_door_closed("lower"),
+            opened_level=self._semantic_state.retrieval_level_opened,
+            wrong_retrieval_level_opened=(
+                self._semantic_state.wrong_retrieval_level_opened
+            ),
+            retrieved_item_id=self._semantic_state.retrieved_item_id,
+            distractor_still_stored=report.distractor_still_stored,
+            details=details,
+        )
+
+    def _item_physical_grasp_evidence(self, item_id: str) -> dict[str, Any]:
+        """Return read-only evidence that a closed gripper lifted the item."""
+
+        try:
+            from bench.execution.manipulation.object_interactions import (
+                get_object_hold_status,
+            )
+
+            robot = self.robots[0]
+            qpos = np.asarray(
+                robot.get_gripper_joint_positions("right"),
+                dtype=float,
+            ).reshape(-1)
+            if qpos.size < 2 or not np.all(np.isfinite(qpos[:2])):
+                return {"picked_up": False, "reason": "invalid_gripper_qpos"}
+            gripper_closed = bool(np.max(np.abs(qpos[:2])) <= 0.035)
+            hold = get_object_hold_status(
+                env=self,
+                object_name=str(item_id),
+                max_end_effector_distance=0.18,
+            )
+            current = self.get_object_world_position(item_id)
+            baseline = self._evaluation_initial_item_positions.get(str(item_id))
+            if baseline is None:
+                lifted = False
+                lateral_motion = False
+                displacement = None
+            else:
+                displacement = current - baseline
+                lifted = bool(float(displacement[2]) >= 0.02)
+                lateral_motion = bool(
+                    float(np.linalg.norm(displacement[:2])) >= 0.04
+                )
+            checks = {
+                "gripper_closed": gripper_closed,
+                "held_near_end_effector": bool(hold.get("held", False)),
+                "lifted_or_displaced": bool(lifted or lateral_motion),
+            }
+            return {
+                "picked_up": bool(all(checks.values())),
+                "checks": checks,
+                "gripper_qpos": qpos[:2].astype(float).tolist(),
+                "initial_position": (
+                    None if baseline is None else baseline.astype(float).tolist()
+                ),
+                "current_position": current.astype(float).tolist(),
+                "displacement": (
+                    None
+                    if displacement is None
+                    else displacement.astype(float).tolist()
+                ),
+                "hold": hold,
+            }
+        except Exception as exc:
+            return {
+                "picked_up": False,
+                "reason": f"{type(exc).__name__}: {exc}",
+            }
 
     def _object_collision_diagnostics(self) -> dict[str, list[dict[str, Any]]]:
         result: dict[str, list[dict[str, Any]]] = {}

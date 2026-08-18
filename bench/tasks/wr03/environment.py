@@ -20,6 +20,7 @@ from bench.tasks.wr03.domain.semantics import (
     record_storage_door_closed,
 )
 from bench.tasks.wr03.domain.episode import validate_level
+from bench.tasks.wr03.evaluation import WR03EvaluationSnapshot, WR03Evaluator
 from bench.tasks.wr03.physical_events import PhysicalSample, WR03PhysicalObserver
 RED_CAN_XML = f"{assets_root}/objects/objaverse/canned_food/canned_food_15/model.xml"
 ITEM_COUNTER_NAME = "counter_1_main_group"
@@ -136,7 +137,9 @@ class WR03StoreAndRetrieveRememberedCan(Kitchen):
         self._demo_storage_level = "lower"
         self._semantic_state = SemanticState()
         self._physical_observer: WR03PhysicalObserver | None = None
+        self._wr03_evaluator: WR03Evaluator | None = None
         self._physical_event_diagnostics: dict[str, Any] = {}
+        self._evaluation_initial_can_position: np.ndarray | None = None
         self.level_by_item = {CAN_ID: self._demo_storage_level}
         kwargs.setdefault("obj_registries", ("objaverse", "aigen", "lightwheel"))
         super().__init__(*args, **kwargs)
@@ -239,10 +242,12 @@ class WR03StoreAndRetrieveRememberedCan(Kitchen):
 
     def _setup_scene(self) -> None:
         self._physical_observer = None
+        self._wr03_evaluator = None
         super()._setup_scene()
         self._demo_storage_level = "lower"
         self._semantic_state = SemanticState()
         self.level_by_item = {CAN_ID: self._demo_storage_level}
+        self._evaluation_initial_can_position = None
 
     # Episode and semantic events ---------------------------------------
 
@@ -261,7 +266,9 @@ class WR03StoreAndRetrieveRememberedCan(Kitchen):
         self.level_by_item = {CAN_ID: self._demo_storage_level}
         self._semantic_state = SemanticState()
         self._physical_observer = None
+        self._wr03_evaluator = None
         self._physical_event_diagnostics = {}
+        self._evaluation_initial_can_position = None
         self._ep_meta.setdefault("refs", {})["item_id"] = CAN_ID
 
     def configure_canonical_physics(self) -> None:
@@ -306,6 +313,9 @@ class WR03StoreAndRetrieveRememberedCan(Kitchen):
             )
 
     def start_physical_observer(self) -> None:
+        self._evaluation_initial_can_position = self.get_object_world_position(
+            CAN_ID
+        ).copy()
         self._physical_observer = WR03PhysicalObserver(
             self._semantic_state,
             dwell_steps=self.physical_event_dwell_steps,
@@ -503,14 +513,19 @@ class WR03StoreAndRetrieveRememberedCan(Kitchen):
         return metadata
 
     def _check_success(self) -> bool:
+        evaluator = self._wr03_evaluator
+        if evaluator is not None:
+            return evaluator.observe(self.evaluation_snapshot()).success
         self._update_task_state()
         return evaluate_success(self._semantic_state, self.physical_state()).success
 
     def task_diagnostics(self) -> dict[str, Any]:
-        self._update_task_state()
-        physical = self.physical_state()
-        report = evaluate_success(self._semantic_state, physical)
-        return {
+        snapshot = self.evaluation_snapshot()
+        evaluator = self._wr03_evaluator
+        if evaluator is not None:
+            return evaluator.observe(snapshot).to_diagnostics()
+        report = evaluate_success(self._semantic_state, self.physical_state())
+        return dict(snapshot.details) | {
             "success": report.success,
             "terminal": bool(
                 report.success
@@ -527,6 +542,32 @@ class WR03StoreAndRetrieveRememberedCan(Kitchen):
                 )
             ),
             "success_checks": report.checks(),
+        }
+
+    def evaluation_snapshot(self) -> WR03EvaluationSnapshot:
+        """Expose only read-only physical and detected-event facts."""
+
+        self._update_task_state()
+        physical = self.physical_state()
+        report = evaluate_success(self._semantic_state, physical)
+        collision_state = self._object_collision_diagnostics()
+        grasp_evidence = self._can_physical_grasp_evidence()
+        details = {
+            "step_id": int(getattr(self, "timestep", 0)),
+            "success_checks": report.checks(),
+            "raw_stage_checks": {
+                "can_pick": bool(grasp_evidence.get("picked_up", False)),
+                "can_store": self.stored_level is not None,
+                "close_both_cabinets": bool(
+                    self.stored_level is not None
+                    and self._semantic_state.storage_hidden
+                    and physical.both_doors_closed
+                ),
+                "open_remembered_cabinet": (
+                    self._semantic_state.retrieval_level_opened is not None
+                ),
+                "retrieve_can": self._semantic_state.retrieved_item_id is not None,
+            },
             "storage": {
                 "stored_level": self.stored_level,
                 "closed_levels_after_storage": sorted(
@@ -551,15 +592,124 @@ class WR03StoreAndRetrieveRememberedCan(Kitchen):
             "physical": {
                 "can_in_lower": physical.can_in_lower,
                 "can_in_upper": physical.can_in_upper,
+                "can_outside_both": physical.can_outside_both,
+                "can_grasped": bool(grasp_evidence.get("picked_up", False)),
+                "can_grasp_evidence": grasp_evidence,
                 "can_world_position": self.get_object_world_position(CAN_ID)
                 .astype(float)
                 .tolist(),
                 "lower_door_closed": physical.lower_door_closed,
                 "upper_door_closed": physical.upper_door_closed,
+                "object_collisions_enabled": all(
+                    entry["enabled"]
+                    for entries in collision_state.values()
+                    for entry in entries
+                ),
+                "object_collision_geoms": collision_state,
             },
             "physical_events": dict(self._physical_event_diagnostics),
+            "collision_policy": "all_object_collisions_enabled",
             "execution_mode": "action_only_physics",
         }
+        other_door_closed = bool(
+            physical.upper_door_closed
+            if self.stored_level == "lower"
+            else physical.lower_door_closed
+            if self.stored_level == "upper"
+            else False
+        )
+        return WR03EvaluationSnapshot(
+            step_id=int(getattr(self, "timestep", 0)),
+            can_grasped=bool(grasp_evidence.get("picked_up", False)),
+            stored_level=self.stored_level,
+            storage_hidden=self._semantic_state.storage_hidden,
+            lower_door_closed=physical.lower_door_closed,
+            upper_door_closed=physical.upper_door_closed,
+            opened_level=self._semantic_state.retrieval_level_opened,
+            wrong_retrieval_level_opened=(
+                self._semantic_state.wrong_retrieval_level_opened
+            ),
+            retrieved_item_id=self._semantic_state.retrieved_item_id,
+            can_outside_both=physical.can_outside_both,
+            other_door_closed=other_door_closed,
+            protocol_violation=self._semantic_state.protocol_violation,
+            details=details,
+        )
+
+    def _can_physical_grasp_evidence(self) -> dict[str, Any]:
+        """Return read-only evidence that the gripper physically lifted the can."""
+
+        try:
+            from bench.execution.manipulation.object_interactions import (
+                get_object_hold_status,
+            )
+
+            robot = self.robots[0]
+            qpos = np.asarray(
+                robot.get_gripper_joint_positions("right"),
+                dtype=float,
+            ).reshape(-1)
+            if qpos.size < 2 or not np.all(np.isfinite(qpos[:2])):
+                return {"picked_up": False, "reason": "invalid_gripper_qpos"}
+            gripper_closed = bool(np.max(np.abs(qpos[:2])) <= 0.035)
+            hold = get_object_hold_status(
+                env=self,
+                object_name=CAN_ID,
+                max_end_effector_distance=0.18,
+            )
+            current = self.get_object_world_position(CAN_ID)
+            baseline = self._evaluation_initial_can_position
+            if baseline is None:
+                displacement = None
+                lifted = False
+                lateral_motion = False
+            else:
+                displacement = current - baseline
+                lifted = bool(float(displacement[2]) >= 0.02)
+                lateral_motion = bool(
+                    float(np.linalg.norm(displacement[:2])) >= 0.04
+                )
+            checks = {
+                "gripper_closed": gripper_closed,
+                "held_near_end_effector": bool(hold.get("held", False)),
+                "lifted_or_displaced": bool(lifted or lateral_motion),
+            }
+            return {
+                "picked_up": bool(all(checks.values())),
+                "checks": checks,
+                "gripper_qpos": qpos[:2].astype(float).tolist(),
+                "initial_position": (
+                    None if baseline is None else baseline.astype(float).tolist()
+                ),
+                "current_position": current.astype(float).tolist(),
+                "displacement": (
+                    None
+                    if displacement is None
+                    else displacement.astype(float).tolist()
+                ),
+                "hold": hold,
+            }
+        except Exception as exc:
+            return {
+                "picked_up": False,
+                "reason": f"{type(exc).__name__}: {exc}",
+            }
+
+    def _object_collision_diagnostics(self) -> dict[str, list[dict[str, Any]]]:
+        result: dict[str, list[dict[str, Any]]] = {CAN_ID: []}
+        for geom_name in self.objects[CAN_ID].contact_geoms or ():
+            geom_id = int(self.sim.model.geom_name2id(geom_name))
+            contype = int(self.sim.model.geom_contype[geom_id])
+            conaffinity = int(self.sim.model.geom_conaffinity[geom_id])
+            result[CAN_ID].append(
+                {
+                    "geom": str(geom_name),
+                    "contype": contype,
+                    "conaffinity": conaffinity,
+                    "enabled": bool(contype != 0 and conaffinity != 0),
+                }
+            )
+        return result
 
 
 __all__ = ["WR03StoreAndRetrieveRememberedCan"]

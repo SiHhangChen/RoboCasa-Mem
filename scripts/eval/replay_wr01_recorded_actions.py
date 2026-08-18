@@ -30,7 +30,7 @@ from bench.tasks.contracts import EpisodeRequest
 
 
 TASK_ID = "WR-01"
-EVALUATOR_PROFILE = "wr01-recorded-action-only-physics-replay-v1"
+EVALUATOR_PROFILE = "wr01-eight-stage-action-only-physics-replay-v1"
 
 
 def parse_args() -> argparse.Namespace:
@@ -166,6 +166,7 @@ def main() -> int:
         "created_at": datetime.now(timezone.utc).isoformat(),
         "task_id": TASK_ID,
         "dataset_root": str(root),
+        "seeds": [int(item["seed"]) for item in episodes],
         "replay": {
             "mode": REPLAY_MODE,
             "evaluator_profile": EVALUATOR_PROFILE,
@@ -227,6 +228,7 @@ def main() -> int:
                         f"doors={storage.get('doors', {})} "
                         f"door={retrieval.get('opened_level')} "
                         f"retrieved={retrieval.get('retrieved_item_id')} "
+                        f"stages={diagnostics.get('stage_checks', {})} "
                         f"collisions={physical.get('object_collisions_enabled')} "
                         f"positions={physical.get('item_world_positions', {})}",
                         flush=True,

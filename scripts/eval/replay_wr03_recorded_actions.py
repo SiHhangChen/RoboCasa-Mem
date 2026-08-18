@@ -54,7 +54,7 @@ from bench.runtime import RoboCasaRuntimeFactory
 from bench.tasks import get_task_definition, resolve_builtin_task_plugin
 from bench.tasks.contracts import EpisodeRequest
 
-RECORDED_EVALUATOR_PROFILE = "wr03-recorded-action-only-physics-replay-v2"
+RECORDED_EVALUATOR_PROFILE = "wr03-ordered-stage-action-only-physics-replay-v3"
 
 
 def parse_args() -> argparse.Namespace:
@@ -340,9 +340,27 @@ def main() -> int:
                 diagnostics = dict(transition.diagnostics.details or {})
                 if transition.diagnostics.success and success_step is None:
                     success_step = step
+                if step % 250 == 0:
+                    storage = diagnostics.get("storage", {})
+                    retrieval = diagnostics.get("retrieval", {})
+                    physical = diagnostics.get("physical", {})
+                    print(
+                        f"[replay] seed={seed:06d} step={step} "
+                        f"stored={storage.get('stored_level')} "
+                        f"hidden={storage.get('storage_hidden', False)} "
+                        f"door={retrieval.get('opened_level')} "
+                        f"retrieved={retrieval.get('retrieved_item_id')} "
+                        f"stages={diagnostics.get('stage_checks', {})} "
+                        f"collisions={physical.get('object_collisions_enabled')}",
+                        flush=True,
+                    )
                 retrieval = diagnostics.get("retrieval", {})
                 if isinstance(retrieval, dict) and retrieval.get("protocol_violation"):
                     violation_reason = "protocol_violation"
+                    break
+                failure_code = diagnostics.get("failure_code")
+                if failure_code in {"wrong_retrieval_cabinet", "protocol_violation"}:
+                    violation_reason = str(failure_code)
                     break
             # Full-horizon validation: success is a final-state property for the
             # store -> close doors -> remember -> retrieve chain, so only the

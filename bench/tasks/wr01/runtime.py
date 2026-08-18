@@ -5,10 +5,16 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from bench.runtime import TaskRuntimeAdapter, default_close, default_diagnostics, default_success
+from bench.runtime import TaskRuntimeAdapter, default_close
 from bench.tasks.runtime_support import cabinet_initialization, manual_navigation, operations_actions, standard_plan, standard_scene
 from bench.tasks.wr01.config import load_task_config, resolve_action_config
 from bench.tasks.wr01.domain.episode import resolve_episode_plan, resolve_scene_config
+from bench.tasks.wr01.evaluation import (
+    TASK_EVALUATOR_METADATA_KEY,
+    WR01Evaluator,
+    diagnostics_for_runtime,
+    success_for_runtime,
+)
 from bench.tasks.wr01.execution.navigation import build_navigation_config
 from bench.tasks.wr01.expert.operations import build_operation_handlers
 from bench.tasks.wr01.initialization import apply_robot_base_initial_state, apply_robot_torso_initial_state, initialize_episode_state
@@ -36,14 +42,44 @@ def _environment(config: Any, scene: Any, plan: Any, resources: Mapping[str, Any
             )}
 
 
+_initialize_cabinet = cabinet_initialization(
+    initialize_episode_state,
+    apply_robot_base_initial_state,
+    apply_robot_torso_initial_state,
+)
+
+
+def _initialize(descriptor: Any, env: Any, observation: Mapping[str, Any]):
+    updated, initialization, metadata, targets = _initialize_cabinet(
+        descriptor,
+        env,
+        observation,
+    )
+    evaluator = WR01Evaluator(
+        storage_order=descriptor.episode_plan.storage_order,
+        target_item_id=descriptor.episode_plan.target_item_id,
+        target_level=descriptor.episode_plan.target_level,
+    )
+    evaluator.reset(env.evaluation_snapshot())
+    env._wr01_evaluator = evaluator
+    return (
+        updated,
+        initialization,
+        {**dict(metadata), TASK_EVALUATOR_METADATA_KEY: evaluator},
+        targets,
+    )
+
+
 _ADAPTER = TaskRuntimeAdapter(
     task_id="WR-01", load_task_config=load_task_config, resolve_task_options=None,
     scene=standard_scene(resolve_scene_config), plan=standard_plan(resolve_episode_plan),
     actions=operations_actions(resolve_action_config), navigation=manual_navigation(build_navigation_config),
     prompt=lambda plan, variant: resolve_prompt_spec(target_item_id=plan.target_item_id, variant=variant),
     environment=_environment,
-    initialize=cabinet_initialization(initialize_episode_state, apply_robot_base_initial_state, apply_robot_torso_initial_state),
-    diagnostics=default_diagnostics, success=default_success, close=default_close,
+    initialize=_initialize,
+    diagnostics=diagnostics_for_runtime,
+    success=success_for_runtime,
+    close=default_close,
     expert_runtime=build_operation_handlers,
 )
 TASK_RUNTIME_API = _ADAPTER.api()

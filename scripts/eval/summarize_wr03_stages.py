@@ -7,13 +7,13 @@
 默认只汇总正式全 horizon 评测（run 名以 ``-50seed-20action`` 结尾）。
 旧版 smoke/实验 run 不会进入正式报表；使用 ``--include-legacy-runs``
 才显式包含它们。脚本同时输出逐 seed 的最终判定，避免把“到达过某个中间
-阶段”误读为最终成功。
+阶段”误读为最终成功。新 evaluator 的 qualified 阶段优先于旧版
+success_checks；旧版运行仍保留兼容回退。
 
 扫描 outputs/eval/gr00t/WR03/<step>/<run_id>/ 和根级 outputs/eval/wr03-gr00t-*/
 下的运行目录，对每个 run 统计 WR-03 记忆任务的达成漏斗（判定依据来自各
-episode result.json 的 diagnostics.success_checks 字段，与
-bench/tasks/wr03/domain/semantics.py 的 SuccessReport 一致）：
-    存储入柜 → 双门关闭 → 记忆锁定 → 正确取回门 → 同物取出 → 最终成功
+episode result.json 的 diagnostics.stages.*.qualified 字段）：
+    罐头取 → 罐头存 → 双柜门关闭并锁定记忆 → 打开记忆柜 → 取回罐头 → 最终成功
 
 error/cancelled 的 episode 计入 n_error/n_cancelled 但不进漏斗分母。
 """
@@ -32,19 +32,19 @@ OFFICIAL_EVALUATOR_PROFILE = "wr03-50seed-20action"
 OFFICIAL_RUN_SUFFIX = "-50seed-20action"
 
 STAGES = [
-    "storage",
-    "doors_closed",
-    "barrier",
-    "correct_door",
-    "retrieved",
+    "can_pick",
+    "can_store",
+    "close_both_cabinets",
+    "open_remembered_cabinet",
+    "retrieve_can",
     "success",
 ]
 STAGE_LABELS = {
-    "storage": "存储入柜",
-    "doors_closed": "双门关闭",
-    "barrier": "记忆锁定",
-    "correct_door": "正确取回门",
-    "retrieved": "同物取出",
+    "can_pick": "罐头取",
+    "can_store": "罐头存",
+    "close_both_cabinets": "双柜门关闭并锁定记忆",
+    "open_remembered_cabinet": "打开记忆柜",
+    "retrieve_can": "取回罐头",
     "success": "最终成功",
 }
 
@@ -112,16 +112,32 @@ def load_episodes(run: Path) -> list[dict]:
 def stage_hits(r: dict) -> dict[str, bool]:
     checks = _checks(r.get("diagnostics", {}))
     d = r.get("diagnostics", {})
-    hits = {
-        "storage": bool(checks.get("can_storage_verified")),
-        "doors_closed": bool(checks.get("both_doors_closed_after_storage")),
-        "barrier": bool(checks.get("memory_barrier_latched")),
-        "correct_door": bool(
-            checks.get("correct_retrieval_door")
-            and checks.get("no_wrong_retrieval_door")
-        ),
-        "retrieved": bool(checks.get("same_can_retrieved")),
-    }
+    stages = d.get("stages", {}) or {}
+    stage_names = tuple(stage for stage in STAGES if stage != "success")
+    if isinstance(stages, dict) and all(
+        isinstance(stages.get(stage), dict) for stage in stage_names
+    ):
+        hits = {
+            stage: bool(stages[stage].get("qualified"))
+            for stage in stage_names
+        }
+    else:
+        # Compatibility with WR-03 results written before the independent
+        # evaluator existed. The legacy payload has no physical pick stage,
+        # so that field remains false rather than being fabricated.
+        hits = {
+            "can_pick": False,
+            "can_store": bool(checks.get("can_storage_verified")),
+            "close_both_cabinets": bool(
+                checks.get("both_doors_closed_after_storage")
+                and checks.get("memory_barrier_latched")
+            ),
+            "open_remembered_cabinet": bool(
+                checks.get("correct_retrieval_door")
+                and checks.get("no_wrong_retrieval_door")
+            ),
+            "retrieve_can": bool(checks.get("same_can_retrieved")),
+        }
     # “最终成功”必须以 episode 的最终判定为准，不能因为历史上曾短暂满足
     # 某个条件就被计为成功。
     hits["success"] = bool(
