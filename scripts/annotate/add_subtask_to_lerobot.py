@@ -8,8 +8,8 @@ registers the feature in ``meta/info.json``. Videos and all other columns are
 left untouched. After this, lerobot >=0.4.4 returns ``item["subtask"]`` on
 every frame, which is what MemER's generate_sft_data.py / eval rollout read.
 
-The episode_index in the dataset is assumed to equal the seed used by the
-recorder (true for the canonical seed-ordered conversion used by MemBench).
+Records may provide an explicit ``episode_index`` when the source recorder
+seeds are not contiguous; otherwise the recorder seed is used as the index.
 
 Usage:
     python scripts/annotate/add_subtask_to_lerobot.py \\
@@ -36,13 +36,23 @@ def load_subtask_map(subtasks_path: Path) -> dict[int, dict]:
         for line in subtasks_path.read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
-    return {int(r["seed"]): r for r in records}
+    return {int(r.get("episode_index", r["seed"])): r for r in records}
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--lerobot-root", type=Path, required=True)
     parser.add_argument("--subtasks", type=Path, required=True)
+    parser.add_argument(
+        "--high-level-instruction",
+        default=None,
+        help="Replace the single task label in meta/tasks.parquet.",
+    )
+    parser.add_argument(
+        "--include-memory-keyframes",
+        action="store_true",
+        help="Add a per-frame memory_keyframe bool column from record keyframes.",
+    )
     parser.add_argument("--backup-info", action="store_true",
                         help="copy info.json to info.json.subtask_backup first")
     args = parser.parse_args()
@@ -81,6 +91,16 @@ def main() -> None:
             table = table.drop(["subtask_index"])
         subtask_col = pa.array(indices, type=pa.int64())
         table = table.append_column("subtask_index", subtask_col)
+        if args.include_memory_keyframes:
+            keyframe_set = {int(value) for value in record.get("keyframes", [])}
+            frame_indices = table["frame_index"].to_pylist()
+            memory_col = pa.array(
+                [int(frame) in keyframe_set for frame in frame_indices],
+                type=pa.bool_(),
+            )
+            if "memory_keyframe" in table.column_names:
+                table = table.drop(["memory_keyframe"])
+            table = table.append_column("memory_keyframe", memory_col)
         tmp = path + ".tmp"
         pq.write_table(table, tmp, compression="snappy")
         Path(tmp).replace(path)
@@ -102,16 +122,34 @@ def main() -> None:
     sub_df.index.name = "subtask"
     sub_df.to_parquet(root / "meta" / "subtasks.parquet")
 
+    if args.high_level_instruction:
+        tasks_path = root / "meta" / "tasks.parquet"
+        tasks_df = pd.read_parquet(tasks_path)
+        if len(tasks_df) != 1 or "task_index" not in tasks_df.columns:
+            raise ValueError(
+                "--high-level-instruction currently requires exactly one task row"
+            )
+        tasks_df.index = pd.Index([args.high_level_instruction], name="task")
+        tasks_df.to_parquet(tasks_path)
+
     # register feature in info.json
     info["features"]["subtask_index"] = {
         "dtype": "int64",
         "shape": [1],
         "names": None,
     }
+    if args.include_memory_keyframes:
+        info["features"]["memory_keyframe"] = {
+            "dtype": "bool",
+            "shape": [1],
+            "names": None,
+        }
     info_path.write_text(json.dumps(info, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
     print(f"wrote subtask_index to {n_columns_written} parquet files")
     print(f"wrote {root / 'meta' / 'subtasks.parquet'} with {len(labels)} subtasks")
+    if args.high_level_instruction:
+        print(f"updated {root / 'meta' / 'tasks.parquet'} task instruction")
     print(f"registered subtask_index feature in {info_path}")
 
 

@@ -1,0 +1,74 @@
+{
+  "task_id": "WR-03",
+  "spatial_reference": "Upper/lower refer to the two fixed world-coordinate WR03 cabinet levels, not camera-image directions. The initial storage subtask intentionally permits either cabinet; only the remembered retrieval-door choice is level-specific.",
+  "high_level_instruction": "Place the can into one of the two cabinets. Close both cabinet doors, remember where the can was stored, then retrieve it.",
+  "subtasks": {
+    "store_can": {
+      "label": "pick up the can and store it in either open cabinet",
+      "keyframe": "last"
+    },
+    "close_upper": {
+      "label": "close the upper cabinet door",
+      "keyframe": "last"
+    },
+    "close_lower": {
+      "label": "close the lower cabinet door",
+      "keyframe": "last"
+    },
+    "open_upper": {
+      "label": "open the upper cabinet door where the can was stored",
+      "keyframe": "first"
+    },
+    "open_lower": {
+      "label": "open the lower cabinet door where the can was stored",
+      "keyframe": "first"
+    },
+    "retrieve_can": {
+      "label": "retrieve the can from the opened cabinet",
+      "keyframe": "last"
+    }
+  },
+  "stage_prefixes": {
+    "store_can": [
+      "navigate_to_visible_can",
+      "pick_can_for_storage",
+      "return_with_can_for_transport",
+      "navigate_can_to_",
+      "place_can_in_",
+      "verify_can_stored_in_",
+      "return_after_can_stored"
+    ],
+    "close_upper": [
+      "navigate_to_upper_door_for_closing",
+      "close_upper_cabinet_after_storage",
+      "return_after_closing_upper_cabinet"
+    ],
+    "close_lower": [
+      "navigate_to_lower_door_for_closing",
+      "close_lower_cabinet_after_storage",
+      "return_after_closing_lower_cabinet",
+      "latch_hidden_can_location"
+    ],
+    "open_remembered": [
+      "navigate_to_lower_door_for_retrieval",
+      "navigate_to_upper_door_for_retrieval",
+      "open_remembered_cabinet",
+      "verify_remembered_cabinet_open",
+      "return_after_opening_remembered_cabinet"
+    ],
+    "retrieve_can": [
+      "navigate_to_lower_storage_station_for_retrieval",
+      "navigate_to_upper_storage_station_for_retrieval",
+      "retrieve_same_can_from_cabinet"
+    ]
+  },
+  "dynamic_stage_labels": {
+    "open_remembered": {
+      "field": "stored_level",
+      "values": {
+        "upper": "open_upper",
+        "lower": "open_lower"
+      }
+    }
+  }
+}

@@ -2,7 +2,7 @@
   "default_select": "last",
   "rules": [
     {
-      "exact": "identify the sugared coffee",
+      "pattern": "^pick up the coffee cup in the (left|right) dining placement zone$",
       "select": "first"
     }
   ]

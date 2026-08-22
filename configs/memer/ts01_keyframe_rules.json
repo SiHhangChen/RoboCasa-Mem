@@ -1,0 +1,9 @@
+{
+  "default_select": "last",
+  "rules": [
+    {
+      "exact": "press the completion button",
+      "select": "first"
+    }
+  ]
+}

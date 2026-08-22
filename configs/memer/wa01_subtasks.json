@@ -1,21 +1,26 @@
 {
   "task_id": "WA-01",
-  "high_level_instruction": "Start at the coffee machine with two identical prepared coffees. Add one sugar cube to either coffee, carry both coffees to the dining counter, and identify the coffee you sugared.",
+  "spatial_reference": "left/right refer to the fixed world-coordinate WA-01 dining placement zones, not camera-image directions or initial cup positions.",
+  "high_level_instruction": "Start at the coffee machine with two identical prepared coffees. Add one sugar cube to either coffee, carry both coffees to the dining counter, and pick up the coffee cup you sugared.",
   "subtasks": {
     "add_sugar": {
-      "label": "add one sugar cube to a coffee",
+      "label": "add one sugar cube to a coffee cup",
       "keyframe": "last"
     },
     "place_first": {
-      "label": "carry the first coffee to the dining counter",
+      "label": "carry one coffee cup to the dining counter",
       "keyframe": "last"
     },
     "place_second": {
-      "label": "carry the second coffee to the dining counter",
+      "label": "carry the remaining coffee cup to the dining counter",
       "keyframe": "last"
     },
-    "identify": {
-      "label": "identify the sugared coffee",
+    "select_left": {
+      "label": "pick up the coffee cup in the left dining placement zone",
+      "keyframe": "first"
+    },
+    "select_right": {
+      "label": "pick up the coffee cup in the right dining placement zone",
       "keyframe": "first"
     }
   },
@@ -52,5 +57,14 @@
       "verify_sugared_coffee",
       "select_sugared_coffee"
     ]
+  },
+  "dynamic_stage_labels": {
+    "identify": {
+      "field": "sugared_coffee_slot",
+      "values": {
+        "left": "select_left",
+        "right": "select_right"
+      }
+    }
   }
 }

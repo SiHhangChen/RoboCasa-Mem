@@ -41,6 +41,8 @@ def load_config(path: Path) -> dict:
         "high_level_instruction": config.get("high_level_instruction", ""),
         "subtasks": config["subtasks"],
         "stage_prefixes": prefixes,
+        "dynamic_stage_labels": config.get("dynamic_stage_labels", {}),
+        "keyframes_from_record": bool(config.get("keyframes_from_record", False)),
     }
 
 
@@ -73,6 +75,38 @@ def recorded_total_frames(episode_dir: Path) -> int:
     raise FileNotFoundError(f"no episode.json or trajectory.h5 under {episode_dir}")
 
 
+def resolve_dynamic_subtask(static_subtask: str, record: dict, config: dict) -> str:
+    """Resolve an optional label from deterministic episode-level metadata."""
+    spec = config.get("dynamic_stage_labels", {}).get(static_subtask)
+    if spec is None:
+        return static_subtask
+    if not isinstance(spec, dict):
+        raise ValueError(f"dynamic_stage_labels[{static_subtask!r}] must be an object")
+    field = str(spec.get("field", "")).strip()
+    values = spec.get("values")
+    if not field or not isinstance(values, dict):
+        raise ValueError(
+            f"dynamic_stage_labels[{static_subtask!r}] requires a field and values mapping"
+        )
+    value = record.get(field)
+    target = values.get(value)
+    if target is None:
+        # JSON object keys are strings, while episode metadata commonly stores
+        # numeric counts as integers (for example TS02 search_count=1/2/3).
+        target = values.get(str(value))
+    if target is None:
+        raise ValueError(
+            f"task {record['task_id']} seed {record['seed']}: no dynamic label for "
+            f"{field}={value!r} in stage {static_subtask!r}"
+        )
+    target = str(target)
+    if target not in config["subtasks"]:
+        raise ValueError(
+            f"dynamic label {target!r} for stage {static_subtask!r} is not configured"
+        )
+    return target
+
+
 def label_episode(record: dict, config: dict, recorded_total: int) -> dict:
     subtask_order: list[str] = list(config["subtasks"].keys())
     stage_subs: list[str] = []
@@ -83,7 +117,7 @@ def label_episode(record: dict, config: dict, recorded_total: int) -> dict:
                 f"task {record['task_id']} seed {record['seed']}: "
                 f"stage '{stage['name']}' matched no subtask prefix"
             )
-        stage_subs.append(sub)
+        stage_subs.append(resolve_dynamic_subtask(sub, record, config))
 
     # per-frame labels from stage ranges
     labels: list[str] = []
@@ -102,9 +136,23 @@ def label_episode(record: dict, config: dict, recorded_total: int) -> dict:
     elif len(labels) > recorded_total:
         labels = labels[:recorded_total]
 
-    # memory keyframes: one per contiguous subtask segment, per its rule
+    # Some tasks have repeated semantic labels but multiple meaningful events
+    # inside one segment (TS01 has one placement event per sugar cube). Those
+    # event frames are reconstructed by the task-specific boundary bridge.
+    explicit_keyframes = config.get("keyframes_from_record", False)
     keyframes: list[int] = []
-    if labels:
+    if explicit_keyframes:
+        raw_keyframes = record.get("keyframes")
+        if not isinstance(raw_keyframes, list):
+            raise ValueError(
+                f"task {record['task_id']} seed {record['seed']}: missing explicit keyframes"
+            )
+        keyframes = sorted({int(frame) for frame in raw_keyframes})
+        if any(frame < 0 or frame >= len(labels) for frame in keyframes):
+            raise ValueError(
+                f"task {record['task_id']} seed {record['seed']}: explicit keyframe outside episode"
+            )
+    elif labels:
         seg_start = 0
         seg_sub = labels[0]
         for i in range(1, len(labels) + 1):
@@ -121,7 +169,7 @@ def label_episode(record: dict, config: dict, recorded_total: int) -> dict:
 
     name_map = {str(k): config["subtasks"][k]["label"] for k in subtask_order}
     index_map = {k: i for i, k in enumerate(subtask_order)}
-    return {
+    output = {
         "task_id": record["task_id"],
         "seed": record["seed"],
         "total_frames": len(labels),
@@ -130,6 +178,25 @@ def label_episode(record: dict, config: dict, recorded_total: int) -> dict:
         "subtask_order": [config["subtasks"][k]["label"] for k in subtask_order],
         "keyframes": keyframes,
     }
+    if "episode_index" in record:
+        output["episode_index"] = int(record["episode_index"])
+    return output
+
+
+def load_seed_registry(path: Path | None) -> dict[int, int]:
+    if path is None:
+        return {}
+    mapping: dict[int, int] = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        row = json.loads(line)
+        seed = int(row["seed"])
+        episode_index = int(row["episode_index"])
+        if seed in mapping:
+            raise ValueError(f"duplicate seed {seed} in {path}")
+        mapping[seed] = episode_index
+    return mapping
 
 
 def main() -> None:
@@ -140,9 +207,16 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--seeds", default=None, help="optional comma-separated filter")
     parser.add_argument("--task-id", default=None)
+    parser.add_argument(
+        "--seed-registry",
+        type=Path,
+        default=None,
+        help="Optional LeRobot meta/seeds.jsonl mapping source seed to episode_index.",
+    )
     args = parser.parse_args()
 
     config = load_config(args.config)
+    seed_registry = load_seed_registry(args.seed_registry)
     seeds = {int(s) for s in args.seeds.split(",")} if args.seeds else None
 
     records = [
@@ -158,6 +232,12 @@ def main() -> None:
     n_written = 0
     with args.output.open("w", encoding="utf-8") as fp:
         for record in sorted(records, key=lambda r: r.get("seed", 0)):
+            if seed_registry:
+                seed = int(record["seed"])
+                if seed not in seed_registry:
+                    raise ValueError(f"seed {seed} is missing from {args.seed_registry}")
+                record = dict(record)
+                record["episode_index"] = seed_registry[seed]
             episode_dir = args.episodes_root / f"seed_{record['seed']:06d}_attempt_00"
             if not episode_dir.exists():
                 print(f"WARN: missing episode dir {episode_dir}, skipping", file=sys.stderr)
