@@ -5,12 +5,18 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from bench.runtime import TaskRuntimeAdapter, default_close, default_diagnostics, default_success
+from bench.runtime import TaskRuntimeAdapter, default_close
 from bench.tasks.runtime_support import manual_station_navigation, standard_plan, standard_scene
 from bench.tasks.wa02.config import load_task_config, resolve_action_config, resolve_task_options
 from bench.tasks.wa02.domain.episode import resolve_episode_plan, resolve_scene_config
 from bench.tasks.wa02.domain.geometry import resolve_cup_region_constraints, resolve_cup_sampling_regions
 from bench.tasks.wa02.execution.navigation import build_navigation_config
+from bench.tasks.wa02.evaluation import (
+    TASK_EVALUATOR_METADATA_KEY,
+    WA02Evaluator,
+    diagnostics_for_runtime,
+    success_for_runtime,
+)
 from bench.tasks.wa02.expert.operations import build_operation_handlers
 from bench.tasks.wa02.initialization import apply_robot_base_initial_state, apply_sampled_initial_object_regions
 from bench.tasks.wa02.prompts import resolve_prompt_spec
@@ -41,12 +47,25 @@ def _initialize(descriptor: Any, env: Any, observation: Mapping[str, Any]):
     enabled = bool(initial_objects.pop("enabled", True))
     updated, objects = apply_sampled_initial_object_regions(env, settings=initial_objects, enabled=enabled)
     env.configure_episode(descriptor.episode_plan)
+    evaluator = WA02Evaluator(
+        fill_cup_order=descriptor.episode_plan.fill_cup_order,
+        fill_temperature_order=descriptor.episode_plan.fill_temperature_order,
+        service_slot_by_cup=descriptor.episode_plan.service_slot_by_cup,
+        requested_cup_id=descriptor.episode_plan.requested_cup_id,
+    )
+    evaluator.reset(env.evaluation_snapshot())
+    env._wa02_evaluator = evaluator
     updated, base = apply_robot_base_initial_state(
         env, updated, config=descriptor.config.initial_state.robot_base,
         nav_config=descriptor.navigation, episode=descriptor.episode_plan,
         initial_objects=initial_objects, seed=descriptor.scene.scene_seed,
     )
-    return updated, {"objects": objects, "base": base}, {}, None
+    return (
+        updated,
+        {"objects": objects, "base": base},
+        {TASK_EVALUATOR_METADATA_KEY: evaluator},
+        None,
+    )
 
 
 _ADAPTER = TaskRuntimeAdapter(
@@ -56,7 +75,7 @@ _ADAPTER = TaskRuntimeAdapter(
     navigation=manual_station_navigation(build_navigation_config),
     prompt=lambda plan, variant: resolve_prompt_spec(requested_temperature=plan.requested_temperature, variant=variant),
     environment=_environment, initialize=_initialize,
-    diagnostics=default_diagnostics, success=default_success, close=default_close,
+    diagnostics=diagnostics_for_runtime, success=success_for_runtime, close=default_close,
     expert_runtime=build_operation_handlers,
 )
 TASK_RUNTIME_API = _ADAPTER.api()

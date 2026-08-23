@@ -115,6 +115,7 @@ class WR03PhysicalObserver:
                         and record_storage_door_closed(self.state, level)
                     ):
                         events.append(f"closed:{level}")
+                        self._mark(f"close_{level}_cabinet", sample.step_id)
                 if (
                     stored is not None
                     and sample.can_in_level(stored)

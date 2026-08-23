@@ -62,3 +62,17 @@ def test_wr03_legacy_results_do_not_fabricate_pick_stage() -> None:
     assert not hits["can_pick"]
     assert hits["can_store"]
     assert hits["retrieve_can"]
+
+
+def test_wr03_summary_splits_recorded_close_events() -> None:
+    episode = _episode()
+    episode["diagnostics"]["storage"] = {
+        "closed_levels_after_storage": ["upper"],
+    }
+    del episode["diagnostics"]["stages"]["close_upper_cabinet"]
+    del episode["diagnostics"]["stages"]["close_lower_cabinet"]
+
+    hits = summary.stage_hits(episode)
+
+    assert hits["close_upper_cabinet"]
+    assert not hits["close_lower_cabinet"]

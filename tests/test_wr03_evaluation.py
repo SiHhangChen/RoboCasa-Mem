@@ -12,6 +12,7 @@ def _snapshot(
     *,
     grasped: bool = False,
     stored: str | None = None,
+    closed_levels: frozenset[str] = frozenset(),
     hidden: bool = False,
     lower_closed: bool = False,
     upper_closed: bool = False,
@@ -26,6 +27,7 @@ def _snapshot(
         step_id=step,
         can_grasped=grasped,
         stored_level=stored,
+        closed_levels_after_storage=closed_levels,
         storage_hidden=hidden,
         lower_door_closed=lower_closed,
         upper_door_closed=upper_closed,
@@ -52,9 +54,8 @@ def _complete(evaluator: WR03Evaluator) -> None:
         _snapshot(
             3,
             stored="lower",
-            hidden=True,
-            lower_closed=True,
             upper_closed=True,
+            closed_levels=frozenset({"upper"}),
         )
     )
     evaluator.observe(
@@ -62,9 +63,20 @@ def _complete(evaluator: WR03Evaluator) -> None:
             4,
             stored="lower",
             hidden=True,
+            lower_closed=True,
+            upper_closed=True,
+            closed_levels=frozenset({"upper", "lower"}),
+        )
+    )
+    evaluator.observe(
+        _snapshot(
+            5,
+            stored="lower",
+            hidden=True,
             lower_closed=False,
             upper_closed=True,
             opened="lower",
+            closed_levels=frozenset({"upper", "lower"}),
         )
     )
 
@@ -74,12 +86,13 @@ def test_wr03_evaluator_qualifies_ordered_stages_and_final_success() -> None:
     _complete(evaluator)
     result = evaluator.observe(
         _snapshot(
-            5,
+            6,
             stored="lower",
             hidden=True,
             lower_closed=False,
             upper_closed=True,
             opened="lower",
+            closed_levels=frozenset({"upper", "lower"}),
             retrieved="red_can",
             outside=True,
             other_closed=True,
@@ -90,9 +103,16 @@ def test_wr03_evaluator_qualifies_ordered_stages_and_final_success() -> None:
     assert result.failure_code is None
     assert {
         name: result.stages[name].qualified_step for name in STAGE_ORDER
-    } == {name: index for index, name in enumerate(STAGE_ORDER, start=1)}
+    } == {
+        "can_pick": 1,
+        "can_store": 2,
+        "close_upper_cabinet": 3,
+        "close_lower_cabinet": 4,
+        "open_remembered_cabinet": 5,
+        "retrieve_can": 6,
+    }
     diagnostics = result.to_diagnostics()
-    assert diagnostics["evaluation"]["step_id"] == 5
+    assert diagnostics["evaluation"]["step_id"] == 6
     assert diagnostics["stage_checks"] == {name: True for name in STAGE_ORDER}
 
 
@@ -105,16 +125,35 @@ def test_wr03_evaluator_rejects_open_before_memory_barrier() -> None:
             3,
             stored="lower",
             opened="lower",
-            lower_closed=False,
-            upper_closed=True,
+            closed_levels=frozenset(),
         )
     )
 
     assert result.stages["open_remembered_cabinet"].observed
     assert not result.stages["open_remembered_cabinet"].qualified
     assert result.stages["open_remembered_cabinet"].reason == (
-        "prerequisite_not_qualified:close_both_cabinets"
+        "prerequisite_not_qualified:close_lower_cabinet"
     )
+
+
+def test_wr03_evaluator_qualifies_both_close_stages_from_one_sample() -> None:
+    evaluator = _evaluator()
+    evaluator.observe(_snapshot(1, grasped=True))
+    evaluator.observe(_snapshot(2, stored="lower"))
+
+    result = evaluator.observe(
+        _snapshot(
+            3,
+            stored="lower",
+            hidden=True,
+            lower_closed=True,
+            upper_closed=True,
+            closed_levels=frozenset({"upper", "lower"}),
+        )
+    )
+
+    assert result.stages["close_upper_cabinet"].qualified_step == 3
+    assert result.stages["close_lower_cabinet"].qualified_step == 3
 
 
 def test_wr03_evaluator_makes_wrong_retrieval_cabinet_terminal() -> None:
@@ -126,19 +165,30 @@ def test_wr03_evaluator_makes_wrong_retrieval_cabinet_terminal() -> None:
             3,
             stored="lower",
             hidden=True,
+            upper_closed=True,
+            closed_levels=frozenset({"upper"}),
+        )
+    )
+    evaluator.observe(
+        _snapshot(
+            4,
+            stored="lower",
+            hidden=True,
             lower_closed=True,
             upper_closed=True,
+            closed_levels=frozenset({"upper", "lower"}),
         )
     )
     result = evaluator.observe(
         _snapshot(
-            4,
+            6,
             stored="lower",
             hidden=True,
             lower_closed=True,
             upper_closed=False,
             opened="upper",
             wrong_opened=True,
+            closed_levels=frozenset({"upper", "lower"}),
         )
     )
 
@@ -152,10 +202,11 @@ def test_wr03_success_is_revoked_if_final_state_regresses() -> None:
     _complete(evaluator)
     success = evaluator.observe(
         _snapshot(
-            5,
+            6,
             stored="lower",
             hidden=True,
             opened="lower",
+            closed_levels=frozenset({"upper", "lower"}),
             retrieved="red_can",
             outside=True,
             other_closed=True,
@@ -163,10 +214,11 @@ def test_wr03_success_is_revoked_if_final_state_regresses() -> None:
     )
     regressed = evaluator.observe(
         _snapshot(
-            6,
+            7,
             stored="lower",
             hidden=True,
             opened="lower",
+            closed_levels=frozenset({"upper", "lower"}),
             retrieved="red_can",
             outside=True,
             other_closed=False,

@@ -13,7 +13,7 @@ success_checks；旧版运行仍保留兼容回退。
 扫描 outputs/eval/gr00t/WR03/<step>/<run_id>/ 和根级 outputs/eval/wr03-gr00t-*/
 下的运行目录，对每个 run 统计 WR-03 记忆任务的达成漏斗（判定依据来自各
 episode result.json 的 diagnostics.stages.*.qualified 字段）：
-    罐头取 → 罐头存 → 双柜门关闭并锁定记忆 → 打开记忆柜 → 取回罐头 → 最终成功
+    罐头取 → 罐头存 → 关上柜 → 关下柜 → 开柜 → 取物 → 最终成功
 
 error/cancelled 的 episode 计入 n_error/n_cancelled 但不进漏斗分母。
 """
@@ -34,7 +34,8 @@ OFFICIAL_RUN_SUFFIX = "-50seed-20action"
 STAGES = [
     "can_pick",
     "can_store",
-    "close_both_cabinets",
+    "close_upper_cabinet",
+    "close_lower_cabinet",
     "open_remembered_cabinet",
     "retrieve_can",
     "success",
@@ -42,9 +43,10 @@ STAGES = [
 STAGE_LABELS = {
     "can_pick": "罐头取",
     "can_store": "罐头存",
-    "close_both_cabinets": "双柜门关闭并锁定记忆",
-    "open_remembered_cabinet": "打开记忆柜",
-    "retrieve_can": "取回罐头",
+    "close_upper_cabinet": "关上柜",
+    "close_lower_cabinet": "关下柜",
+    "open_remembered_cabinet": "开柜",
+    "retrieve_can": "取物",
     "success": "最终成功",
 }
 
@@ -113,13 +115,35 @@ def stage_hits(r: dict) -> dict[str, bool]:
     checks = _checks(r.get("diagnostics", {}))
     d = r.get("diagnostics", {})
     stages = d.get("stages", {}) or {}
-    stage_names = tuple(stage for stage in STAGES if stage != "success")
-    if isinstance(stages, dict) and all(
-        isinstance(stages.get(stage), dict) for stage in stage_names
-    ):
+    storage = d.get("storage", {}) or {}
+    closed_levels = set(storage.get("closed_levels_after_storage") or ())
+    has_stage_payload = isinstance(stages, dict) and any(
+        isinstance(stages.get(stage), dict)
+        for stage in (
+            "can_pick",
+            "can_store",
+            "close_upper_cabinet",
+            "close_lower_cabinet",
+        )
+    )
+    if has_stage_payload:
         hits = {
-            stage: bool(stages[stage].get("qualified"))
-            for stage in stage_names
+            "can_pick": bool((stages.get("can_pick") or {}).get("qualified")),
+            "can_store": bool((stages.get("can_store") or {}).get("qualified")),
+            "close_upper_cabinet": bool(
+                (stages.get("close_upper_cabinet") or {}).get("qualified")
+                or "upper" in closed_levels
+            ),
+            "close_lower_cabinet": bool(
+                (stages.get("close_lower_cabinet") or {}).get("qualified")
+                or "lower" in closed_levels
+            ),
+            "open_remembered_cabinet": bool(
+                (stages.get("open_remembered_cabinet") or {}).get("qualified")
+            ),
+            "retrieve_can": bool(
+                (stages.get("retrieve_can") or {}).get("qualified")
+            ),
         }
     else:
         # Compatibility with WR-03 results written before the independent
@@ -128,10 +152,8 @@ def stage_hits(r: dict) -> dict[str, bool]:
         hits = {
             "can_pick": False,
             "can_store": bool(checks.get("can_storage_verified")),
-            "close_both_cabinets": bool(
-                checks.get("both_doors_closed_after_storage")
-                and checks.get("memory_barrier_latched")
-            ),
+            "close_upper_cabinet": "upper" in closed_levels,
+            "close_lower_cabinet": "lower" in closed_levels,
             "open_remembered_cabinet": bool(
                 checks.get("correct_retrieval_door")
                 and checks.get("no_wrong_retrieval_door")

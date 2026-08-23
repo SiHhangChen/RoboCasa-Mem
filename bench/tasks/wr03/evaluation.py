@@ -18,14 +18,16 @@ from bench.tasks.wr03.domain.contracts import CAN_ID, CABINET_LEVELS
 STAGE_ORDER = (
     "can_pick",
     "can_store",
-    "close_both_cabinets",
+    "close_upper_cabinet",
+    "close_lower_cabinet",
     "open_remembered_cabinet",
     "retrieve_can",
 )
 STAGE_LABELS = {
     "can_pick": "罐头取",
     "can_store": "罐头存",
-    "close_both_cabinets": "双柜门关闭并锁定记忆",
+    "close_upper_cabinet": "关上柜",
+    "close_lower_cabinet": "关下柜",
     "open_remembered_cabinet": "打开记忆柜",
     "retrieve_can": "取回罐头",
 }
@@ -50,6 +52,7 @@ class WR03EvaluationSnapshot:
     step_id: int
     can_grasped: bool = False
     stored_level: str | None = None
+    closed_levels_after_storage: frozenset[str] = frozenset()
     storage_hidden: bool = False
     lower_door_closed: bool = False
     upper_door_closed: bool = False
@@ -66,6 +69,9 @@ class WR03EvaluationSnapshot:
         if step < 0:
             raise ValueError("WR-03 evaluation step_id must be non-negative")
         stored = None if self.stored_level is None else _level(self.stored_level)
+        closed_levels = frozenset(
+            _level(level) for level in (self.closed_levels_after_storage or ())
+        )
         opened = None if self.opened_level is None else _level(self.opened_level)
         retrieved = (
             None
@@ -76,6 +82,7 @@ class WR03EvaluationSnapshot:
             raise ValueError(f"invalid WR-03 retrieved item id: {retrieved!r}")
         object.__setattr__(self, "step_id", step)
         object.__setattr__(self, "stored_level", stored)
+        object.__setattr__(self, "closed_levels_after_storage", closed_levels)
         object.__setattr__(self, "opened_level", opened)
         object.__setattr__(self, "retrieved_item_id", retrieved)
         for name in (
@@ -119,10 +126,13 @@ class WR03EvaluationSnapshot:
         return {
             "can_pick": self.can_grasped,
             "can_store": self.stored_level is not None,
-            "close_both_cabinets": bool(
+            "close_upper_cabinet": bool(
                 self.stored_level is not None
-                and self.storage_hidden
-                and self.both_doors_closed
+                and "upper" in self.closed_levels_after_storage
+            ),
+            "close_lower_cabinet": bool(
+                self.stored_level is not None
+                and "lower" in self.closed_levels_after_storage
             ),
             "open_remembered_cabinet": self.opened_level is not None,
             "retrieve_can": self.retrieved_item_id is not None,
@@ -267,6 +277,7 @@ class WR03Evaluator:
         qualified_before = {
             name: self._stages[name].qualified for name in STAGE_ORDER
         }
+        qualified_now = dict(qualified_before)
         for name, value in raw.items():
             if value:
                 self._mark_observed(name, snapshot.step_id)
@@ -281,7 +292,18 @@ class WR03Evaluator:
             ):
                 continue
             prerequisite = STAGE_PREREQUISITES[name]
-            if prerequisite is not None and not qualified_before[prerequisite]:
+            prerequisite_qualified = (
+                prerequisite is None or qualified_before[prerequisite]
+            )
+            # Both physical door-close events can first become visible in the
+            # same sampled frame. Preserve their declared order without
+            # permanently rejecting the lower-door event on that frame.
+            if (
+                name == "close_lower_cabinet"
+                and prerequisite == "close_upper_cabinet"
+            ):
+                prerequisite_qualified = qualified_now[prerequisite]
+            if not prerequisite_qualified:
                 self._reject(
                     name,
                     snapshot.step_id,
@@ -295,6 +317,7 @@ class WR03Evaluator:
                     self._terminal_failure_code = reason
                 continue
             self._qualify(name, snapshot.step_id)
+            qualified_now[name] = True
 
         self._previous_raw = raw
         self._last_step_id = snapshot.step_id

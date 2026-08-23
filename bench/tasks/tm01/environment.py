@@ -34,6 +34,11 @@ from bench.tasks.tm01.domain.semantics import (
     PhysicalState,
     diagnostics,
     evaluate_success,
+    failure_attribution,
+    record_close_attempt,
+    record_completion_button_attempt,
+    record_inspection_attempt,
+    record_open_attempt,
 )
 from bench.tasks.tm01.physical_events import PhysicalSample, TM01PhysicalObserver
 from bench.tasks.tm01.single_drawer import SingleTabletopDrawer
@@ -112,6 +117,7 @@ class TM01BoilWaterAndInspectTwoDrawers(Kitchen):
         else:
             resolved_observer = ObserverConfig(**dict(observer_config))
         self.drawer_names = (names[0], names[1])
+        self.fixture_names = self.drawer_names
         self.drawer_world_xyzs = xyzs
         self.drawer_world_yaw_deg = float(drawer_world_yaw_deg)
         self.completion_button_world_xyzs = button_xyzs
@@ -282,6 +288,14 @@ class TM01BoilWaterAndInspectTwoDrawers(Kitchen):
     def physical_observer(self) -> TM01PhysicalObserver:
         return self._tm01_observer
 
+    @property
+    def open_threshold(self) -> float:
+        return float(self._tm01_observer.config.drawer_open_threshold)
+
+    @property
+    def closed_threshold(self) -> float:
+        return float(self._tm01_observer.config.drawer_closed_threshold)
+
     def cabinet_for_drawer(self, drawer: str) -> SingleTabletopDrawer:
         name = str(drawer)
         if name not in self.drawer_names:
@@ -295,6 +309,86 @@ class TM01BoilWaterAndInspectTwoDrawers(Kitchen):
 
     def drawer_open_fraction(self, drawer: str) -> float:
         return float(self.cabinet_for_drawer(drawer).open_fraction(self))
+
+    def slot_open_fraction(self, fixture_name: str) -> float:
+        return self.drawer_open_fraction(fixture_name)
+
+    def set_slot_open_fraction(self, fixture_name: str, fraction: float) -> None:
+        self.set_drawer_open_fraction(fixture_name, fraction)
+
+    def all_drawers_closed(self) -> bool:
+        return all(
+            self.slot_open_fraction(name) <= self.closed_threshold
+            for name in self.fixture_names
+        )
+
+    def record_open_event(
+        self,
+        fixture_name: str,
+        *,
+        drawer_open: bool,
+        failure_reason: str | None = None,
+    ) -> dict[str, Any]:
+        result = record_open_attempt(
+            self.semantic_state,
+            fixture_name,
+            drawer_open=drawer_open,
+            failure_reason=failure_reason,
+        ).as_dict()
+        result["diagnostics"] = diagnostics(self.semantic_state)
+        return result
+
+    def record_inspection_event(
+        self,
+        fixture_name: str,
+        *,
+        drawer_open: bool,
+    ) -> dict[str, Any]:
+        result = record_inspection_attempt(
+            self.semantic_state,
+            fixture_name,
+            drawer_open=drawer_open,
+        ).as_dict()
+        result["diagnostics"] = diagnostics(self.semantic_state)
+        return result
+
+    def record_close_event(
+        self,
+        fixture_name: str,
+        *,
+        drawer_closed: bool,
+        failure_reason: str | None = None,
+    ) -> dict[str, Any]:
+        result = record_close_attempt(
+            self.semantic_state,
+            fixture_name,
+            drawer_closed=drawer_closed,
+            failure_reason=failure_reason,
+        ).as_dict()
+        result["diagnostics"] = diagnostics(self.semantic_state)
+        return result
+
+    def record_completion_button_event(
+        self,
+        *,
+        button_physically_pressed: bool,
+        all_drawers_closed: bool | None = None,
+        button_id: str | None = None,
+        failure_reason: str | None = None,
+    ) -> dict[str, Any]:
+        result = record_completion_button_attempt(
+            self.semantic_state,
+            button_id=(button_id or COMPLETION_BUTTON_NAMES[0]),
+            all_drawers_closed=(
+                self.all_drawers_closed()
+                if all_drawers_closed is None
+                else bool(all_drawers_closed)
+            ),
+            button_physically_pressed=button_physically_pressed,
+            failure_reason=failure_reason,
+        ).as_dict()
+        result["diagnostics"] = diagnostics(self.semantic_state)
+        return result
 
     def set_drawer_open_fraction(self, drawer: str, fraction: float) -> None:
         value = float(fraction)
@@ -504,6 +598,13 @@ class TM01BoilWaterAndInspectTwoDrawers(Kitchen):
 
     def task_diagnostics(self) -> dict[str, Any]:
         state = diagnostics(self.semantic_state)
+        physical = self.physical_state()
+        success_report = evaluate_success(
+            self.semantic_state,
+            physical,
+            off_commit_max_rad=self._tm01_observer.config.off_commit_max_rad,
+            drawer_closed_threshold=self._tm01_observer.config.drawer_closed_threshold,
+        )
         state.update(
             {
                 "target_knob_qpos_rad": self.native_knob_qpos(),
@@ -517,6 +618,21 @@ class TM01BoilWaterAndInspectTwoDrawers(Kitchen):
                 },
                 "invalid_environment_labels": list(
                     self._tm01_observer.invalid_environment_labels
+                ),
+                "success_checks": success_report.checks(),
+                "failure_attribution": (
+                    self._tm01_observer.invalid_environment_labels[0]
+                    if self._tm01_observer.invalid_environment_labels
+                    else failure_attribution(
+                        self.semantic_state,
+                        physical,
+                        off_commit_max_rad=(
+                            self._tm01_observer.config.off_commit_max_rad
+                        ),
+                        drawer_closed_threshold=(
+                            self._tm01_observer.config.drawer_closed_threshold
+                        ),
+                    )
                 ),
                 "success": self._check_success(),
             }

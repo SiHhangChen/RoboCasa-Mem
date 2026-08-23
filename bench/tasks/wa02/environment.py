@@ -31,6 +31,7 @@ from bench.tasks.wa02.domain.semantics import (
     record_verified_fill,
     record_verified_staging,
 )
+from bench.tasks.wa02.evaluation import WA02EvaluationSnapshot, WA02Evaluator
 from bench.tasks.wa02.sensor_faucet_asset import (
     install_wa02_twin_sensor_faucets,
     wa02_sensor_faucet_stream_name,
@@ -111,6 +112,7 @@ class WA02ServeHotColdWaterCups(Kitchen):
         self._cup_counter_reset_region: dict[str, Any] | None = None
         self._episode_plan: EpisodePlan | None = None
         self._semantic_state = _default_semantic_state()
+        self._wa02_evaluator: WA02Evaluator | None = None
         self.service_slot_poses: dict[str, list[float]] = {}
         self.service_slot_regions: dict[str, dict[str, list[float]]] = {}
         self.cup_temperatures: dict[str, str | None] = {cup: None for cup in CUP_IDS}
@@ -129,9 +131,16 @@ class WA02ServeHotColdWaterCups(Kitchen):
         }
         self._sensor_faucet_affinity_by_cup: dict[str, str] = {}
         self._water_stream_intercept_trace: dict[str, Any] = {}
+        # 记录每个水温当前已被截断到哪个杯子,避免激活期间重复 forward。
+        self._sensor_stream_intercepted_for: dict[str, str | None] = {
+            temperature: None for temperature in TEMPERATURES
+        }
         self._grasp_started_at: dict[str, np.ndarray | None] = {
             cup: None for cup in CUP_IDS
         }
+        self._grasp_steps_by_cup: dict[str, int] = {cup: 0 for cup in CUP_IDS}
+        self._pickup_min_grasp_steps: int = 3
+        self._pickup_min_lift: float = 0.04
         self._selection_armed_by_cup: dict[str, bool] = {
             cup: False for cup in CUP_IDS
         }
@@ -143,10 +152,13 @@ class WA02ServeHotColdWaterCups(Kitchen):
             cup: None for cup in CUP_IDS
         }
         self._physical_event_diagnostics: dict[str, Any] = {
+            "pickup_detected_by_cup": {},
             "grasp_detected_by_cup": {},
+            "fill_detected_by_cup": {},
             "staging_detected_by_cup": {},
             "selection_detected": None,
         }
+        self._last_physical_event_update_step: int | None = None
         self._task_event_locked: bool = False
         # Wa02_water_marker_gate_pending tracks that a physical fill happened
         # while the stream was visually active; used only for the marker gate
@@ -332,6 +344,7 @@ class WA02ServeHotColdWaterCups(Kitchen):
         self.cup_filled = {cup: False for cup in CUP_IDS}
         self.cup_fill_progress = {cup: 0.0 for cup in CUP_IDS}
         self._semantic_state = _semantic_for_plan(self._episode_plan)
+        self._wa02_evaluator = None
         self._sensor_faucet_affinity_by_cup.clear()
         self.deactivate_sensor_faucets()
         self._reset_physical_event_tracking()
@@ -345,6 +358,7 @@ class WA02ServeHotColdWaterCups(Kitchen):
 
         self._episode_plan = episode
         self._semantic_state = _semantic_for_plan(episode)
+        self._wa02_evaluator = None
         self.cup_temperatures = {cup: None for cup in CUP_IDS}
         self.cup_filled = {cup: False for cup in CUP_IDS}
         self.cup_fill_progress = {cup: 0.0 for cup in CUP_IDS}
@@ -627,12 +641,18 @@ class WA02ServeHotColdWaterCups(Kitchen):
     # Diagnostics and task result --------------------------------------
 
     def _check_success(self) -> bool:
+        evaluator = self._wa02_evaluator
+        if evaluator is not None:
+            return bool(evaluator.observe(self.evaluation_snapshot()).success)
         self.update_state()
         return evaluate_success(self._semantic_state).success
 
     def task_diagnostics(self) -> dict[str, object]:
         """Return oracle diagnostics for the recorder, not policy observations."""
 
+        evaluator = self._wa02_evaluator
+        if evaluator is not None:
+            return evaluator.observe(self.evaluation_snapshot()).to_diagnostics()
         self.update_state()
         report = evaluate_success(self._semantic_state)
         slots = {
@@ -672,6 +692,76 @@ class WA02ServeHotColdWaterCups(Kitchen):
                 "staged_before_final_pick": self._semantic_state.cups_staged_before_final_pick,
             },
             "selection": {"final_taken_cup_id": self._semantic_state.final_taken_cup_id},
+        }
+
+    def evaluation_snapshot(self) -> WA02EvaluationSnapshot:
+        """Expose the physical/semantic history consumed by the ordered evaluator."""
+
+        self.update_state()
+        plan = self.episode_plan
+        details = self.task_diagnostics_fallback()
+        return WA02EvaluationSnapshot(
+            step_id=int(getattr(self, "timestep", 0)),
+            fill_cup_order=plan.fill_cup_order,
+            fill_temperature_order=plan.fill_temperature_order,
+            service_slot_by_cup=plan.service_slot_by_cup,
+            requested_cup_id=plan.requested_cup_id,
+            pickup_events_by_cup={
+                cup: cup in self._physical_event_diagnostics.get(
+                    "pickup_detected_by_cup", {}
+                )
+                for cup in CUP_IDS
+            },
+            filled_temperature_by_cup=dict(
+                self._semantic_state.filled_temperature_by_cup
+            ),
+            staged_slot_by_cup=dict(self._semantic_state.staged_slot_by_cup),
+            final_taken_cup_id=self._semantic_state.final_taken_cup_id,
+            details=details,
+        )
+
+    def task_diagnostics_fallback(self) -> dict[str, Any]:
+        """Build physical diagnostics without invoking the task evaluator."""
+
+        slots = {
+            slot: np.asarray(position, dtype=float).tolist()
+            for slot, position in self.service_slot_poses.items()
+        }
+        report = evaluate_success(self._semantic_state)
+        return {
+            "success_checks_legacy": report.checks(),
+            "physical_events": dict(self._physical_event_diagnostics),
+            "oracle": {
+                "hot_cup_id": self._semantic_state.hot_cup_id,
+                "cold_cup_id": self._semantic_state.cold_cup_id,
+                "requested_temperature": self._semantic_state.requested_temperature,
+                "requested_cup_id": self._semantic_state.requested_cup_id,
+                "fill_cup_order": list(self.episode_plan.fill_cup_order),
+                "fill_temperature_order": list(self.episode_plan.fill_temperature_order),
+                "service_slot_by_cup": dict(self._semantic_state.service_slot_by_cup),
+            },
+            "fill": {
+                "water_control_mode": "twin_proximity_sensor_faucets",
+                "active_sensor_faucets": sorted(self._active_sensor_faucets),
+                "cup_filled": dict(self.cup_filled),
+                "cup_fill_progress": dict(self.cup_fill_progress),
+                "cup_temperatures": dict(self.cup_temperatures),
+                "recorded_temperature_by_cup": dict(
+                    self._semantic_state.filled_temperature_by_cup
+                ),
+                "sensor_cup_by_temperature": dict(self._sensor_cup_by_temperature),
+                "water_stream_intercept": dict(self._water_stream_intercept_trace),
+            },
+            "service": {
+                "slot_positions_world": slots,
+                "placement_regions": deepcopy(self.service_slot_regions),
+                "recorded_slot_by_cup": dict(self._semantic_state.staged_slot_by_cup),
+                "physically_staged": self.are_cups_physically_staged(),
+                "staged_before_final_pick": self._semantic_state.cups_staged_before_final_pick,
+            },
+            "selection": {
+                "final_taken_cup_id": self._semantic_state.final_taken_cup_id,
+            },
         }
 
     def get_ep_meta(self) -> dict[str, Any]:
@@ -844,6 +934,8 @@ class WA02ServeHotColdWaterCups(Kitchen):
             intercepted = bool(
                 truncated_half_height < original_half_height - 1.0e-6
             )
+            if intercepted:
+                self._sensor_stream_intercepted_for[temp] = cup
             result = {
                 "restored": False,
                 "intercepted": intercepted,
@@ -974,6 +1066,8 @@ class WA02ServeHotColdWaterCups(Kitchen):
                     self._active_sensor_faucets.add(temp)
                     self._sensor_cup_by_temperature[temp] = in_zone_cup
                     self._set_sensor_stream_visibility(temp, visible=True)
+                    if self._sensor_stream_intercepted_for.get(temp) != in_zone_cup:
+                        self.set_water_stream_intercept(in_zone_cup, temp)
                 elif was_active:
                     self._active_sensor_faucets.discard(temp)
                     self._sensor_cup_by_temperature[temp] = None
@@ -1068,14 +1162,18 @@ class WA02ServeHotColdWaterCups(Kitchen):
         """
 
         self._grasp_started_at = {cup: None for cup in CUP_IDS}
+        self._grasp_steps_by_cup = {cup: 0 for cup in CUP_IDS}
         self._selection_armed_by_cup = {cup: False for cup in CUP_IDS}
         self._selection_grasp_steps = {cup: 0 for cup in CUP_IDS}
         self._staging_detected_at = {cup: None for cup in CUP_IDS}
         self._physical_event_diagnostics = {
+            "pickup_detected_by_cup": {},
             "grasp_detected_by_cup": {},
+            "fill_detected_by_cup": {},
             "staging_detected_by_cup": {},
             "selection_detected": None,
         }
+        self._last_physical_event_update_step = None
         self._task_event_locked = False
         self._water_marker_gate_pending = {cup: None for cup in CUP_IDS}
 
@@ -1098,6 +1196,39 @@ class WA02ServeHotColdWaterCups(Kitchen):
         plan = self._episode_plan
         if plan is None:
             return
+        current_step = int(getattr(self, "timestep", 0))
+        if self._last_physical_event_update_step == current_step:
+            return
+        self._last_physical_event_update_step = current_step
+
+        # Pickup: require a short stable grasp followed by an actual lift from
+        # the reset/last-known position. This event is latched once per cup and
+        # is intentionally independent from the later final-selection grasp.
+        for cup in CUP_IDS:
+            if cup in self._physical_event_diagnostics.get("pickup_detected_by_cup", {}):
+                continue
+            grasped = self._cup_physically_grasped(cup)
+            position = np.asarray(self.object_position(cup), dtype=float).copy()
+            if not grasped:
+                self._grasp_started_at[cup] = None
+                self._grasp_steps_by_cup[cup] = 0
+                continue
+            if self._grasp_started_at[cup] is None:
+                self._grasp_started_at[cup] = position
+                self._grasp_steps_by_cup[cup] = 0
+            self._grasp_steps_by_cup[cup] += 1
+            initial = self._grasp_started_at[cup]
+            lifted = bool(initial is not None and position[2] - initial[2] >= self._pickup_min_lift)
+            if self._grasp_steps_by_cup[cup] >= self._pickup_min_grasp_steps and lifted:
+                self._physical_event_diagnostics["pickup_detected_by_cup"][cup] = {
+                    "step": current_step,
+                    "position": position.tolist(),
+                    "lift_m": float(position[2] - initial[2]) if initial is not None else None,
+                }
+                self._physical_event_diagnostics["grasp_detected_by_cup"][cup] = (
+                    current_step
+                )
+
         # Physical fill events: a cup is filled when it dwells under the active
         # sensor faucet long enough for the water level to reach full.  The
         # dwell-based sensor association (activated by ``_refresh_sensor_faucets``
@@ -1139,6 +1270,10 @@ class WA02ServeHotColdWaterCups(Kitchen):
                 continue
             slot = str(plan.service_slot_by_cup[cup])
             if not self._cup_physically_staged(cup, slot):
+                continue
+            # A cup held over the target region is not yet placed. Require a
+            # release before latching the historical ready event.
+            if self._cup_physically_grasped(cup):
                 continue
             applied = record_verified_staging(self._semantic_state, cup, slot)
             if applied:
@@ -1221,6 +1356,7 @@ class WA02ServeHotColdWaterCups(Kitchen):
         )
         self.sim.model.site_pos[site_id] = original_pos
         self.sim.model.site_size[site_id][1] = original_half_height
+        self._sensor_stream_intercepted_for[_temperature(temperature)] = None
         return {
             "temperature": _temperature(temperature),
             "restored": True,

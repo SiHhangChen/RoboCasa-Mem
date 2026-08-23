@@ -15,13 +15,12 @@ from bench.tasks.tm01.domain.contracts import (
 )
 from bench.tasks.tm01.domain.semantics import (
     SemanticState,
-    cancel_incomplete_drawer_cycle,
-    mark_active_drawer_inspected,
     record_a1,
     record_a2,
-    record_completion_request,
-    record_drawer_completion,
-    start_drawer_cycle,
+    record_close_attempt,
+    record_completion_button_attempt,
+    record_inspection_attempt,
+    record_open_attempt,
 )
 
 
@@ -98,6 +97,7 @@ class TM01PhysicalObserver:
         self._last_step_id: int | None = None
         self._previous: PhysicalSample | None = None
         self._knob: _KnobEvidence | None = None
+        self._pending_drawer: str | None = None
         self._button_armed = {name: True for name in COMPLETION_BUTTON_NAMES}
         self._button_release_steps = {name: 0 for name in COMPLETION_BUTTON_NAMES}
 
@@ -113,6 +113,7 @@ class TM01PhysicalObserver:
             min_qpos=float(initial.knob_qpos_rad),
             max_qpos=float(initial.knob_qpos_rad),
         )
+        self._pending_drawer = None
         self._button_armed = {
             name: float(initial.completion_button_press_depth_m.get(name, float("inf")))
             <= self.config.button_released_threshold_m
@@ -167,7 +168,10 @@ class TM01PhysicalObserver:
                 assert button_id is not None
                 self.state.completion_button_attempted = True
                 self.state.green_press_count += 1
+                self.state.completion_button_attempt_count += 1
+                self.state.completion_button_press_count += 1
                 self.state.completion_button_attempt_history.append(button_id)
+                self.state.invalid_completion_button_press = True
             self.state.fail("simultaneous_semantic_events")
         elif (
             intents
@@ -175,7 +179,7 @@ class TM01PhysicalObserver:
             and not self.invalid_environment_labels
         ):
             event, payload = intents[0]
-            report = self._commit(event, payload)
+            report = self._commit(event, payload, sample=sample)
             if report.passed:
                 committed.append(event.value)
 
@@ -233,7 +237,7 @@ class TM01PhysicalObserver:
             state.fail("burner_interrupted_before_B1")
             return None
         if (
-            state.active_drawer is not None
+            (state.active_drawer is not None or self._pending_drawer is not None)
             and sample.knob_gripper_contact
             and evidence.max_qpos - qpos >= 0.05
         ):
@@ -285,7 +289,8 @@ class TM01PhysicalObserver:
             for name in DRAWER_NAMES
         }
         active = self.state.active_drawer
-        if active is None:
+        pending = self._pending_drawer
+        if active is None and pending is None:
             candidates = [
                 name
                 for name, fraction in fractions.items()
@@ -302,15 +307,41 @@ class TM01PhysicalObserver:
                 ):
                     self.state.fail("burner_interrupted_before_A2")
                     return None
-                report = start_drawer_cycle(self.state, candidates[0])
-                if not report.passed:
+                pending = candidates[0]
+                self._pending_drawer = pending
+        elif pending is not None:
+            for name, fraction in fractions.items():
+                if name != pending and fraction > self.config.drawer_closed_threshold:
+                    self.state.fail("overlapping_drawer_cycles")
                     return None
-                active = candidates[0]
         else:
+            assert active is not None
             for name, fraction in fractions.items():
                 if name != active and fraction > self.config.drawer_closed_threshold:
                     self.state.fail("overlapping_drawer_cycles")
                     return None
+
+        if pending is not None:
+            fraction = fractions[pending]
+            if fraction >= self.config.drawer_open_threshold:
+                report = record_open_attempt(
+                    self.state,
+                    pending,
+                    drawer_open=True,
+                )
+                self._pending_drawer = None
+                if not report.passed:
+                    return None
+                active = pending
+            elif fraction <= self.config.drawer_closed_threshold:
+                record_open_attempt(
+                    self.state,
+                    pending,
+                    drawer_open=False,
+                    failure_reason="drawer_not_open",
+                )
+                self._pending_drawer = None
+                return None
 
         if active is None:
             return None
@@ -319,11 +350,21 @@ class TM01PhysicalObserver:
             if fraction >= self.config.drawer_open_threshold:
                 self.state.drawer_dwell_steps += 1
                 if self.state.drawer_dwell_steps >= self.config.inspect_dwell_steps:
-                    mark_active_drawer_inspected(self.state)
+                    report = record_inspection_attempt(
+                        self.state,
+                        active,
+                        drawer_open=True,
+                    )
+                    if not report.passed:
+                        return None
             elif fraction > self.config.drawer_closed_threshold:
                 self.state.drawer_dwell_steps = 0
             else:
-                cancel_incomplete_drawer_cycle(self.state)
+                record_close_attempt(
+                    self.state,
+                    active,
+                    drawer_closed=True,
+                )
                 return None
         if (
             self.state.active_drawer == active
@@ -364,17 +405,36 @@ class TM01PhysicalObserver:
                     self._button_release_steps[name] = 0
         return tuple(events)
 
-    def _commit(self, event: StageEvent, payload: str | None):
+    def _commit(
+        self,
+        event: StageEvent,
+        payload: str | None,
+        *,
+        sample: PhysicalSample,
+    ):
         if event is StageEvent.A1:
             report = record_a1(self.state)
         elif event is StageEvent.A2:
             report = record_a2(self.state)
         elif event in (StageEvent.B1, StageEvent.B2):
             assert payload is not None
-            report = record_drawer_completion(self.state, payload)
+            report = record_close_attempt(
+                self.state,
+                payload,
+                drawer_closed=True,
+            )
         else:
             assert payload is not None
-            report = record_completion_request(self.state, payload)
+            report = record_completion_button_attempt(
+                self.state,
+                button_id=payload,
+                all_drawers_closed=all(
+                    float(sample.drawer_open_fraction.get(name, 1.0))
+                    <= self.config.drawer_closed_threshold
+                    for name in DRAWER_NAMES
+                ),
+                button_physically_pressed=True,
+            )
         if event in (StageEvent.A1, StageEvent.A2) and report.passed:
             qpos = float(self._previous.knob_qpos_rad) if self._previous else 0.0
             if event is StageEvent.A1 and self._knob is not None:
@@ -408,6 +468,7 @@ class TM01PhysicalObserver:
                 0 if evidence is None else evidence.any_robot_contact_steps
             ),
             "invalid_environment": bool(self.invalid_environment_labels),
+            "pending_drawer": self._pending_drawer,
         }
         return ObserverUpdate(
             step_id=int(step_id),

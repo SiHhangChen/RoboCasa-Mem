@@ -558,10 +558,13 @@ class WR03StoreAndRetrieveRememberedCan(Kitchen):
             "raw_stage_checks": {
                 "can_pick": bool(grasp_evidence.get("picked_up", False)),
                 "can_store": self.stored_level is not None,
-                "close_both_cabinets": bool(
+                "close_upper_cabinet": bool(
                     self.stored_level is not None
-                    and self._semantic_state.storage_hidden
-                    and physical.both_doors_closed
+                    and "upper" in self._semantic_state.closed_levels_after_storage
+                ),
+                "close_lower_cabinet": bool(
+                    self.stored_level is not None
+                    and "lower" in self._semantic_state.closed_levels_after_storage
                 ),
                 "open_remembered_cabinet": (
                     self._semantic_state.retrieval_level_opened is not None
@@ -622,6 +625,9 @@ class WR03StoreAndRetrieveRememberedCan(Kitchen):
             step_id=int(getattr(self, "timestep", 0)),
             can_grasped=bool(grasp_evidence.get("picked_up", False)),
             stored_level=self.stored_level,
+            closed_levels_after_storage=frozenset(
+                self._semantic_state.closed_levels_after_storage
+            ),
             storage_hidden=self._semantic_state.storage_hidden,
             lower_door_closed=physical.lower_door_closed,
             upper_door_closed=physical.upper_door_closed,
