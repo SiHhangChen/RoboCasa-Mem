@@ -55,3 +55,6 @@ pretrain_model/
 
 # Training logs.
 *.log
+
+# Checkpoint weights (large generated artifacts, kept out of git).
+ckpts/

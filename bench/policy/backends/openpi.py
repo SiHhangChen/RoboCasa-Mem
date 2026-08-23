@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 from pathlib import Path
 import time
 from typing import Any
@@ -104,6 +105,7 @@ class OpenPIBackend:
         state_schema: str,
         default_prompt: str | None = None,
         pytorch_device: str | None = None,
+        norm_asset_id: str | None = None,
         checkpoint_uri: str | None = None,
         server_id: str | None = None,
         code_revision: dict[str, str] | None = None,
@@ -117,6 +119,15 @@ class OpenPIBackend:
                 "or install policy/openpi."
             ) from exc
         train_config = training_config.get_config(config_name)
+        if norm_asset_id is not None:
+            assets = dataclasses.replace(
+                train_config.data.assets,
+                asset_id=str(norm_asset_id),
+            )
+            train_config = dataclasses.replace(
+                train_config,
+                data=dataclasses.replace(train_config.data, assets=assets),
+            )
         horizon = int(train_config.model.action_horizon)
         checkpoint_path = checkpoint_dir.expanduser().resolve()
         policy = policy_config.create_trained_policy(
