@@ -49,6 +49,7 @@ _ENTRIES: tuple[CatalogEntry, ...] = (
     CatalogEntry("WA-02", "wa02", "WA02ServeHotColdWaterCups", "1.0.0", 6000),
     CatalogEntry("WA-03", "wa03", "WA03SortSugaredAndUnsugaredCoffee", "1.0.0", 6500),
     CatalogEntry("WA-04", "wa04", "WA04ServeUniqueTemperatureCupAmongThree", "1.0.0", 8500),
+    CatalogEntry("WA-05", "wa05", "WA05FillOneCupAndMatchTemperatureButton", "1.0.0", 4000),
     CatalogEntry("WR-01", "wr01", "WR01RetrieveRememberedCan", "1.0.0", 15000),
     CatalogEntry("WR-02", "wr02", "WR02ReturnCondimentPair", "1.0.0", 5000),
     CatalogEntry("WR-03", "wr03", "WR03StoreAndRetrieveRememberedCan", "1.0.0", 15000),

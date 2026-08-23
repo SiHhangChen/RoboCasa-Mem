@@ -12,7 +12,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 TASK_IDS = (
     "TM01", "TM02", "TM03", "TM04", "TS01", "TS02", "TS03", "TS04",
-    "WA-01", "WA-02", "WA-03", "WA-04", "WR-01", "WR-02", "WR-03", "WR-04",
+    "WA-01", "WA-02", "WA-03", "WA-04", "WA-05", "WR-01", "WR-02", "WR-03", "WR-04",
     "WR-05", "WR-06", "WX-01",
 )
 

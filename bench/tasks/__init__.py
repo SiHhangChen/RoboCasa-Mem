@@ -110,6 +110,11 @@ BUILTIN_TASK_PLUGINS: tuple[TaskPlugin, ...] = (
         env_name="WA04ServeUniqueTemperatureCupAmongThree",
     ),
     _builtin_task_plugin(
+        "WA-05",
+        aliases=("WA05", "WA_05"),
+        env_name="WA05FillOneCupAndMatchTemperatureButton",
+    ),
+    _builtin_task_plugin(
         "WR-01",
         aliases=("WR01", "WR_01"),
         env_name="WR01RetrieveRememberedCan",
