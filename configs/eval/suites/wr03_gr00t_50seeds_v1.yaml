@@ -18,8 +18,8 @@ task:
 seeds: {start: 1050, stop: 1100}
 
 rollout:
-  replan_steps: 20
-  max_steps: 4800
+  replan_steps: 10
+  max_steps: 8000
   action_repeat: 1
   stop_on_success: false
   ignore_done: true
