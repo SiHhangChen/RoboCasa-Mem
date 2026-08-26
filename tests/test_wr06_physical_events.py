@@ -162,6 +162,25 @@ def test_wr06_plate_stage_latches_environment_memory_barrier() -> None:
     }
 
 
+def test_wr06_held_bottle_at_plate_does_not_complete_staging() -> None:
+    state = _state()
+    observer = WR06PhysicalObserver(
+        state, dwell_steps=2, terminal_verification_steps=2
+    )
+    observer.reset(_sample(0, lower=True, lower_supported=True))
+
+    step = _observe_dwell(observer, 1)
+    step = _observe_dwell(observer, step, plate=True, grasped=True)
+    assert not state.item_staged_at_plate
+    assert not state.memory_barrier_latched
+
+    observer.observe(_sample(step, plate=True, grasped=False))
+    assert not state.item_staged_at_plate
+    observer.observe(_sample(step + 1, plate=True, grasped=False))
+    assert state.item_staged_at_plate
+    assert state.memory_barrier_latched
+
+
 def test_wr06_first_wrong_return_level_is_latched() -> None:
     state = _state()
     observer = WR06PhysicalObserver(

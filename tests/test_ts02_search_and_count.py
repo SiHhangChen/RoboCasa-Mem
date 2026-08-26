@@ -172,6 +172,7 @@ def test_physical_observer_debounces_a_long_button_hold() -> None:
     observer.observe(sample(1, 0.75, 0.0))
     observer.observe(sample(2, 0.0, 0.0))
     assert observer.state.target_found
+    assert observer.completed_fixture_steps == {FIXTURE_NAMES[0]: 2}
 
     observer.observe(sample(3, 0.0, 0.006))
     observer.observe(sample(4, 0.0, 0.006))
@@ -179,6 +180,7 @@ def test_physical_observer_debounces_a_long_button_hold() -> None:
 
     assert observer.state.completion_button_press_count == 1
     assert observer.state.completion_button_pressed
+    assert observer.valid_button_press_steps == [3]
 
 
 def test_physical_observer_requires_release_before_the_next_press() -> None:
@@ -225,6 +227,7 @@ def test_physical_observer_requires_release_before_the_next_press() -> None:
     observer.observe(sample(10, 0.0, 0.0, 0.006))
     assert observer.state.completion_button_press_count == 2
     assert observer.state.completion_button_pressed
+    assert observer.valid_button_press_steps == [5, 10]
 
 
 def test_red_cube_is_attached_only_to_the_target_drawer_body() -> None:

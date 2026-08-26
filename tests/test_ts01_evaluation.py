@@ -12,6 +12,7 @@ from __future__ import annotations
 import pytest
 
 from bench.tasks.ts01.evaluation import (
+    REPORT_STAGE_ORDER,
     SUGAR_STAGE_NAMES,
     TS01EvaluationSnapshot,
     TS01Evaluator,
@@ -345,3 +346,60 @@ def test_snapshot_total_cannot_change_during_an_episode() -> None:
 def test_snapshot_rejects_confirmed_count_above_total() -> None:
     with pytest.raises(ValueError, match="cannot exceed total_sugar_count"):
         _snapshot(0, target=1, total=1, count=2)
+
+
+@pytest.mark.parametrize("target", (1, 2, 3))
+def test_public_report_projects_only_applicable_benchmark_stages(
+    target: int,
+) -> None:
+    evaluator = _evaluator(target)
+    result = evaluator.result()
+    for count in range(1, target + 1):
+        result = evaluator.observe(_snapshot(count, target=target, count=count))
+
+    report = result.to_report_stages()
+
+    assert report["order"] == list(REPORT_STAGE_ORDER)
+    assert "button" not in report["order"]
+    assert "button" not in report["stages"]
+    for index in range(1, 4):
+        verdict = report["stages"][f"sugar_{index}"]
+        assert verdict["applicable"] is (index <= target)
+        assert verdict["passed"] is (True if index <= target else None)
+        assert verdict["first_pass_step"] == (
+            index if index <= target else None
+        )
+    assert report["stages"]["success"] == {
+        "applicable": True,
+        "passed": False,
+        "first_pass_step": None,
+    }
+
+    result = evaluator.observe(
+        _snapshot(
+            target + 1,
+            target=target,
+            count=target,
+            button_pressed=True,
+        )
+    )
+    assert result.to_report_stages()["stages"]["success"] == {
+        "applicable": True,
+        "passed": True,
+        "first_pass_step": target + 1,
+    }
+
+
+def test_public_report_keeps_sugar_history_when_over_add_revokes_success() -> None:
+    evaluator = _evaluator(2)
+    evaluator.observe(_snapshot(1, target=2, count=1))
+    evaluator.observe(_snapshot(2, target=2, count=2))
+
+    report = evaluator.observe(
+        _snapshot(3, target=2, count=3)
+    ).to_report_stages()
+
+    assert report["stages"]["sugar_1"]["passed"] is True
+    assert report["stages"]["sugar_2"]["passed"] is True
+    assert report["stages"]["sugar_3"]["applicable"] is False
+    assert report["stages"]["success"]["passed"] is False

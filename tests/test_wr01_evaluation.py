@@ -2,12 +2,16 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import bench.tasks.wr01.runtime as wr01_runtime
+from bench.evaluation.report_stages import validate_report_stages
 from bench.tasks.wr01.evaluation import (
+    REPORT_STAGE_ORDER,
     STAGE_ORDER,
     TASK_EVALUATOR_METADATA_KEY,
     WR01EvaluationSnapshot,
     WR01Evaluator,
     diagnostics_for_runtime,
+    report_stages_for_runtime,
     success_for_runtime,
 )
 
@@ -112,6 +116,54 @@ def test_wr01_evaluator_qualifies_the_eight_ordered_stages() -> None:
         "retrieval_level": "lower",
     }
 
+    report = result.to_report_stages()
+    assert report == {
+        "schema_version": "membench.report_stages/v1",
+        "task_id": "WR-01",
+        "profile_id": "WR-01/report-v1",
+        "order": [
+            "one_can_stored",
+            "two_cans_stored",
+            "storage_hidden",
+            "correct_cabinet_opened",
+            "success",
+        ],
+        "stages": {
+            "one_can_stored": {
+                "applicable": True,
+                "passed": True,
+                "first_pass_step": 2,
+            },
+            "two_cans_stored": {
+                "applicable": True,
+                "passed": True,
+                "first_pass_step": 4,
+            },
+            "storage_hidden": {
+                "applicable": True,
+                "passed": True,
+                "first_pass_step": 6,
+            },
+            "correct_cabinet_opened": {
+                "applicable": True,
+                "passed": True,
+                "first_pass_step": 7,
+            },
+            "success": {
+                "applicable": True,
+                "passed": True,
+                "first_pass_step": 8,
+            },
+        },
+    }
+    assert not set(STAGE_ORDER) & set(report["stages"])
+    assert validate_report_stages(
+        report,
+        expected_task_id="WR-01",
+        expected_profile_id="WR-01/report-v1",
+        expected_success=True,
+    ) == report
+
 
 def test_wr01_evaluator_rejects_a_skipped_pick_until_a_new_grasp_edge() -> None:
     evaluator = _evaluator()
@@ -156,6 +208,13 @@ def test_wr01_evaluator_makes_the_wrong_retrieval_cabinet_terminal() -> None:
     assert not result.stages["open_cabinet"].qualified
     assert result.stages["open_cabinet"].reason == "wrong_retrieval_cabinet"
 
+    report = result.to_report_stages()
+    assert [
+        report["stages"][name]["passed"] for name in REPORT_STAGE_ORDER
+    ] == [True, True, True, False, False]
+    assert report["stages"]["correct_cabinet_opened"]["first_pass_step"] is None
+    assert report["stages"]["success"]["first_pass_step"] is None
+
 
 def test_wr01_runtime_callbacks_share_one_evaluator_result() -> None:
     evaluator = _evaluator()
@@ -175,3 +234,13 @@ def test_wr01_runtime_callbacks_share_one_evaluator_result() -> None:
     assert diagnostics["stage_checks"]["first_can_pick"]
     assert not success_for_runtime(runtime, {})
     assert diagnostics_for_runtime(runtime) == diagnostics
+    report = report_stages_for_runtime(runtime)
+    assert report["order"] == list(REPORT_STAGE_ORDER)
+    assert not any(stage["passed"] for stage in report["stages"].values())
+
+
+def test_wr01_runtime_registers_public_report_stage_projector() -> None:
+    assert wr01_runtime.TASK_RUNTIME_API.report_stage_profile_id == (
+        "WR-01/report-v1"
+    )
+    assert callable(wr01_runtime.TASK_RUNTIME_API.report_stages)

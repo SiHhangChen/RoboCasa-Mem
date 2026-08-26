@@ -210,6 +210,7 @@ def test_tm01_observer_commits_open_inspect_close_attempts() -> None:
     assert observer.state.inspect_history == [DRAWER_NAMES[0]]
     assert observer.state.close_attempt_history == [DRAWER_NAMES[0]]
     assert observer.state.completed_drawer_history == [DRAWER_NAMES[0]]
+    assert observer.event_steps[StageEvent.B1.value] == 4
 
 
 def test_tm01_observer_rejects_an_opening_that_never_reaches_threshold() -> None:

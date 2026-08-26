@@ -2,12 +2,15 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from bench.evaluation.report_stages import validate_report_stages
 from bench.tasks.wa03.evaluation import (
+    REPORT_STAGE_ORDER,
     STAGE_ORDER,
     TASK_EVALUATOR_METADATA_KEY,
     WA03EvaluationSnapshot,
     WA03Evaluator,
     diagnostics_for_runtime,
+    report_stages_for_runtime,
     success_for_runtime,
 )
 
@@ -87,6 +90,30 @@ def test_wa03_evaluator_qualifies_the_ordered_stage_funnel() -> None:
         "correct": 5,
         "success": 5,
     }
+    report = result.to_report_stages()
+    assert report["order"] == [
+        "sugar_added",
+        "one_cup_ready",
+        "two_cups_ready",
+        "three_cups_ready",
+        "success",
+    ]
+    assert {
+        name: report["stages"][name]["first_pass_step"]
+        for name in REPORT_STAGE_ORDER
+    } == {
+        "sugar_added": 1,
+        "one_cup_ready": 2,
+        "two_cups_ready": 3,
+        "three_cups_ready": 4,
+        "success": 5,
+    }
+    assert validate_report_stages(
+        report,
+        expected_task_id="WA-03",
+        expected_profile_id="WA-03/report-v1",
+        expected_success=True,
+    ) == report
 
 
 def test_wa03_ready_requires_three_cups_each_in_its_own_region() -> None:
@@ -230,6 +257,16 @@ def test_wa03_marked_mode_keeps_assignment_separate_from_selection_correctness()
     assert not result.stages["success"].qualified
     assert result.failure_code == "wrong_sugar_assignment"
     assert result.to_diagnostics()["success_checks"]["sugar_assignment_correct"] is False
+    report = result.to_report_stages()
+    assert {
+        name: stage["passed"] for name, stage in report["stages"].items()
+    } == {
+        "sugar_added": True,
+        "one_cup_ready": True,
+        "two_cups_ready": True,
+        "three_cups_ready": True,
+        "success": False,
+    }
 
 
 def test_wa03_runtime_callbacks_share_one_evaluator_result() -> None:
@@ -251,4 +288,14 @@ def test_wa03_runtime_callbacks_share_one_evaluator_result() -> None:
     diagnostics = diagnostics_for_runtime(runtime)
     assert diagnostics["stage_checks"]["sugar"]
     assert not success_for_runtime(runtime, {})
+    assert report_stages_for_runtime(runtime)["order"] == list(
+        REPORT_STAGE_ORDER
+    )
     assert diagnostics_for_runtime(runtime) == diagnostics
+
+
+def test_wa03_runtime_registers_public_report_stages() -> None:
+    from bench.tasks.wa03 import runtime
+
+    assert runtime.TASK_RUNTIME_API.report_stage_profile_id == "WA-03/report-v1"
+    assert callable(runtime.TASK_RUNTIME_API.report_stages)

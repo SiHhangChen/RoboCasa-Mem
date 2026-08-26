@@ -108,6 +108,61 @@ class FakeAdapter:
         runtime.env.close()
 
 
+class ReportAdapter(FakeAdapter):
+    report_stage_profile_id = "WX-01/report-v1"
+
+    def report_stages(self, runtime):
+        success = runtime.env.steps >= 3
+        return {
+            "schema_version": "membench.report_stages/v1",
+            "task_id": self.task_id,
+            "profile_id": self.report_stage_profile_id,
+            "order": ["wipe_completed", "cleaning_completed", "success"],
+            "stages": {
+                "wipe_completed": {
+                    "applicable": True,
+                    "passed": runtime.env.steps >= 1,
+                    "first_pass_step": 1 if runtime.env.steps >= 1 else None,
+                },
+                "cleaning_completed": {
+                    "applicable": True,
+                    "passed": runtime.env.steps >= 2,
+                    "first_pass_step": 2 if runtime.env.steps >= 2 else None,
+                },
+                "success": {
+                    "applicable": True,
+                    "passed": success,
+                    "first_pass_step": 3 if success else None,
+                },
+            },
+        }
+
+
+class MissingReportAdapter(FakeAdapter):
+    report_stage_profile_id = "WX-01/report-v1"
+    report_stages = None
+
+
+class InvalidReportAdapter(FakeAdapter):
+    report_stage_profile_id = "WX-01/report-v1"
+
+    def report_stages(self, runtime):
+        del runtime
+        return {
+            "schema_version": "membench.report_stages/v1",
+            "task_id": self.task_id,
+            "profile_id": self.report_stage_profile_id,
+            "order": ["success"],
+            "stages": {
+                "success": {
+                    "applicable": False,
+                    "passed": None,
+                    "first_pass_step": None,
+                }
+            },
+        }
+
+
 def test_runner_replans_and_stops_on_success(tmp_path: Path):
     suite = EvalSuiteConfig(
         suite_version="test",
@@ -131,6 +186,58 @@ def test_runner_replans_and_stops_on_success(tmp_path: Path):
     assert result.policy_actions_consumed == 3
     assert result.reward_sum == 3
     assert (writer.episodes_dir / "seed_001000" / "result.json").is_file()
+
+
+def test_runner_persists_declared_report_stage_profile(tmp_path: Path) -> None:
+    suite = EvalSuiteConfig(
+        suite_version="test",
+        task_id="WX-01",
+        env_split="pretrain",
+        seeds=(1000,),
+        rollout=RolloutConfig(max_steps=10, replan_steps=2),
+        artifacts=ArtifactConfig(record_video=False),
+    )
+    writer = ArtifactWriter(tmp_path / "run", expected_seeds=suite.seeds)
+    runner = RolloutRunner(client=FakeClient(), suite=suite, artifacts=writer)
+
+    result = runner.run_episode(ReportAdapter(), 1000)
+
+    assert result.status == "success"
+    assert result.report_stages is not None
+    assert result.report_stages["order"] == [
+        "wipe_completed",
+        "cleaning_completed",
+        "success",
+    ]
+    payload = json.loads(
+        (writer.episodes_dir / "seed_001000" / "result.json").read_text()
+    )
+    assert payload["report_stages"] == result.report_stages
+    assert writer.write_summary()["report_stages"]["complete"] is True
+
+
+@pytest.mark.parametrize(
+    "adapter",
+    (MissingReportAdapter(), InvalidReportAdapter()),
+    ids=("missing", "invalid"),
+)
+def test_declared_report_stage_profile_requires_valid_report(adapter) -> None:
+    suite = EvalSuiteConfig(
+        suite_version="test",
+        task_id="WX-01",
+        env_split="pretrain",
+        seeds=(1000,),
+        rollout=RolloutConfig(max_steps=10, replan_steps=2),
+        artifacts=ArtifactConfig(record_video=False),
+    )
+    runner = RolloutRunner(client=FakeClient(), suite=suite)
+
+    result = runner.run_episode(adapter, 1000)
+
+    assert result.status == "error"
+    assert result.success is False
+    assert result.report_stages is None
+    assert "report" in str(result.error)
 
 
 class SemanticTerminalRuntime:
@@ -254,6 +361,50 @@ def test_full_horizon_success_is_revoked_by_later_violation() -> None:
     assert result.success_step == 2
     assert result.failure_reason == "item_removed_after_success"
     assert result.env_steps == 4
+
+
+class TransientSuccessEnv(FakeEnv):
+    def step(self, action):
+        del action
+        self.steps += 1
+        return {"step": self.steps}, 0.0, False, {"success": self.steps == 2}
+
+
+class TransientSuccessAdapter(FakeAdapter):
+    def create_episode(self, *, seed, policy_contract, suite):
+        del policy_contract, suite
+        return EpisodeRuntime(
+            episode_id=f"wx01-{seed}",
+            seed=seed,
+            env=TransientSuccessEnv(),
+            observation={"step": 0},
+            prompt="return cup",
+        )
+
+
+def test_full_horizon_reports_success_that_is_not_preserved() -> None:
+    suite = EvalSuiteConfig(
+        suite_version="test",
+        task_id="WX-01",
+        env_split="pretrain",
+        seeds=(1000,),
+        rollout=RolloutConfig(
+            max_steps=4,
+            replan_steps=2,
+            stop_on_success=False,
+            ignore_done=True,
+        ),
+        artifacts=ArtifactConfig(record_video=False),
+    )
+
+    result = RolloutRunner(client=FakeClient(), suite=suite).run_episode(
+        TransientSuccessAdapter(),
+        1000,
+    )
+
+    assert result.status == "failure"
+    assert result.success_step == 2
+    assert result.failure_reason == "terminal_state_not_preserved"
 
 
 class CloseFailAdapter(FakeAdapter):

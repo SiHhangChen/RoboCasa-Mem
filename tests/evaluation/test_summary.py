@@ -5,6 +5,35 @@ import pytest
 from bench.evaluation.summary import aggregate_episode_results
 
 
+def _ts01_report(
+    *,
+    target: int,
+    passed_sugars: int,
+    success: bool,
+) -> dict[str, object]:
+    stages: dict[str, dict[str, object]] = {}
+    for index in range(1, 4):
+        applicable = index <= target
+        passed = index <= passed_sugars if applicable else None
+        stages[f"sugar_{index}"] = {
+            "applicable": applicable,
+            "passed": passed,
+            "first_pass_step": index if passed is True else None,
+        }
+    stages["success"] = {
+        "applicable": True,
+        "passed": success,
+        "first_pass_step": target + 1 if success else None,
+    }
+    return {
+        "schema_version": "membench.report_stages/v1",
+        "task_id": "TS01",
+        "profile_id": "TS01/report-v1",
+        "order": ["sugar_1", "sugar_2", "sugar_3", "success"],
+        "stages": stages,
+    }
+
+
 def test_legacy_aggregation_is_preserved_without_expected_seeds():
     summary = aggregate_episode_results(
         [
@@ -89,3 +118,144 @@ def test_non_task_terminal_status_is_not_publishable(status: str):
 def test_expected_seed_values_must_be_integers():
     with pytest.raises(ValueError, match="integer"):
         aggregate_episode_results([], expected_seeds=["1"])
+
+
+def test_report_stage_denominators_exclude_non_applicable_stages() -> None:
+    summary = aggregate_episode_results(
+        [
+            {
+                "seed": 1,
+                "task_id": "TS01",
+                "status": "success",
+                "success": True,
+                "report_stages": _ts01_report(
+                    target=1,
+                    passed_sugars=1,
+                    success=True,
+                ),
+            },
+            {
+                "seed": 2,
+                "task_id": "TS01",
+                "status": "failure",
+                "success": False,
+                "failure_reason": "max_steps",
+                "report_stages": _ts01_report(
+                    target=2,
+                    passed_sugars=1,
+                    success=False,
+                ),
+            },
+            {
+                "seed": 3,
+                "task_id": "TS01",
+                "status": "success",
+                "success": True,
+                "report_stages": _ts01_report(
+                    target=3,
+                    passed_sugars=3,
+                    success=True,
+                ),
+            },
+        ],
+        expected_seeds=[1, 2, 3],
+    )
+
+    report = summary["report_stages"]
+    assert report["complete"] is True
+    assert report["eligible_episodes"] == report["reported_episodes"] == 3
+    assert report["stages"]["sugar_1"] == {
+        "passed": 3,
+        "denominator": 3,
+        "rate": 1.0,
+        "not_applicable": 0,
+        "first_pass_step_mean": 1.0,
+    }
+    assert report["stages"]["sugar_2"]["passed"] == 1
+    assert report["stages"]["sugar_2"]["denominator"] == 2
+    assert report["stages"]["sugar_2"]["not_applicable"] == 1
+    assert report["stages"]["sugar_3"]["passed"] == 1
+    assert report["stages"]["sugar_3"]["denominator"] == 1
+    assert report["stages"]["sugar_3"]["not_applicable"] == 2
+    assert report["stages"]["success"]["passed"] == 2
+    assert report["stages"]["success"]["denominator"] == 3
+    assert summary["publishable"] is True
+
+
+def test_partial_report_stage_coverage_is_not_publishable() -> None:
+    summary = aggregate_episode_results(
+        [
+            {
+                "seed": 1,
+                "task_id": "TS01",
+                "status": "success",
+                "success": True,
+                "report_stages": _ts01_report(
+                    target=1,
+                    passed_sugars=1,
+                    success=True,
+                ),
+            },
+            {
+                "seed": 2,
+                "task_id": "TS01",
+                "status": "failure",
+                "success": False,
+                "failure_reason": "max_steps",
+            },
+        ],
+        expected_seeds=[1, 2],
+    )
+
+    assert summary["report_stages"]["reported_episodes"] == 1
+    assert summary["report_stages"]["missing_episodes"] == 1
+    assert summary["report_stages"]["complete"] is False
+    assert summary["publishable"] is False
+
+
+def test_incompatible_report_stage_profiles_cannot_be_aggregated() -> None:
+    first = _ts01_report(target=1, passed_sugars=1, success=True)
+    second = {
+        "schema_version": "membench.report_stages/v1",
+        "task_id": "TS03",
+        "profile_id": "TS03/report-v1",
+        "order": ["sugar_1", "sugar_2", "success"],
+        "stages": {
+            "sugar_1": {
+                "applicable": True,
+                "passed": True,
+                "first_pass_step": 1,
+            },
+            "sugar_2": {
+                "applicable": False,
+                "passed": None,
+                "first_pass_step": None,
+            },
+            "success": {
+                "applicable": True,
+                "passed": True,
+                "first_pass_step": 2,
+            },
+        },
+    }
+
+    with pytest.raises(ValueError, match="incompatible report-stage profiles"):
+        aggregate_episode_results(
+            [
+                {
+                    "seed": 1,
+                    "task_id": "TS01",
+                    "status": "success",
+                    "success": True,
+                    "report_stages": first,
+                },
+                {
+                    "seed": 2,
+                    "task_id": "TS03",
+                    "status": "success",
+                    "success": True,
+                    "report_stages": second,
+                },
+            ],
+            expected_seeds=[1, 2],
+        )
