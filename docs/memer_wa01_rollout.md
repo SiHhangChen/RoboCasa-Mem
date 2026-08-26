@@ -37,7 +37,7 @@ processor。若使用 LoRA adapter，再额外安装 `peft`。
 
 ```bash
 cd /home/chensihang/membench
-CUDA_VISIBLE_DEVICES=6,7 ./scripts/eval/eval_memer_wa01.sh serve
+CUDA_VISIBLE_DEVICES=6,7 ./scripts/eval/memer/eval_memer_wa01.sh serve
 ```
 
 服务默认使用：
@@ -51,25 +51,40 @@ CUDA_VISIBLE_DEVICES=6,7 ./scripts/eval/eval_memer_wa01.sh serve
 终端 2 只验证协议、相机、state/action schema 和 action horizon：
 
 ```bash
-./scripts/eval/eval_memer_wa01.sh preflight
+./scripts/eval/memer/eval_memer_wa01.sh preflight
 ```
 
-## 单 seed 闭环
+## 配置评测范围
+
+正式入口统一使用 `configs/eval/suites/wa01_v1.yaml`。MemER 每 10 个环境步
+重新规划，因此运行前将该文件中的 `rollout.replan_steps` 手动改为 `10`。
+
+单 seed 调试时，同时把 `seeds` 改为：
+
+```yaml
+seeds: {start: 1050, stop: 1051}
+```
+
+然后运行：
 
 ```bash
-SUITE=configs/eval/suites/wa01_memer_full_v1.yaml \
 RUN_ID=wa01-memer-full-20000-seed1050 \
-./scripts/eval/eval_memer_wa01.sh eval
+./scripts/eval/memer/eval_memer_wa01.sh eval
 
-./scripts/eval/eval_memer_wa01.sh summary
+./scripts/eval/memer/eval_memer_wa01.sh summary
 ```
 
-单 seed 通过后再启动 50 seeds：
+单 seed 通过后，将同一 YAML 的 seed 范围恢复为正式的 50 seeds：
+
+```yaml
+seeds: {start: 1050, stop: 1100}
+```
+
+再启动评测：
 
 ```bash
-SUITE=configs/eval/suites/wa01_memer_full_50seeds_v1.yaml \
 RUN_ID=wa01-memer-full-20000-50seeds \
-./scripts/eval/eval_memer_wa01.sh eval
+./scripts/eval/memer/eval_memer_wa01.sh eval
 ```
 
 每个 episode 的 request metrics 会记录 MemER latency、subtask index、JSON

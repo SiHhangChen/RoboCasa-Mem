@@ -1,5 +1,10 @@
 #!/usr/bin/env python
-"""Rebuild and verify an evaluation summary from committed episode artifacts."""
+"""Rebuild and verify the canonical summary for one evaluation run.
+
+Normal rollouts write ``summary.json`` automatically. This command is a
+recovery and audit entry point for rebuilding that file exclusively from
+committed episode artifacts; it does not derive task-specific verdicts.
+"""
 
 from __future__ import annotations
 

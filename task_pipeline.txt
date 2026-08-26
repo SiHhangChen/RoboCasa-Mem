@@ -94,7 +94,7 @@
 
   进入会话后（你现在已经在里面了），运行：
   cd /home/chensihang/membench
-  ./train_pi05_wa01.sh
+  scripts/train/pi05/train_pi05_wa01.sh
   此时你会看到 loss 实时打印：
   Step 0: grad_norm=0.6608, loss=0.2226, param_norm=1803.7705
   Step 10: grad_norm=0.62, loss=0.21, ...
