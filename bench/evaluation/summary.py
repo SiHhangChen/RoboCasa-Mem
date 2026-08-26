@@ -5,6 +5,11 @@ from __future__ import annotations
 import math
 from typing import Any, Iterable, Mapping
 
+from bench.evaluation.report_stages import (
+    REPORT_STAGE_SUMMARY_SCHEMA,
+    validate_report_stages,
+)
+
 
 def wilson_interval(
     successes: int,
@@ -76,7 +81,13 @@ def aggregate_episode_results(
         and not duplicate_seeds
         and completed == recorded
     )
-    return {
+    report_stage_summary = _aggregate_report_stages(aggregate_items)
+    if (
+        report_stage_summary is not None
+        and not report_stage_summary["complete"]
+    ):
+        publishable = False
+    summary = {
         "episodes_total": len(aggregate_items),
         "counts": counts,
         "completed_task_episodes": completed,
@@ -98,6 +109,92 @@ def aggregate_episode_results(
         "overall_success_rate": overall_success_rate,
         "publishable": publishable,
         "duplicate_seeds": duplicate_seeds,
+    }
+    if report_stage_summary is not None:
+        summary["report_stages"] = report_stage_summary
+    return summary
+
+
+def _aggregate_report_stages(
+    results: Iterable[Mapping[str, Any]],
+) -> dict[str, Any] | None:
+    eligible = [
+        result
+        for result in results
+        if result.get("status") in {"success", "failure"}
+    ]
+    reported: list[dict[str, Any]] = []
+    for result in eligible:
+        raw = result.get("report_stages")
+        if raw is None:
+            continue
+        task_id = result.get("task_id")
+        reported.append(
+            validate_report_stages(
+                raw,
+                expected_task_id=(
+                    str(task_id) if isinstance(task_id, str) else None
+                ),
+                expected_success=bool(result.get("success")),
+            )
+        )
+    if not reported:
+        return None
+
+    first = reported[0]
+    identity = (
+        first["schema_version"],
+        first["task_id"],
+        first["profile_id"],
+        tuple(first["order"]),
+    )
+    for report in reported[1:]:
+        candidate = (
+            report["schema_version"],
+            report["task_id"],
+            report["profile_id"],
+            tuple(report["order"]),
+        )
+        if candidate != identity:
+            raise ValueError(
+                "cannot aggregate incompatible report-stage profiles: "
+                f"{identity!r} != {candidate!r}"
+            )
+
+    stages: dict[str, dict[str, Any]] = {}
+    for stage_id in first["order"]:
+        verdicts = [report["stages"][stage_id] for report in reported]
+        denominator = sum(int(verdict["applicable"]) for verdict in verdicts)
+        passed = sum(
+            int(verdict["passed"] is True)
+            for verdict in verdicts
+            if verdict["applicable"]
+        )
+        steps = [
+            int(verdict["first_pass_step"])
+            for verdict in verdicts
+            if verdict["applicable"] and verdict["passed"] is True
+        ]
+        stages[stage_id] = {
+            "passed": passed,
+            "denominator": denominator,
+            "rate": passed / denominator if denominator else None,
+            "not_applicable": len(reported) - denominator,
+            "first_pass_step_mean": (
+                sum(steps) / len(steps) if steps else None
+            ),
+        }
+
+    return {
+        "schema_version": REPORT_STAGE_SUMMARY_SCHEMA,
+        "task_id": first["task_id"],
+        "profile_id": first["profile_id"],
+        "order": list(first["order"]),
+        "eligible_episodes": len(eligible),
+        "reported_episodes": len(reported),
+        "missing_episodes": len(eligible) - len(reported),
+        "complete": len(eligible) == len(reported),
+        "stages": stages,
     }
 
 

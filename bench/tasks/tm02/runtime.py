@@ -6,10 +6,18 @@ from collections.abc import Mapping
 from dataclasses import asdict
 from typing import Any
 
-from bench.runtime import TaskRuntimeAdapter, default_close, default_diagnostics, default_success
+from bench.runtime import TaskRuntimeAdapter, default_close
 from bench.tasks.runtime_support import config_actions, manual_navigation, path_base_initialization, standard_plan, standard_scene, variant_prompt
 from bench.tasks.tm02.config import CALIBRATION_RESOURCE_NAMES, load_task_config, missing_calibration_resources, require_production_calibration, resolve_action_config, resolve_observer_config, resolve_task_options
 from bench.tasks.tm02.domain.episode import resolve_episode_plan, resolve_scene_config
+from bench.tasks.tm02.evaluation import (
+    REPORT_STAGE_PROFILE_ID,
+    TASK_EVALUATOR_METADATA_KEY,
+    TM02Evaluator,
+    diagnostics_for_runtime,
+    report_stages_for_runtime,
+    success_for_runtime,
+)
 from bench.tasks.tm02.execution.navigation import build_navigation_config
 from bench.tasks.tm02.expert.operations import build_operation_handlers
 from bench.tasks.tm02.initialization import apply_manual_path_initial_base_pose
@@ -48,13 +56,35 @@ def _release_facts(config: Any, episode: Any, resources: Mapping[str, Any], opti
     }
 
 
+_initialize_base = path_base_initialization(apply_manual_path_initial_base_pose)
+
+
+def _initialize(descriptor: Any, env: Any, observation: Mapping[str, Any]):
+    updated, initialization, metadata, targets = _initialize_base(
+        descriptor,
+        env,
+        observation,
+    )
+    evaluator = TM02Evaluator()
+    evaluator.reset(env.evaluation_snapshot())
+    env._tm02_evaluator = evaluator
+    return (
+        updated,
+        initialization,
+        {**dict(metadata), TASK_EVALUATOR_METADATA_KEY: evaluator},
+        targets,
+    )
+
+
 _ADAPTER = TaskRuntimeAdapter(
     task_id="TM02", load_task_config=load_task_config, resolve_task_options=resolve_task_options,
     scene=standard_scene(resolve_scene_config, uses_seed=False), plan=standard_plan(resolve_episode_plan),
     actions=config_actions(resolve_action_config), navigation=manual_navigation(build_navigation_config),
     prompt=variant_prompt(resolve_prompt_spec), environment=_environment,
-    initialize=path_base_initialization(apply_manual_path_initial_base_pose),
-    diagnostics=default_diagnostics, success=default_success, close=default_close,
+    initialize=_initialize,
+    diagnostics=diagnostics_for_runtime, success=success_for_runtime, close=default_close,
+    report_stage_profile_id=REPORT_STAGE_PROFILE_ID,
+    report_stages=report_stages_for_runtime,
     validate_descriptor=_validate, release_facts=_release_facts,
     expert_runtime=build_operation_handlers,
     task_validated_resource_names=tuple(CALIBRATION_RESOURCE_NAMES),

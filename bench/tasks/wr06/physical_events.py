@@ -160,14 +160,19 @@ class WR06PhysicalObserver:
 
         elif self._phase == self.TO_PLATE:
             supported = self._supported_level(sample)
-            if self._stable("plate_first_entry", sample.item_at_fixed_plate):
+            # Passing through the plate target while still grasped is transport,
+            # not completed staging. Qualify the stage only after a stable
+            # physical release in the configured plate region.
+            if self._stable(
+                "plate_first_release",
+                sample.item_at_fixed_plate and not sample.item_grasped,
+            ):
                 latch_memory_barrier(
                     self.state,
                     item_at_fixed_plate=True,
                     item_outside_shelves=True,
                 )
-                if not sample.item_grasped:
-                    self._plate_pick_release_seen = True
+                self._plate_pick_release_seen = True
                 events.extend(("staged", "barrier"))
                 self._transition(self.AT_PLATE, sample.step_id)
             elif supported is not None and self._stable(

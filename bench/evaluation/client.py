@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import time
-from typing import Any
+from typing import Any, Protocol
 import uuid
 
 from bench.evaluation.action import validate_action_chunk
@@ -19,6 +19,23 @@ from bench.policy.protocol.errors import (
     ProtocolError,
     raise_for_error_response,
 )
+
+
+class PolicyClient(Protocol):
+    """Client boundary consumed by the policy-neutral rollout runner."""
+
+    @property
+    def contract(self) -> PolicyContract: ...
+
+    def reset(self, episode_id: str) -> None: ...
+
+    def infer(
+        self,
+        observation: CanonicalObservation,
+        *,
+        episode_id: str,
+        step: int,
+    ) -> InferenceResponse: ...
 
 
 class RemotePolicyClient:

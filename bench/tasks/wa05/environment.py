@@ -31,6 +31,7 @@ from bench.tasks.wa05.domain.semantics import (
     record_verified_fill,
     record_verified_staging,
 )
+from bench.tasks.wa05.evaluation import WA05EvaluationSnapshot
 from bench.tasks.wa05.sensor_faucet_asset import (
     install_wa05_twin_sensor_faucets,
     wa05_sensor_faucet_stream_name,
@@ -168,6 +169,7 @@ class WA05FillOneCupAndMatchTemperatureButton(Kitchen):
             "staging_detected_by_cup": {},
         }
         self._task_event_locked: bool = False
+        self._last_task_event_update_step: int | None = None
         # Wa05_water_marker_gate_pending tracks that a physical fill happened
         # while the stream was visually active; used only for the marker gate
         # below and never for the semantic label itself.
@@ -456,6 +458,10 @@ class WA05FillOneCupAndMatchTemperatureButton(Kitchen):
             raise RuntimeError("WA-05 episode was not configured after reset")
         return self._episode_plan
 
+    @property
+    def semantic_state(self) -> SemanticState:
+        return self._semantic_state
+
     def configure_service_slots(
         self,
         *,
@@ -553,6 +559,10 @@ class WA05FillOneCupAndMatchTemperatureButton(Kitchen):
         """
 
         super().update_state()
+        step_id = int(getattr(self, "timestep", 0))
+        if self._last_task_event_update_step == step_id:
+            return
+        self._last_task_event_update_step = step_id
         self._refresh_sensor_faucets()
         self._update_task_events_from_physics()
         # Only interpret a button qpos edge as an intentional answer when the
@@ -757,6 +767,26 @@ class WA05FillOneCupAndMatchTemperatureButton(Kitchen):
     def _check_success(self) -> bool:
         self.update_state()
         return evaluate_success(self._semantic_state).success
+
+    def evaluation_snapshot(self) -> WA05EvaluationSnapshot:
+        """Expose verified fill, staging, and answer facts to the evaluator."""
+
+        details = self.task_diagnostics()
+        state = self._semantic_state
+        report = evaluate_success(state)
+        plan = self.episode_plan
+        return WA05EvaluationSnapshot(
+            step_id=int(getattr(self, "timestep", 0)),
+            cup_id=plan.cup_id,
+            service_slot=plan.service_slot,
+            filled_temperature=state.filled_temperature,
+            staged_before_answer=state.staged_before_answer,
+            pressed_temperature=state.pressed_temperature,
+            domain_success=report.success,
+            absorbing_failure=state.absorbing_failure,
+            failure_code=state.failure_code,
+            details=details,
+        )
 
     def task_diagnostics(self) -> dict[str, object]:
         """Return oracle diagnostics for the recorder, not policy observations."""
@@ -1158,6 +1188,7 @@ class WA05FillOneCupAndMatchTemperatureButton(Kitchen):
             "staging_detected_by_cup": {},
         }
         self._task_event_locked = False
+        self._last_task_event_update_step = None
         self._water_marker_gate_pending = {cup: None for cup in CUP_IDS}
 
     def _update_task_events_from_physics(self) -> None:
@@ -1168,8 +1199,7 @@ class WA05FillOneCupAndMatchTemperatureButton(Kitchen):
         never infers hidden labels (temperature / cup identity) from images or
         prompts; it only commits what the physical state provably shows:
 
-        * a cup is filled when it is held under the active sensor faucet with
-          the water level at full;
+        * a cup has water once it is observed under an active sensor faucet;
         * staging is recorded when the released cup first reaches its slot;
         * a later active faucet of the other temperature is a mixed fill.
         """
@@ -1179,12 +1209,10 @@ class WA05FillOneCupAndMatchTemperatureButton(Kitchen):
         plan = self._episode_plan
         if plan is None:
             return
-        # Physical fill events: a cup is filled when it dwells under the active
-        # sensor faucet long enough for the water level to reach full.  The
-        # dwell-based sensor association (activated by ``_refresh_sensor_faucets``
-        # after ``zone_settle_steps``) is the physical evidence.  Auto-ramp the
-        # fill progress so the replay path does not depend on the expert's
-        # ``_run_fill_dwell`` calling ``set_cup_fill_progress``.
+        # The sensor association already includes the configured activation
+        # debounce. Its first verified water contact commits the semantic fill;
+        # the synthetic liquid level continues to animate independently and is
+        # not an evaluation threshold.
         for cup in CUP_IDS:
             temperature = self._sensor_cup_by_temperature.get("hot")
             if temperature == cup:
@@ -1197,20 +1225,28 @@ class WA05FillOneCupAndMatchTemperatureButton(Kitchen):
             if not self.cup_is_under_sensor_faucet(cup, temperature):
                 continue
             filled_temperature = self._semantic_state.filled_temperature
-            if filled_temperature is not None:
-                if temperature != filled_temperature:
-                    record_verified_fill(self._semantic_state, temperature)
-                    self._physical_event_diagnostics["mixed_fill_detected"] = {
-                        "cup_id": cup,
-                        "first_temperature": filled_temperature,
-                        "second_temperature": temperature,
-                    }
+            if (
+                filled_temperature is not None
+                and temperature != filled_temperature
+            ):
+                record_verified_fill(self._semantic_state, temperature)
+                self._physical_event_diagnostics["mixed_fill_detected"] = {
+                    "cup_id": cup,
+                    "first_temperature": filled_temperature,
+                    "second_temperature": temperature,
+                }
                 continue
+
+            fill_steps = max(
+                1,
+                int(getattr(self, "fill_under_water_steps_required", 40)),
+            )
             progress = float(self.cup_fill_progress.get(cup, 0.0))
-            progress = min(1.0, progress + 0.025)
+            progress = min(1.0, progress + 1.0 / fill_steps)
             self.set_cup_fill_progress(cup, progress)
-            if progress < 1.0 - 1.0e-6:
+            if filled_temperature is not None:
                 continue
+
             applied = record_verified_fill(self._semantic_state, temperature)
             if applied:
                 self.cup_temperatures[cup] = temperature

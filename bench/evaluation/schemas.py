@@ -11,6 +11,8 @@ from typing import Any
 
 import numpy as np
 
+from bench.evaluation.report_stages import validate_report_stages
+
 
 EPISODE_RESULT_SCHEMA = "membench.episode_result/v1"
 VALID_EPISODE_STATUSES = frozenset({"success", "failure", "error", "cancelled"})
@@ -84,6 +86,19 @@ def validate_episode_result(
             result["failure_reason"] = "unknown"
         else:
             raise ValueError("failure episode must include a non-empty failure_reason")
+
+    report_stages = result.get("report_stages")
+    if report_stages is not None:
+        task_id = result.get("task_id")
+        if not _nonempty_string(task_id):
+            raise ValueError(
+                "episode task_id must be present when report_stages is present"
+            )
+        result["report_stages"] = validate_report_stages(
+            report_stages,
+            expected_task_id=str(task_id),
+            expected_success=success,
+        )
 
     result["schema_version"] = EPISODE_RESULT_SCHEMA
     result["seed"] = seed

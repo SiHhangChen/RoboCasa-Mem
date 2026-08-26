@@ -12,9 +12,11 @@ from bench.tasks.wa02.domain.episode import resolve_episode_plan, resolve_scene_
 from bench.tasks.wa02.domain.geometry import resolve_cup_region_constraints, resolve_cup_sampling_regions
 from bench.tasks.wa02.execution.navigation import build_navigation_config
 from bench.tasks.wa02.evaluation import (
+    REPORT_STAGE_PROFILE_ID,
     TASK_EVALUATOR_METADATA_KEY,
     WA02Evaluator,
     diagnostics_for_runtime,
+    report_stages_for_runtime,
     success_for_runtime,
 )
 from bench.tasks.wa02.expert.operations import build_operation_handlers
@@ -76,6 +78,8 @@ _ADAPTER = TaskRuntimeAdapter(
     prompt=lambda plan, variant: resolve_prompt_spec(requested_temperature=plan.requested_temperature, variant=variant),
     environment=_environment, initialize=_initialize,
     diagnostics=diagnostics_for_runtime, success=success_for_runtime, close=default_close,
+    report_stage_profile_id=REPORT_STAGE_PROFILE_ID,
+    report_stages=report_stages_for_runtime,
     expert_runtime=build_operation_handlers,
 )
 TASK_RUNTIME_API = _ADAPTER.api()

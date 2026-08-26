@@ -6,11 +6,13 @@ task:
   display_name: Return object to original place
   description: Wipe the remembered dining-table spot and return its displaced cup.
   success_conditions:
+    # Stage 1: wipe the remembered area.
     - remembered_area_wiped
+    # Stage 2: place the sponge after wiping.
+    - cleaning_tool_released
+    # Stage 3: place the cup at the wiped origin on the dining table.
     - blocking_object_at_origin
     - blocking_object_on_dining_table
-    - cleaning_tool_released
-    - blocking_object_released
 
 scene:
   env_name: WX01ReturnObjectToOriginalPlace

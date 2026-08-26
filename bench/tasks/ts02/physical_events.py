@@ -65,12 +65,16 @@ class TS02PhysicalObserver:
         self.button_released_threshold_m = float(button_released_threshold_m)
         self.button_release_dwell_steps = int(button_release_dwell_steps)
         self.state = SemanticState(self.fixture_names, self.target_fixture)
+        self.completed_fixture_steps: dict[str, int] = {}
+        self.valid_button_press_steps: list[int] = []
         self._previous: PhysicalSample | None = None
         self._button_armed = True
         self._button_release_steps = 0
 
     def reset_state(self) -> None:
         self.state = SemanticState(self.fixture_names, self.target_fixture)
+        self.completed_fixture_steps = {}
+        self.valid_button_press_steps = []
         self._previous = None
         self._button_armed = True
         self._button_release_steps = 0
@@ -141,6 +145,10 @@ class TS02PhysicalObserver:
                 )
                 if report.passed:
                     events.append(f"close:{active}")
+                    self.completed_fixture_steps.setdefault(
+                        str(active),
+                        int(sample.step_id),
+                    )
 
         button_depth = float(sample.completion_button_press_depth_m)
         if self._button_armed and button_depth >= self.button_pressed_threshold_m:
@@ -156,6 +164,7 @@ class TS02PhysicalObserver:
             )
             if report.passed:
                 events.append("press:completion_button")
+                self.valid_button_press_steps.append(int(sample.step_id))
         elif not self._button_armed:
             if button_depth <= self.button_released_threshold_m:
                 self._button_release_steps += 1
@@ -199,6 +208,8 @@ class TS02PhysicalObserver:
                 "button_armed": self._button_armed,
                 "button_release_steps": self._button_release_steps,
                 "failure_reason": self.state.failure_reason,
+                "completed_fixture_steps": dict(self.completed_fixture_steps),
+                "valid_button_press_steps": list(self.valid_button_press_steps),
             },
         )
 

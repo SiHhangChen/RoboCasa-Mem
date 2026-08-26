@@ -53,11 +53,13 @@ class TM02PhysicalObserver:
     def __init__(self, config: ObserverConfig) -> None:
         self.config = config
         self.state = SemanticState()
+        self.event_steps: dict[str, int] = {}
         self.invalid_environment_labels: list[str] = []
         self._last: PhysicalSample | None = None
 
     def reset(self, initial: PhysicalSample) -> None:
         self.state = SemanticState()
+        self.event_steps = {}
         self.invalid_environment_labels = []
         self._last = initial
         checks = {
@@ -178,6 +180,8 @@ class TM02PhysicalObserver:
 
         if len(semantic_events) > 1:
             self.state.fail("simultaneous_semantic_events")
+        for event in semantic_events:
+            self.event_steps.setdefault(event, int(sample.step_id))
         self._last = sample
         return self._update(sample.step_id, tuple(semantic_events))
 
@@ -207,6 +211,7 @@ class TM02PhysicalObserver:
         values["invalid_environment_labels"] = list(
             self.invalid_environment_labels
         )
+        values["semantic_event_steps"] = dict(self.event_steps)
         return ObserverUpdate(
             step_id=int(step_id),
             semantic_events=semantic_events,

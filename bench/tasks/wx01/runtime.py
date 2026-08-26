@@ -5,10 +5,18 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from bench.runtime import TaskRuntimeAdapter, default_close, default_diagnostics, default_success
+from bench.runtime import TaskRuntimeAdapter, default_close
 from bench.tasks.runtime_support import manual_station_navigation, standard_scene, variant_prompt
 from bench.tasks.wx01.config import load_task_config, resolve_action_config
 from bench.tasks.wx01.domain.episode import resolve_episode_plan, resolve_scene_config
+from bench.tasks.wx01.evaluation import (
+    REPORT_STAGE_PROFILE_ID,
+    TASK_EVALUATOR_METADATA_KEY,
+    WX01Evaluator,
+    diagnostics_for_runtime,
+    report_stages_for_runtime,
+    success_for_runtime,
+)
 from bench.tasks.wx01.execution.geometry import resolve_episode_targets
 from bench.tasks.wx01.execution.manipulation import build_manipulation_assembly
 from bench.tasks.wx01.execution.navigation import build_navigation_config
@@ -60,7 +68,15 @@ def _initialize(descriptor: Any, env: Any, observation: Mapping[str, Any]):
         env, setup.controller, targets=targets, config=descriptor.config.initial_state,
         grasp_pose_file=descriptor.resources["cleaning_tool_grasp_pose"],
     )
-    return updated, {"objects": objects, "base": base, "short_start": short_start}, {}, targets
+    evaluator = WX01Evaluator()
+    evaluator.reset(env.evaluation_snapshot())
+    env._wx01_evaluator = evaluator
+    return (
+        updated,
+        {"objects": objects, "base": base, "short_start": short_start},
+        {TASK_EVALUATOR_METADATA_KEY: evaluator},
+        targets,
+    )
 
 
 _ADAPTER = TaskRuntimeAdapter(
@@ -69,7 +85,9 @@ _ADAPTER = TaskRuntimeAdapter(
     actions=lambda config, plan, resources: resolve_action_config(episode=plan, operations=config.operations),
     navigation=manual_station_navigation(build_navigation_config),
     prompt=variant_prompt(resolve_prompt_spec), environment=_environment, initialize=_initialize,
-    diagnostics=default_diagnostics, success=default_success, close=default_close,
+    diagnostics=diagnostics_for_runtime, success=success_for_runtime, close=default_close,
+    report_stage_profile_id=REPORT_STAGE_PROFILE_ID,
+    report_stages=report_stages_for_runtime,
     expert_runtime=build_operation_handlers,
 )
 TASK_RUNTIME_API = _ADAPTER.api()

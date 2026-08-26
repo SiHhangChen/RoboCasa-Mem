@@ -121,6 +121,20 @@ class CanonicalEvaluationAdapter:
     def diagnostics(self, runtime: EpisodeRuntime) -> Mapping[str, Any]:
         return dict(self._runtime_api().diagnostics(runtime.metadata["initialized_task_runtime"]))
 
+    @property
+    def report_stage_profile_id(self) -> str | None:
+        value = self._runtime_api().report_stage_profile_id
+        return None if value is None else str(value)
+
+    def report_stages(
+        self,
+        runtime: EpisodeRuntime,
+    ) -> Mapping[str, Any] | None:
+        callback = self._runtime_api().report_stages
+        if callback is None:
+            return None
+        return dict(callback(runtime.metadata["initialized_task_runtime"]) or {})
+
     def close(self, runtime: EpisodeRuntime) -> None:
         try:
             runtime.metadata["runtime"].close()
@@ -151,6 +165,7 @@ class CanonicalEvaluationAdapter:
             raise ProtocolError(ErrorCode.CONTRACT_MISMATCH, f"expected state schema {STATE_SCHEMA}")
         return {
             "adapter_mode": "resolved_episode_runtime",
+            "report_stage_profile_id": self.report_stage_profile_id,
             "resolved_episode_identity": episode.identity,
             "task_config_path": episode.task_config_file,
             "observation_profile_path": episode.observation_profile_file,

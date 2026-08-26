@@ -12,6 +12,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
+from bench.evaluation.report_profiles import WR03_REPORT_PROFILE
 from bench.tasks.wr03.domain.contracts import CAN_ID, CABINET_LEVELS
 
 
@@ -20,6 +21,7 @@ STAGE_ORDER = (
     "can_store",
     "close_upper_cabinet",
     "close_lower_cabinet",
+    "storage_hidden",
     "open_remembered_cabinet",
     "retrieve_can",
 )
@@ -28,14 +30,29 @@ STAGE_LABELS = {
     "can_store": "罐头存",
     "close_upper_cabinet": "关上柜",
     "close_lower_cabinet": "关下柜",
+    "storage_hidden": "存储位置隐藏",
     "open_remembered_cabinet": "打开记忆柜",
     "retrieve_can": "取回罐头",
 }
-STAGE_PREREQUISITES: dict[str, str | None] = {
-    name: None if index == 0 else STAGE_ORDER[index - 1]
-    for index, name in enumerate(STAGE_ORDER)
+STAGE_PREREQUISITES: dict[str, str | tuple[str, ...] | None] = {
+    "can_pick": None,
+    "can_store": "can_pick",
+    "close_upper_cabinet": "can_store",
+    "close_lower_cabinet": "can_store",
+    "storage_hidden": ("close_upper_cabinet", "close_lower_cabinet"),
+    "open_remembered_cabinet": "storage_hidden",
+    "retrieve_can": "open_remembered_cabinet",
 }
+REPORT_STAGE_ORDER = WR03_REPORT_PROFILE.stage_ids
+REPORT_STAGE_PROFILE_ID = WR03_REPORT_PROFILE.profile_id
 TASK_EVALUATOR_METADATA_KEY = "task_evaluator"
+
+_REPORT_STAGE_SOURCES = {
+    "can_stored": "can_store",
+    "storage_hidden": "storage_hidden",
+    "correct_cabinet_opened": "open_remembered_cabinet",
+    "success": "retrieve_can",
+}
 
 
 def _level(value: Any) -> str:
@@ -80,6 +97,13 @@ class WR03EvaluationSnapshot:
         )
         if retrieved is not None and retrieved != CAN_ID:
             raise ValueError(f"invalid WR-03 retrieved item id: {retrieved!r}")
+        if bool(self.storage_hidden) and (
+            stored is None or closed_levels != frozenset(CABINET_LEVELS)
+        ):
+            raise ValueError(
+                "WR-03 storage_hidden requires stored can and both "
+                "post-storage door-close events"
+            )
         object.__setattr__(self, "step_id", step)
         object.__setattr__(self, "stored_level", stored)
         object.__setattr__(self, "closed_levels_after_storage", closed_levels)
@@ -134,6 +158,7 @@ class WR03EvaluationSnapshot:
                 self.stored_level is not None
                 and "lower" in self.closed_levels_after_storage
             ),
+            "storage_hidden": self.storage_hidden,
             "open_remembered_cabinet": self.opened_level is not None,
             "retrieve_can": self.retrieved_item_id is not None,
         }
@@ -218,6 +243,28 @@ class WR03EvalResult:
         )
         return payload
 
+    def to_report_stages(self) -> dict[str, Any]:
+        """Project internal protocol facts onto the public WR-03 funnel."""
+
+        stages: dict[str, dict[str, Any]] = {}
+        for name in REPORT_STAGE_ORDER:
+            internal = self.stages[_REPORT_STAGE_SOURCES[name]]
+            passed = bool(self.success) if name == "success" else bool(
+                internal.qualified
+            )
+            stages[name] = {
+                "applicable": True,
+                "passed": passed,
+                "first_pass_step": internal.qualified_step if passed else None,
+            }
+        return {
+            "schema_version": "membench.report_stages/v1",
+            "task_id": WR03_REPORT_PROFILE.task_id,
+            "profile_id": REPORT_STAGE_PROFILE_ID,
+            "order": list(REPORT_STAGE_ORDER),
+            "stages": stages,
+        }
+
 
 @dataclass
 class _MutableStage:
@@ -292,22 +339,31 @@ class WR03Evaluator:
             ):
                 continue
             prerequisite = STAGE_PREREQUISITES[name]
-            prerequisite_qualified = (
-                prerequisite is None or qualified_before[prerequisite]
-            )
-            # Both physical door-close events can first become visible in the
-            # same sampled frame. Preserve their declared order without
-            # permanently rejecting the lower-door event on that frame.
-            if (
-                name == "close_lower_cabinet"
-                and prerequisite == "close_upper_cabinet"
-            ):
-                prerequisite_qualified = qualified_now[prerequisite]
+            if isinstance(prerequisite, tuple):
+                # The two doors may close in either order. The memory barrier
+                # can become visible in the same sample as the second close.
+                prerequisite_qualified = bool(
+                    all(qualified_now[value] for value in prerequisite)
+                )
+                prerequisite_reason = (
+                    "prerequisites_not_qualified:" + ",".join(
+                        value
+                        for value in prerequisite
+                        if not qualified_now[value]
+                    )
+                )
+            else:
+                prerequisite_qualified = (
+                    prerequisite is None or qualified_before[prerequisite]
+                )
+                prerequisite_reason = (
+                    f"prerequisite_not_qualified:{prerequisite}"
+                )
             if not prerequisite_qualified:
                 self._reject(
                     name,
                     snapshot.step_id,
-                    f"prerequisite_not_qualified:{prerequisite}",
+                    prerequisite_reason,
                 )
                 continue
             reason = self._stage_validation_failure(name, snapshot)
@@ -379,12 +435,24 @@ class WR03Evaluator:
             reason = str(rejected[-1]["reason"])
         else:
             prerequisite = STAGE_PREREQUISITES[name]
-            reason = (
-                f"waiting_for_prerequisite:{prerequisite}"
-                if prerequisite is not None
-                and not self._stages[prerequisite].qualified
-                else "not_observed"
-            )
+            if isinstance(prerequisite, tuple):
+                missing = [
+                    value
+                    for value in prerequisite
+                    if not self._stages[value].qualified
+                ]
+                reason = (
+                    "waiting_for_prerequisites:" + ",".join(missing)
+                    if missing
+                    else "not_observed"
+                )
+            else:
+                reason = (
+                    f"waiting_for_prerequisite:{prerequisite}"
+                    if prerequisite is not None
+                    and not self._stages[prerequisite].qualified
+                    else "not_observed"
+                )
             invalidated = False
         return StageEvalResult(
             observed=stage.observed,
@@ -446,7 +514,13 @@ def diagnostics_for_runtime(runtime: Any) -> Mapping[str, Any]:
     return evaluate_initialized_runtime(runtime).to_diagnostics()
 
 
+def report_stages_for_runtime(runtime: Any) -> Mapping[str, Any]:
+    return evaluate_initialized_runtime(runtime).to_report_stages()
+
+
 __all__ = [
+    "REPORT_STAGE_ORDER",
+    "REPORT_STAGE_PROFILE_ID",
     "STAGE_LABELS",
     "STAGE_ORDER",
     "STAGE_PREREQUISITES",
@@ -457,5 +531,6 @@ __all__ = [
     "WR03Evaluator",
     "diagnostics_for_runtime",
     "evaluate_initialized_runtime",
+    "report_stages_for_runtime",
     "success_for_runtime",
 ]

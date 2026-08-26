@@ -17,9 +17,11 @@ from bench.tasks.wa01.domain.episode import resolve_episode_plan, resolve_scene_
 from bench.tasks.wa01.domain.geometry import dining_region_config_summary
 from bench.tasks.wa01.execution.navigation import build_navigation_config
 from bench.tasks.wa01.evaluation import (
+    REPORT_STAGE_PROFILE_ID,
     TASK_EVALUATOR_METADATA_KEY,
     WA01Evaluator,
     diagnostics_for_runtime,
+    report_stages_for_runtime,
     success_for_runtime,
 )
 from bench.tasks.wa01.expert.operations import build_operation_handlers
@@ -103,6 +105,8 @@ _ADAPTER = TaskRuntimeAdapter(
     diagnostics=diagnostics_for_runtime,
     success=success_for_runtime,
     close=default_close,
+    report_stage_profile_id=REPORT_STAGE_PROFILE_ID,
+    report_stages=report_stages_for_runtime,
     expert_runtime=build_operation_handlers,
 )
 TASK_RUNTIME_API = _ADAPTER.api()

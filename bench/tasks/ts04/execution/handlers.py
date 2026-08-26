@@ -116,15 +116,18 @@ def open_fixture(
     physically_open = bool(
         actuation.get("pass", False) and fraction >= float(env.open_threshold)
     )
-    result = env.record_open_event(
-        fixture_name,
-        drawer_open=physically_open,
-        failure_reason=(
-            None
-            if physically_open
-            else str(actuation.get("reason") or "drawer_not_open")
-        ),
-    )
+    if physically_open and env.semantic_state.active_fixture == fixture_name:
+        result = _observer_committed_result(env, "open_fixture", fixture_name)
+    else:
+        result = env.record_open_event(
+            fixture_name,
+            drawer_open=physically_open,
+            failure_reason=(
+                None
+                if physically_open
+                else str(actuation.get("reason") or "drawer_not_open")
+            ),
+        )
     result.update(
         {
             "actuation_mode": mode,
@@ -146,10 +149,18 @@ def inspect_fixture(
     env = controller.env
     known = fixture_name in env.fixture_names
     fraction = float(env.slot_open_fraction(fixture_name)) if known else 0.0
-    result = env.record_inspection_event(
-        fixture_name,
-        drawer_open=known and fraction >= float(env.open_threshold),
-    )
+    if (
+        known
+        and fraction >= float(env.open_threshold)
+        and env.semantic_state.active_fixture == fixture_name
+        and env.semantic_state.inspected_active_fixture
+    ):
+        result = _observer_committed_result(env, "inspect_fixture", fixture_name)
+    else:
+        result = env.record_inspection_event(
+            fixture_name,
+            drawer_open=known and fraction >= float(env.open_threshold),
+        )
     result.update(
         {
             "dwell_steps": int(dwell_steps),
@@ -182,6 +193,7 @@ def close_fixture(
             drawer_closed=known and fraction <= float(env.closed_threshold),
         )
 
+    completed_before = len(env.semantic_state.completed_fixture_history)
     mode = str(actuation_mode).strip().lower()
     if mode == "semantic":
         env.set_slot_open_fraction(fixture_name, float(closed_fraction))
@@ -206,15 +218,23 @@ def close_fixture(
     physically_closed = bool(
         actuation.get("pass", False) and fraction <= float(env.closed_threshold)
     )
-    result = env.record_close_event(
-        fixture_name,
-        drawer_closed=physically_closed,
-        failure_reason=(
-            None
-            if physically_closed
-            else str(actuation.get("reason") or "drawer_not_closed")
-        ),
-    )
+    history = env.semantic_state.completed_fixture_history
+    if (
+        physically_closed
+        and len(history) == completed_before + 1
+        and history[-1] == fixture_name
+    ):
+        result = _observer_committed_result(env, "close_fixture", fixture_name)
+    else:
+        result = env.record_close_event(
+            fixture_name,
+            drawer_closed=physically_closed,
+            failure_reason=(
+                None
+                if physically_closed
+                else str(actuation.get("reason") or "drawer_not_closed")
+            ),
+        )
     result.update(
         {
             "actuation_mode": mode,
@@ -276,6 +296,7 @@ def press_completion_button(
             button_physically_pressed=False,
             all_drawers_closed=all_closed,
         )
+    press_count_before = int(env.semantic_state.completion_button_press_count)
     actuation = press_completion_button_physically(
         controller,
         prepress_z_offset=float(prepress_z_offset),
@@ -296,13 +317,21 @@ def press_completion_button(
         actuation.get("physical_button_motion_observed", False)
         and actuation.get("pass", False)
     )
-    semantic = env.record_completion_button_event(
-        button_physically_pressed=physical_motion,
-        all_drawers_closed=_all_drawers_closed(env),
-        failure_reason=str(
-            actuation.get("reason") or "completion_button_not_physically_pressed"
-        ),
-    )
+    if (
+        physical_motion
+        and env.semantic_state.completion_button_press_count == press_count_before + 1
+    ):
+        semantic = _observer_committed_result(
+            env, "press_completion_button", "completion_button"
+        )
+    else:
+        semantic = env.record_completion_button_event(
+            button_physically_pressed=physical_motion,
+            all_drawers_closed=_all_drawers_closed(env),
+            failure_reason=str(
+                actuation.get("reason") or "completion_button_not_physically_pressed"
+            ),
+        )
     checks = {
         "physical_press_operation": bool(actuation.get("pass", False)),
         "physical_button_motion": physical_motion,
@@ -334,6 +363,26 @@ def _all_drawers_closed(env: Any) -> bool:
         float(env.slot_open_fraction(name)) <= float(env.closed_threshold)
         for name in env.fixture_names
     )
+
+
+def _observer_committed_result(
+    env: Any,
+    primitive: str,
+    fixture: str,
+) -> dict[str, Any]:
+    """Avoid double commits when execution already crossed a physical edge."""
+
+    result = {
+        "primitive": str(primitive),
+        "fixture": str(fixture),
+        "checks": {"physical_event_observer_committed": True},
+        "pass": True,
+        "reason": None,
+    }
+    diagnostics = getattr(env, "inspection_diagnostics", None)
+    if callable(diagnostics):
+        result["diagnostics"] = diagnostics()
+    return result
 
 
 __all__ = [

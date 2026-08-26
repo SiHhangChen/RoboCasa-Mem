@@ -45,6 +45,14 @@ class EvaluationAdapter(Protocol):
 
     def diagnostics(self, runtime: EpisodeRuntime) -> Mapping[str, Any]: ...
 
+    @property
+    def report_stage_profile_id(self) -> str | None: ...
+
+    def report_stages(
+        self,
+        runtime: EpisodeRuntime,
+    ) -> Mapping[str, Any] | None: ...
+
     def close(self, runtime: EpisodeRuntime) -> None: ...
 
 

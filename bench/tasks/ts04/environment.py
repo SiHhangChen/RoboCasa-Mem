@@ -34,6 +34,8 @@ from bench.tasks.ts04.domain.semantics import (
     record_inspection_attempt,
     record_open_attempt,
 )
+from bench.tasks.ts04.evaluation import TS04EvaluationSnapshot
+from bench.tasks.ts04.physical_events import PhysicalSample, TS04PhysicalObserver
 from bench.tasks.ts04.single_drawer import SingleTabletopDrawer
 from bench.tasks.ts04.target_object import (
     TARGET_OBJECT_GEOM_NAME,
@@ -85,6 +87,9 @@ class TS04InspectTwoDrawers(Kitchen):
         target_fixture: str = FIXTURE_NAMES[0],
         open_threshold: float = 0.70,
         closed_threshold: float = 0.08,
+        button_pressed_threshold_m: float = 0.004,
+        button_released_threshold_m: float = 0.001,
+        button_release_dwell_steps: int = 2,
         **kwargs: Any,
     ) -> None:
         names = tuple(str(name) for name in fixture_names)
@@ -115,7 +120,16 @@ class TS04InspectTwoDrawers(Kitchen):
             raise ValueError("TS04 target_fixture must name one of the two drawers")
         self.open_threshold = float(open_threshold)
         self.closed_threshold = float(closed_threshold)
-        self._semantic_state = SemanticState(names, self.target_fixture)
+        self._physical_observer = TS04PhysicalObserver(
+            fixture_names=names,
+            target_fixture=self.target_fixture,
+            drawer_open_threshold=self.open_threshold,
+            drawer_closed_threshold=self.closed_threshold,
+            button_pressed_threshold_m=float(button_pressed_threshold_m),
+            button_released_threshold_m=float(button_released_threshold_m),
+            button_release_dwell_steps=int(button_release_dwell_steps),
+        )
+        self._observer_armed = False
         super().__init__(**kwargs)
 
     # Scene construction -------------------------------------------------
@@ -196,36 +210,63 @@ class TS04InspectTwoDrawers(Kitchen):
 
     def _setup_scene(self) -> None:
         super()._setup_scene()
+        self._observer_armed = False
         self.close_all_drawers()
         self.reset_semantic_state()
+
+    def _reset_internal(self) -> None:
+        """Arm physical edge detection only after reset has settled."""
+
+        self._observer_armed = False
+        super()._reset_internal()
+        self.close_all_drawers()
+        self.sim.forward()
+        self._physical_observer.reset(self._physical_sample())
+        self._observer_armed = True
+
+    def update_state(self) -> None:
+        super().update_state()
+        if self._observer_armed:
+            self._physical_observer.observe(self._physical_sample())
+
+    def reward(self, action=None):
+        del action
+        if self._observer_armed:
+            self._physical_observer.observe(self._physical_sample())
+        return 1.0 if self._check_success() else 0.0
 
     # Semantic events ----------------------------------------------------
 
     @property
     def semantic_state(self) -> SemanticState:
-        return self._semantic_state
+        return self._physical_observer.state
+
+    @property
+    def physical_observer(self) -> TS04PhysicalObserver:
+        return self._physical_observer
 
     @property
     def checked_fixture_set(self) -> set[str]:
-        return self._semantic_state.checked_fixture_set
+        return self.semantic_state.checked_fixture_set
 
     @property
     def completed_fixture_history(self) -> list[str]:
-        return self._semantic_state.completed_fixture_history
+        return self.semantic_state.completed_fixture_history
 
     @property
     def active_fixture(self) -> str | None:
-        return self._semantic_state.active_fixture
+        return self.semantic_state.active_fixture
 
     @property
     def num_checked(self) -> int:
-        return self._semantic_state.num_checked
+        return self.semantic_state.num_checked
 
     def reset_semantic_state(self) -> None:
-        self._semantic_state = SemanticState(
-            self.fixture_names,
-            self.target_fixture,
-        )
+        try:
+            self._physical_observer.reset(self._physical_sample())
+            self._observer_armed = True
+        except Exception:
+            self._physical_observer.reset_state()
 
     def record_open_event(
         self,
@@ -235,7 +276,7 @@ class TS04InspectTwoDrawers(Kitchen):
         failure_reason: str | None = None,
     ) -> dict[str, Any]:
         result = record_open_attempt(
-            self._semantic_state,
+            self.semantic_state,
             fixture_name,
             drawer_open=drawer_open,
             failure_reason=failure_reason,
@@ -250,7 +291,7 @@ class TS04InspectTwoDrawers(Kitchen):
         drawer_open: bool,
     ) -> dict[str, Any]:
         result = record_inspection_attempt(
-            self._semantic_state,
+            self.semantic_state,
             fixture_name,
             drawer_open=drawer_open,
         ).as_dict()
@@ -264,12 +305,18 @@ class TS04InspectTwoDrawers(Kitchen):
         drawer_closed: bool,
         failure_reason: str | None = None,
     ) -> dict[str, Any]:
-        result = record_close_attempt(
-            self._semantic_state,
+        report = record_close_attempt(
+            self.semantic_state,
             fixture_name,
             drawer_closed=drawer_closed,
             failure_reason=failure_reason,
-        ).as_dict()
+        )
+        if report.passed:
+            self._physical_observer.completed_fixture_steps.setdefault(
+                str(fixture_name),
+                int(getattr(self, "timestep", 0)),
+            )
+        result = report.as_dict()
         result["diagnostics"] = self.inspection_diagnostics()
         return result
 
@@ -285,12 +332,17 @@ class TS04InspectTwoDrawers(Kitchen):
             if all_drawers_closed is None
             else bool(all_drawers_closed)
         )
-        result = record_completion_button_attempt(
-            self._semantic_state,
+        report = record_completion_button_attempt(
+            self.semantic_state,
             all_drawers_closed=closed,
             button_physically_pressed=button_physically_pressed,
             failure_reason=failure_reason,
-        ).as_dict()
+        )
+        if report.passed:
+            self._physical_observer.valid_button_press_steps.append(
+                int(getattr(self, "timestep", 0))
+            )
+        result = report.as_dict()
         result["diagnostics"] = self.inspection_diagnostics()
         return result
 
@@ -328,6 +380,16 @@ class TS04InspectTwoDrawers(Kitchen):
                 fixture_name: self.slot_open_fraction(fixture_name)
                 for fixture_name in self.fixture_names
             }
+        )
+
+    def _physical_sample(self) -> PhysicalSample:
+        return PhysicalSample(
+            step_id=int(getattr(self, "timestep", 0)),
+            drawer_open_fraction={
+                fixture_name: self.slot_open_fraction(fixture_name)
+                for fixture_name in self.fixture_names
+            },
+            completion_button_press_depth_m=self.completion_button_press_depth(),
         )
 
     def all_drawers_closed(self) -> bool:
@@ -428,21 +490,61 @@ class TS04InspectTwoDrawers(Kitchen):
 
     def _check_success(self) -> bool:
         return evaluate_success(
-            self._semantic_state,
+            self.semantic_state,
             self.physical_state(),
             closed_threshold=self.closed_threshold,
         ).success
 
+    def evaluation_snapshot(self) -> TS04EvaluationSnapshot:
+        """Expose debounced trajectory facts to the task-local evaluator."""
+
+        state = self.semantic_state
+        observer = self._physical_observer
+        domain_report = evaluate_success(
+            state,
+            self.physical_state(),
+            closed_threshold=self.closed_threshold,
+        )
+        details = self.inspection_diagnostics()
+        details["completed_fixture_steps"] = dict(
+            observer.completed_fixture_steps
+        )
+        details["valid_button_press_steps"] = list(
+            observer.valid_button_press_steps
+        )
+        return TS04EvaluationSnapshot(
+            step_id=int(getattr(self, "timestep", 0)),
+            fixture_names=tuple(self.fixture_names),
+            target_fixture=state.target_fixture,
+            completed_fixture_history=tuple(state.completed_fixture_history),
+            completed_fixture_steps=dict(observer.completed_fixture_steps),
+            target_found=state.target_found,
+            search_after_target_detected=state.search_after_target_detected,
+            valid_button_press_steps=tuple(observer.valid_button_press_steps),
+            actual_button_press_count=state.completion_button_press_count,
+            required_button_press_count=state.required_button_presses,
+            domain_success=domain_report.success,
+            failure_reason=state.failure_reason,
+            details=details,
+        )
+
     def inspection_diagnostics(self) -> dict[str, Any]:
         return diagnostics(
-            self._semantic_state,
+            self.semantic_state,
             self.physical_state(),
             closed_threshold=self.closed_threshold,
             fixture_display_names=self.FIXTURE_DISPLAY_NAMES,
         )
 
     def task_diagnostics(self) -> dict[str, Any]:
-        return self.inspection_diagnostics()
+        values = self.inspection_diagnostics()
+        values["completed_fixture_steps"] = dict(
+            self._physical_observer.completed_fixture_steps
+        )
+        values["valid_button_press_steps"] = list(
+            self._physical_observer.valid_button_press_steps
+        )
+        return values
 
     def _validate_fixture(self, fixture_name: str) -> None:
         if str(fixture_name) not in self.fixture_names:

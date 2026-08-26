@@ -135,6 +135,11 @@ class Gr00TBackend:
 
         config = GrootConfig(
             base_model_path=str(base_model),
+            backbone_model_path=(
+                None
+                if vlm_model_dir is None
+                else str(vlm_model_dir.expanduser().resolve())
+            ),
             embodiment_tag=policy_section.get("embodiment_tag", "robocasa_panda_omron"),
             chunk_size=int(policy_section.get("chunk_size", 40)),
             n_action_steps=int(policy_section.get("n_action_steps", 40)),

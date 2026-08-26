@@ -93,6 +93,7 @@ class TM01PhysicalObserver:
     ) -> None:
         self.config = config
         self.state = semantic_state or SemanticState()
+        self.event_steps: dict[str, int] = {}
         self.invalid_environment_labels: list[str] = []
         self._last_step_id: int | None = None
         self._previous: PhysicalSample | None = None
@@ -105,6 +106,7 @@ class TM01PhysicalObserver:
         """Arm only from the frozen all-off, all-closed initial state."""
 
         self.state = SemanticState()
+        self.event_steps = {}
         self.invalid_environment_labels = []
         self._last_step_id = int(initial.step_id)
         self._previous = initial
@@ -182,6 +184,7 @@ class TM01PhysicalObserver:
             report = self._commit(event, payload, sample=sample)
             if report.passed:
                 committed.append(event.value)
+                self.event_steps.setdefault(event.value, step_id)
 
         self._last_step_id = step_id
         self._previous = sample
@@ -469,6 +472,7 @@ class TM01PhysicalObserver:
             ),
             "invalid_environment": bool(self.invalid_environment_labels),
             "pending_drawer": self._pending_drawer,
+            "semantic_event_steps": dict(self.event_steps),
         }
         return ObserverUpdate(
             step_id=int(step_id),

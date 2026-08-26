@@ -35,6 +35,10 @@ from bench.tasks.wr05.domain.semantics import (
     evaluate_success,
     record_plate_stage,
 )
+from bench.tasks.wr05.evaluation import (
+    WR05EvaluationSnapshot,
+    WR05Evaluator,
+)
 
 DEFAULT_LAYOUT_ID = 32
 STORAGE_FIXTURE_NAME = "opencabinet_1_main_group_1"
@@ -130,6 +134,7 @@ class WR05ReturnCondimentPair(Kitchen):
         )
         self.fixed_plate = bool(fixed_plate)
         self._semantic_state = SemanticState()
+        self._wr05_evaluator: WR05Evaluator | None = None
         kwargs.setdefault("obj_registries", ("objaverse", "aigen", "lightwheel"))
         super().__init__(*args, **kwargs)
 
@@ -183,6 +188,7 @@ class WR05ReturnCondimentPair(Kitchen):
             for condiment_name in self.condiment_names
         }
         self._semantic_state = SemanticState()
+        self._wr05_evaluator = None
         self.current_condiment_home_correct = {
             condiment_name: self._condiment_in_return_shelf(condiment_name)
             for condiment_name in self.condiment_names
@@ -309,16 +315,10 @@ class WR05ReturnCondimentPair(Kitchen):
 
     def task_diagnostics(self) -> dict[str, Any]:
         """Expose every final WR-05 predicate to the production recorder."""
-        report = self._success_report()
-        return {
-            "success": report.success,
-            **report.checks(),
-            "current_condiment_home_correct": dict(
-                self.current_condiment_home_correct
-            ),
-            "current_condiment_relation": dict(self.current_condiment_relation),
-            "current_condiment_positions": dict(self.current_condiment_positions),
-        }
+        snapshot = self.evaluation_snapshot()
+        if self._wr05_evaluator is not None:
+            return self._wr05_evaluator.observe(snapshot).to_diagnostics()
+        return dict(snapshot.details) | {"success": bool(snapshot.domain_success)}
 
     def housemem_diagnostics(self) -> dict[str, Any]:
         """Legacy-compatible diagnostics alias used by eval adapters."""
@@ -326,7 +326,11 @@ class WR05ReturnCondimentPair(Kitchen):
 
     def _update_housemem_state(self) -> None:
         for condiment_name in self.condiment_names:
-            if self._condiment_at_plate_side(condiment_name):
+            if self._condiment_at_plate_side(condiment_name) and OU.gripper_obj_far(
+                self,
+                condiment_name,
+                th=0.15,
+            ):
                 record_plate_stage(self._semantic_state, condiment_name)
         self.current_condiment_home_correct = {
             condiment_name: self._condiment_in_return_shelf(condiment_name)
@@ -342,6 +346,37 @@ class WR05ReturnCondimentPair(Kitchen):
             for condiment_name in self.condiment_names
         }
         self._sync_semantic_diagnostics()
+
+    def evaluation_snapshot(self) -> WR05EvaluationSnapshot:
+        """Expose history facts and current physical return predicates."""
+
+        report = self._success_report()
+        released = {
+            condiment_name: bool(
+                OU.gripper_obj_far(self, condiment_name, th=0.15)
+            )
+            for condiment_name in self.condiment_names
+        }
+        details = {
+            **report.checks(),
+            "current_condiment_home_correct": dict(
+                self.current_condiment_home_correct
+            ),
+            "current_condiment_relation": dict(self.current_condiment_relation),
+            "current_condiment_positions": dict(self.current_condiment_positions),
+            "released_by_condiment": dict(released),
+        }
+        return WR05EvaluationSnapshot(
+            step_id=int(getattr(self, "timestep", 0)),
+            staged_at_plate=dict(self._semantic_state.staged_at_plate),
+            home_correct_by_condiment=dict(self.current_condiment_home_correct),
+            released_by_condiment=released,
+            shelf_level_relation_correct=(
+                self.condiment_shelf_level_relation_correct
+            ),
+            domain_success=report.success,
+            details=details,
+        )
 
     def _sync_semantic_diagnostics(self) -> None:
         self.ketchup_staged_at_plate = bool(

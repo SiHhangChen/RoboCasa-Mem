@@ -27,10 +27,9 @@ class SuccessReport:
     """The one authoritative WX-01 success report."""
 
     remembered_area_wiped: bool
+    cleaning_tool_released: bool
     blocking_object_at_origin: bool
     blocking_object_on_dining_table: bool
-    cleaning_tool_released: bool
-    blocking_object_released: bool
 
     @property
     def success(self) -> bool:
@@ -39,10 +38,9 @@ class SuccessReport:
     def checks(self) -> dict[str, bool]:
         return {
             "remembered_area_wiped": self.remembered_area_wiped,
+            "cleaning_tool_released": self.cleaning_tool_released,
             "blocking_object_at_origin": self.blocking_object_at_origin,
             "blocking_object_on_dining_table": self.blocking_object_on_dining_table,
-            "cleaning_tool_released": self.cleaning_tool_released,
-            "blocking_object_released": self.blocking_object_released,
         }
 
 
@@ -59,10 +57,9 @@ def evaluate_success(state: SemanticState, physical: PhysicalState) -> SuccessRe
 
     return SuccessReport(
         remembered_area_wiped=bool(state.remembered_area_wiped),
+        cleaning_tool_released=bool(physical.cleaning_tool_released),
         blocking_object_at_origin=bool(physical.blocking_object_at_origin),
         blocking_object_on_dining_table=bool(physical.blocking_object_on_dining_table),
-        cleaning_tool_released=bool(physical.cleaning_tool_released),
-        blocking_object_released=bool(physical.blocking_object_released),
     )
 
 

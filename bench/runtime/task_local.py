@@ -33,6 +33,7 @@ InitializationBuilder = Callable[
     tuple[Mapping[str, Any], Mapping[str, Any], Mapping[str, Any], Any],
 ]
 DiagnosticsBuilder = Callable[[InitializedTaskRuntime], Mapping[str, Any]]
+ReportStagesBuilder = Callable[[InitializedTaskRuntime], Mapping[str, Any]]
 SuccessBuilder = Callable[[InitializedTaskRuntime, Mapping[str, Any]], bool]
 CloseBuilder = Callable[[InitializedTaskRuntime], None]
 DescriptorValidator = Callable[[Any, ResolvedEpisode, bool], None]
@@ -64,6 +65,8 @@ class TaskRuntimeAdapter:
         diagnostics: DiagnosticsBuilder,
         success: SuccessBuilder,
         close: CloseBuilder,
+        report_stage_profile_id: str | None = None,
+        report_stages: ReportStagesBuilder | None = None,
         validate_descriptor: DescriptorValidator | None = None,
         release_facts: ReleaseFactsBuilder | None = None,
         expert_runtime: ExpertRuntimeBuilder | None = None,
@@ -82,12 +85,23 @@ class TaskRuntimeAdapter:
         self._diagnostics = diagnostics
         self._success = success
         self._close = close
+        self._report_stage_profile_id = (
+            None
+            if report_stage_profile_id is None
+            else str(report_stage_profile_id)
+        )
+        self._report_stages = report_stages
         self._validate_descriptor = validate_descriptor
         self._release_facts = release_facts
         self._expert_runtime = expert_runtime
         self._validated = tuple(task_validated_resource_names)
         if not callable(actions):
             raise TypeError(f"{self.task_id} runtime requires an ActionConfig resolver")
+        if (self._report_stage_profile_id is None) != (self._report_stages is None):
+            raise ValueError(
+                f"{self.task_id} runtime must define report_stage_profile_id and "
+                "report_stages together"
+            )
 
     def build_descriptor(self, episode: ResolvedEpisode, execute: bool = True) -> RuntimeDescriptor:
         if episode.task_id != self.task_id:
@@ -174,6 +188,14 @@ class TaskRuntimeAdapter:
     def diagnostics(self, runtime: InitializedTaskRuntime) -> Mapping[str, Any]:
         return dict(self._diagnostics(runtime) or {})
 
+    def report_stages(
+        self,
+        runtime: InitializedTaskRuntime,
+    ) -> Mapping[str, Any] | None:
+        if self._report_stages is None:
+            return None
+        return dict(self._report_stages(runtime) or {})
+
     def close_runtime(self, runtime: InitializedTaskRuntime) -> None:
         self._close(runtime)
 
@@ -184,6 +206,10 @@ class TaskRuntimeAdapter:
             check_success=self.check_success,
             diagnostics=self.diagnostics,
             close_runtime=self.close_runtime,
+            report_stage_profile_id=self._report_stage_profile_id,
+            report_stages=(
+                self.report_stages if self._report_stages is not None else None
+            ),
             build_expert_runtime=self._expert_runtime,
         )
 

@@ -11,9 +11,11 @@ from bench.tasks.ts03.config import load_task_config, resolve_action_config, res
 from bench.tasks.ts03.domain.episode import resolve_episode_plan, resolve_scene_config
 from bench.tasks.ts03.domain.contracts import episode_profile_metadata
 from bench.tasks.ts03.evaluation import (
+    REPORT_STAGE_PROFILE_ID,
     TASK_EVALUATOR_METADATA_KEY,
     TS03Evaluator,
     diagnostics_for_runtime,
+    report_stages_for_runtime,
     success_for_runtime,
 )
 from bench.tasks.ts03.execution.navigation import build_navigation_config
@@ -80,6 +82,8 @@ _ADAPTER = TaskRuntimeAdapter(
     prompt=sugar_prompt(resolve_prompt_spec), environment=_environment,
     initialize=_initialize,
     diagnostics=diagnostics_for_runtime, success=success_for_runtime, close=default_close,
+    report_stage_profile_id=REPORT_STAGE_PROFILE_ID,
+    report_stages=report_stages_for_runtime,
     release_facts=lambda config, episode, resources, options: {
         "task_revision": str(getattr(config, "task", {}).get("revision", "TS03-v1")),
         **episode_profile_metadata(type("EpisodeFacts", (), dict(episode.facts))()),

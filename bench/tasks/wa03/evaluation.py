@@ -19,6 +19,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
+from bench.evaluation.report_profiles import WA03_REPORT_PROFILE
 from bench.tasks.wa03.domain.contracts import COFFEE_IDS
 
 
@@ -36,6 +37,16 @@ _PHYSICAL_STAGES = ("sugar", "one_ready", "two_ready", "ready", "selection")
 _DERIVED_STAGES = ("correct", "success")
 
 TASK_EVALUATOR_METADATA_KEY = "task_evaluator"
+REPORT_STAGE_ORDER = WA03_REPORT_PROFILE.stage_ids
+REPORT_STAGE_PROFILE_ID = WA03_REPORT_PROFILE.profile_id
+
+_REPORT_STAGE_SOURCES = {
+    "sugar_added": "sugar",
+    "one_cup_ready": "one_ready",
+    "two_cups_ready": "two_ready",
+    "three_cups_ready": "ready",
+    "success": "success",
+}
 
 
 def _coffee_id(value: str | None) -> str | None:
@@ -260,6 +271,32 @@ class WA03EvalResult:
             payload["success_checks"]["sugar_assignment_correct"] = bool(assignment)
         return payload
 
+    def to_report_stages(self) -> dict[str, Any]:
+        """Project the detailed evaluator onto the public WA-03 funnel."""
+
+        passed = {
+            "sugar_added": bool(self.stages["sugar"].qualified),
+            "one_cup_ready": bool(self.stages["one_ready"].qualified),
+            "two_cups_ready": bool(self.stages["two_ready"].qualified),
+            "three_cups_ready": bool(self.stages["ready"].qualified),
+            "success": bool(self.success),
+        }
+        stages = {}
+        for name in REPORT_STAGE_ORDER:
+            internal = self.stages[_REPORT_STAGE_SOURCES[name]]
+            stages[name] = {
+                "applicable": True,
+                "passed": passed[name],
+                "first_pass_step": internal.qualified_step if passed[name] else None,
+            }
+        return {
+            "schema_version": "membench.report_stages/v1",
+            "task_id": WA03_REPORT_PROFILE.task_id,
+            "profile_id": REPORT_STAGE_PROFILE_ID,
+            "order": list(REPORT_STAGE_ORDER),
+            "stages": stages,
+        }
+
 
 @dataclass
 class _MutableStage:
@@ -480,7 +517,13 @@ def diagnostics_for_runtime(runtime: Any) -> Mapping[str, Any]:
     return evaluate_initialized_runtime(runtime).to_diagnostics()
 
 
+def report_stages_for_runtime(runtime: Any) -> Mapping[str, Any]:
+    return evaluate_initialized_runtime(runtime).to_report_stages()
+
+
 __all__ = [
+    "REPORT_STAGE_ORDER",
+    "REPORT_STAGE_PROFILE_ID",
     "STAGE_ORDER",
     "STAGE_PREREQUISITES",
     "TASK_EVALUATOR_METADATA_KEY",
@@ -490,5 +533,6 @@ __all__ = [
     "WA03Evaluator",
     "diagnostics_for_runtime",
     "evaluate_initialized_runtime",
+    "report_stages_for_runtime",
     "success_for_runtime",
 ]
