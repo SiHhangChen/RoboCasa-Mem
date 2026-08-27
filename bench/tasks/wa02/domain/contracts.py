@@ -123,6 +123,7 @@ class ActionConfig:
     """Effective workflow metadata derived from YAML and local resources."""
 
     cup_pick_metadata: Mapping[str, Any]
+    cup_pick_metadata_by_cup: Mapping[str, Mapping[str, Any]]
     cup_pick_navigation_xy_tolerance: float
     cup_pick_navigation_yaw_tolerance: float
     sensor_faucet_metadata: Mapping[str, Any]

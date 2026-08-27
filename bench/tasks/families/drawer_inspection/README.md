@@ -1,6 +1,5 @@
 # drawer_inspection
 
-Pure fixture-order and exactly-once inspection state. TS02 extends the cycle
-with a hidden-target stopping rule and exact search-count report; TS04 still
-requires exhaustive inspection. Calibration and fixture identity remain owned
-by each task.
+Pure fixture-order and exactly-once inspection state. TS02 and TS04 both use a
+hidden-target stopping rule and report the exact search count through completion
+button presses. Calibration and fixture identity remain owned by each task.

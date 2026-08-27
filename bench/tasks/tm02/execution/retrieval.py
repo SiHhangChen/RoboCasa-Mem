@@ -31,7 +31,6 @@ def retrieve_item_from_cabinet(
     close_gripper_steps: int,
     post_close_hold_steps: int,
     held_gripper_action: float,
-    disable_collisions_during_transport: bool,
 ) -> dict[str, Any]:
     """Approach the live stored item collinearly from the cabinet front and extract it."""
 
@@ -122,9 +121,12 @@ def retrieve_item_from_cabinet(
             str(item_id),
             initial_object_pos=initial_object[:3, 3],
         )
+        # A physical pick requires both real finger/object contact and a
+        # meaningful grasp signal.  Metadata alone never attaches or moves the
+        # object; subsequent transport is ordinary MuJoCo dynamics.
         grasp_confirmed = bool(
             validation.get("contact", False)
-            or validation.get("grasped_threshold_0.6", False)
+            and validation.get("grasped_threshold_0.6", False)
         )
         if grasp_confirmed:
             eef_world = controller.stage_executor.current_eef_site_world()
@@ -135,7 +137,6 @@ def retrieve_item_from_cabinet(
             adoption = adopt_picked_item(
                 controller,
                 str(item_id),
-                disable_collisions=bool(disable_collisions_during_transport),
             )
             if bool(adoption.get("pass", False)):
                 retreat = _reverse_approach(

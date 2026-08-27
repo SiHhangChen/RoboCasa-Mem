@@ -6,10 +6,21 @@ from collections.abc import Mapping
 from typing import Any
 
 from bench.runtime import TaskRuntimeAdapter, default_close
-from bench.tasks.runtime_support import manual_station_navigation, standard_plan, standard_scene
-from bench.tasks.wa02.config import load_task_config, resolve_action_config, resolve_task_options
+from bench.tasks.runtime_support import (
+    manual_station_navigation,
+    standard_plan,
+    standard_scene,
+)
+from bench.tasks.wa02.config import (
+    load_task_config,
+    resolve_action_config,
+    resolve_task_options,
+)
 from bench.tasks.wa02.domain.episode import resolve_episode_plan, resolve_scene_config
-from bench.tasks.wa02.domain.geometry import resolve_cup_region_constraints, resolve_cup_sampling_regions
+from bench.tasks.wa02.domain.geometry import (
+    resolve_cup_region_constraints,
+    resolve_cup_sampling_regions,
+)
 from bench.tasks.wa02.execution.navigation import build_navigation_config
 from bench.tasks.wa02.evaluation import (
     TASK_EVALUATOR_METADATA_KEY,
@@ -27,6 +38,7 @@ def _environment(config: Any, scene: Any, plan: Any, resources: Mapping[str, Any
     initial_objects.pop("enabled", None)
     regions = resolve_cup_sampling_regions(dict(initial_objects.get("cups") or {}))
     constraints = resolve_cup_region_constraints(dict(initial_objects.get("cup_region_constraints") or {}))
+    gripper = dict(config.manipulation.get("gripper", {}))
     return {
         "sensor_faucet_layout_file": str(resources["sensor_faucet_layout"]),
         "service_threshold": float(config.semantics.get("service_threshold", 0.12)),
@@ -39,6 +51,11 @@ def _environment(config: Any, scene: Any, plan: Any, resources: Mapping[str, Any
             "minimum_inter_region_gap": float(constraints.minimum_inter_region_gap),
             "sampling_inset_xy": list(constraints.sampling_inset_xy),
         },
+        "gripper_force_limit": float(gripper.get("force_limit", 20.0)),
+        "gripper_pad_friction": tuple(
+            float(value)
+            for value in gripper.get("pad_friction", (2.0, 0.05, 0.0001))
+        ),
     }
 
 
@@ -47,6 +64,7 @@ def _initialize(descriptor: Any, env: Any, observation: Mapping[str, Any]):
     enabled = bool(initial_objects.pop("enabled", True))
     updated, objects = apply_sampled_initial_object_regions(env, settings=initial_objects, enabled=enabled)
     env.configure_episode(descriptor.episode_plan)
+    env.configure_canonical_physics()
     evaluator = WA02Evaluator(
         fill_cup_order=descriptor.episode_plan.fill_cup_order,
         fill_temperature_order=descriptor.episode_plan.fill_temperature_order,

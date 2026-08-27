@@ -1,0 +1,40 @@
+{
+  "task_id": "WX-01",
+  "spatial_reference": "The cleaned cup spot is the episode-specific world-coordinate spot where the cup was originally placed; it is not left/right in a camera image. The temporary cup offset and the sponge's post-wipe drop position are episode details and are not exposed as subtask labels.",
+  "high_level_instruction": "Start with the sponge already grasped. Wipe the dirty dining-table spot, then place the cup onto the cleaned spot.",
+  "keyframes_from_record": true,
+  "subtasks": {
+    "wipe_spot": {
+      "label": "wipe the dirty spot with the sponge",
+      "keyframe": "last"
+    },
+    "place_sponge": {
+      "label": "put down the sponge on the dining table",
+      "keyframe": "last"
+    },
+    "pick_cup": {
+      "label": "pick up the cup",
+      "keyframe": "last"
+    },
+    "place_cup": {
+      "label": "return the cup to the spot just wiped with the sponge",
+      "keyframe": "last"
+    }
+  },
+  "stage_prefixes": {
+    "wipe_spot": [
+      "navigate_to_wipe_area_holding_sponge",
+      "wipe_remembered_blocking_origin"
+    ],
+    "place_sponge": [
+      "place_cleaning_tool_after_wipe",
+      "return_after_post_wipe_sponge_place"
+    ],
+    "pick_cup": [
+      "pick_displaced_blocking_object"
+    ],
+    "place_cup": [
+      "return_blocking_object_to_remembered_origin"
+    ]
+  }
+}

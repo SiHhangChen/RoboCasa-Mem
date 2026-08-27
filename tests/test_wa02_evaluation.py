@@ -341,6 +341,9 @@ def test_wa02_runtime_initialization_attaches_evaluator(
         def configure_episode(self, episode: object) -> None:
             assert episode is plan
 
+        def configure_canonical_physics(self) -> None:
+            self.canonical_physics_configured = True
+
         def evaluation_snapshot(self) -> WA02EvaluationSnapshot:
             return _snapshot(0)
 

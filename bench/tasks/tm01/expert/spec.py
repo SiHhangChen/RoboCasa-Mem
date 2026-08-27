@@ -17,7 +17,7 @@ def build_expert_plan(inputs: ExpertPlanInputs):
 
     def drawer_unit(drawer: str, suffix: str):
         return [
-            navigate(f"{drawer}_station", name=f"navigate_{drawer}_{suffix}"),
+            navigate("drawer_station", name=f"navigate_{drawer}_{suffix}"),
             operate("open_drawer_physically", drawer, name=f"open_{drawer}_{suffix}", metadata=actions.drawer_open_metadata),
             operate("inspect_drawer", drawer, name=f"inspect_{drawer}_{suffix}", metadata=actions.inspect_metadata),
             operate("close_drawer_physically", drawer, name=f"close_{drawer}_{suffix}", metadata=actions.drawer_close_metadata),

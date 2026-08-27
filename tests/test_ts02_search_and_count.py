@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import json
 import xml.etree.ElementTree as ET
 
 import pytest
 
-from bench.execution.contracts import OperateStage
+from bench.execution.contracts import NavigateStage, OperateStage
 from bench.tasks import TaskCatalog
 from bench.tasks.contracts import EpisodeRequest, ExpertPlanInputs
 from bench.tasks.ts02.button_asset import (
@@ -15,13 +16,15 @@ from bench.tasks.ts02.button_asset import (
     add_ts02_button_asset,
     ts02_button_geom_names,
 )
-from bench.tasks.ts02.config import load_task_config
-from bench.tasks.ts02.domain.contracts import FIXTURE_NAMES
+from bench.tasks.ts02.config import load_task_config, resolve_robot_base_config
+from bench.tasks.ts02.domain.contracts import FIXTURE_NAMES, RobotBaseMode
 from bench.tasks.ts02.domain.episode import (
     resolve_episode_plan,
     sample_demo_fixture_order,
     sample_target_fixture,
 )
+from bench.tasks.ts02.domain.geometry import minimum_drawer_separation
+from bench.tasks.ts02.execution.navigation import DRAWER_STATION, station_specs
 from bench.tasks.ts02.domain.semantics import (
     PhysicalState,
     SemanticState,
@@ -144,12 +147,20 @@ def test_expert_plan_stops_at_target_and_presses_k_times() -> None:
     operations = [
         stage.operation for stage in plan.stages if isinstance(stage, OperateStage)
     ]
+    navigation_targets = [
+        stage.target.station_id
+        for stage in plan.stages
+        if isinstance(stage, NavigateStage)
+    ]
 
     assert operations.count("open_fixture") == search_count
     assert operations.count("inspect_fixture") == search_count
     assert operations.count("close_fixture") == search_count
+    assert operations.count("retreat_and_return_arm_after_drawer") == search_count
     assert operations.count("press_completion_button") == search_count
     assert plan.metadata["search_count"] == search_count
+    assert navigation_targets[:-1] == [DRAWER_STATION] * search_count
+    assert navigation_targets[-1] == "completion_button_station"
 
 
 def test_physical_observer_debounces_a_long_button_hold() -> None:
@@ -291,3 +302,65 @@ def test_task_config_exposes_button_release_debounce() -> None:
     button = config.operations["completion_button"]
     assert button["release_depth_threshold"] < button["press_depth_threshold"]
     assert button["release_dwell_steps"] >= 1
+
+
+def test_completion_button_is_right_of_all_drawers_and_navigation_matches() -> None:
+    config = load_task_config()
+    button_xyz = tuple(config.scene["completion_button_world_xyz"])
+    drawer_xyzs = tuple(tuple(row) for row in config.scene["drawer_world_xyzs"])
+    assert button_xyz == pytest.approx((3.85, -2.06, 0.92))
+    assert button_xyz[0] < min(row[0] for row in drawer_xyzs)
+
+    station_path = config.path(config.resources["station_poses"])
+    route_path = config.path(config.resources["manual_base_path"])
+    assert station_path is not None
+    assert route_path is not None
+    stations = json.loads(station_path.read_text(encoding="utf-8"))
+    route = json.loads(route_path.read_text(encoding="utf-8"))
+    completion_station = stations["stations"]["completion_button_station"]["samples"][0]
+    completion_route = next(
+        sample
+        for sample in route["samples"]
+        if sample["name"] == "completion_button_station"
+    )
+    assert tuple(stations["completion_button_world_xyz"]) == button_xyz
+    assert tuple(completion_station["button_world_xyz"]) == button_xyz
+    assert completion_station["base_xy"][0] == pytest.approx(button_xyz[0])
+    assert completion_route["xy"][0] == pytest.approx(button_xyz[0])
+
+
+def test_compact_drawer_group_uses_one_shared_drawer_station() -> None:
+    config = load_task_config()
+    drawer_xyzs = tuple(tuple(row) for row in config.scene["drawer_world_xyzs"])
+    assert minimum_drawer_separation(drawer_xyzs) == pytest.approx(0.25)
+
+    class _Fixture:
+        name = "ts02_cabinet_slot_1_fixture"
+        pos = (4.85, -2.37, 1.1363333333333332)
+
+        def front_pose(self, distance: float = 0.42):
+            del distance
+            return (4.85, -2.37, 1.1363333333333332, 0.0, 0.0, 0.0, 1.0)
+
+    class _Env:
+        fixture_names = FIXTURE_NAMES
+
+        def cabinet_for_slot(self, fixture_name):
+            assert fixture_name == FIXTURE_NAMES[1]
+            return _Fixture()
+
+        def slot_pose(self, fixture_name):
+            assert fixture_name == FIXTURE_NAMES[1]
+            return (4.85, -2.37, 1.1363333333333332)
+
+        def completion_button_position(self):
+            return (3.85, -2.06, 0.995)
+
+    specs = station_specs(_Env())
+    assert set(specs) == {DRAWER_STATION, "completion_button_station"}
+    assert specs[DRAWER_STATION]["source_object_or_phase"] == "compact_drawer_group"
+
+
+def test_station_sample_defaults_to_shared_drawer_station() -> None:
+    base = resolve_robot_base_config(mode=RobotBaseMode.STATION_SAMPLE)
+    assert base.station_id == DRAWER_STATION

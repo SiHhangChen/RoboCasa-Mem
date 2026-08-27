@@ -25,19 +25,22 @@
       "navigate_cabinet_slot_0",
       "open_cabinet_slot_0",
       "inspect_cabinet_slot_0",
-      "close_cabinet_slot_0"
+      "close_cabinet_slot_0",
+      "return_after_cabinet_slot_0"
     ],
     "inspect_center": [
       "navigate_cabinet_slot_1",
       "open_cabinet_slot_1",
       "inspect_cabinet_slot_1",
-      "close_cabinet_slot_1"
+      "close_cabinet_slot_1",
+      "return_after_cabinet_slot_1"
     ],
     "inspect_right": [
       "navigate_cabinet_slot_2",
       "open_cabinet_slot_2",
       "inspect_cabinet_slot_2",
-      "close_cabinet_slot_2"
+      "close_cabinet_slot_2",
+      "return_after_cabinet_slot_2"
     ],
     "press_button": [
       "navigate_completion_button",

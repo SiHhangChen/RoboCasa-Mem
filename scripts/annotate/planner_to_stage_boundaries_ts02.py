@@ -133,6 +133,7 @@ def build_stage_names(
                 f"open_{fixture}",
                 f"inspect_{fixture}",
                 f"close_{fixture}",
+                f"return_after_{fixture}",
             ]
         )
     names.append("navigate_completion_button")
@@ -285,8 +286,8 @@ def build_boundary_record(episode_dir: Path) -> dict[str, Any]:
                 "end_frame": cumulative,
             }
         )
-        if name.startswith("close_cabinet_slot_"):
-            _require(steps > 0, f"seed {seed}: close stage {name!r} is empty")
+        if name.startswith("return_after_cabinet_slot_"):
+            _require(steps > 0, f"seed {seed}: return stage {name!r} is empty")
             keyframes.append(cumulative - 1)
         if name == "navigate_completion_button":
             keyframes.append(start_frame)
@@ -324,11 +325,18 @@ def build_boundary_record(episode_dir: Path) -> dict[str, Any]:
 def collect_boundary_records(
     episodes_root: Path, *, expected_episodes: int
 ) -> list[dict[str, Any]]:
-    episode_dirs = sorted(
+    episode_dirs = [
         path
         for path in episodes_root.glob("seed_*_attempt_00")
         if path.is_dir() and EPISODE_DIR_PATTERN.fullmatch(path.name)
-    )
+    ]
+    if not episode_dirs:
+        episode_dirs = [
+            path
+            for path in episodes_root.glob("*/train/*/seed_*_attempt_00")
+            if path.is_dir() and EPISODE_DIR_PATTERN.fullmatch(path.name)
+        ]
+    episode_dirs = sorted(episode_dirs, key=_episode_seed)
     if expected_episodes > 0:
         _require(
             len(episode_dirs) == expected_episodes,

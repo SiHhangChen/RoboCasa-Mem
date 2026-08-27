@@ -130,6 +130,17 @@ def test_wa02_uses_short_fill_stage_settles_and_sensor_debounce() -> None:
     actions = resolve_action_config(config=load_task_config())
 
     assert actions.cup_pick_metadata["pregrasp_settle_steps"] == 30
+    assert actions.cup_pick_metadata_by_cup["cup_A"][
+        "grasp_approach_sector"
+    ] == {
+        "center_deg": -90.0,
+        "half_width_deg": 90.0,
+        "frame": "world",
+        "angle_reference": "cup_center_to_pregrasp",
+    }
+    assert actions.cup_pick_metadata_by_cup["cup_B"][
+        "grasp_approach_sector"
+    ] == actions.cup_pick_metadata["grasp_approach_sector"]
     for metadata in actions.held_fill_metadata_by_temperature.values():
         assert metadata["entry_settle_steps"] == 1
         assert metadata["under_water_settle_steps"] == 1

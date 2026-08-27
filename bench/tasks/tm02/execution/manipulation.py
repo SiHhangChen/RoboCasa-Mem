@@ -19,7 +19,6 @@ from bench.tasks.tm02.execution.water import operate_tm02_water_button
 from bench.tasks.tm02.execution.completion_button import press_completion_button_physically
 from bench.tasks.tm02.execution.door import move_slide_door
 from bench.tasks.tm02.execution.retrieval import retrieve_item_from_cabinet
-from bench.tasks.tm02.execution.storage import install_held_item_follow_assist
 
 
 SUPPORTED_OPERATIONS = {
@@ -103,8 +102,6 @@ def build_manipulation_assembly(
         ),
         missing_resources=missing_resources,
     )
-    install_held_item_follow_assist(env, controller)
-
     def water_button(target: str, **kwargs: Any) -> dict[str, Any]:
         del target
         return operate_tm02_water_button(controller, **kwargs)
@@ -140,6 +137,10 @@ def build_manipulation_assembly(
         values = dict(kwargs)
         values.pop("mode", None)
         values.pop("require_physical_grasp", None)
+        if "disable_collisions_during_transport" in values:
+            raise ValueError(
+                "TM02 is action-only; disable_collisions_during_transport is forbidden"
+            )
         result = retrieve_item_from_cabinet(
             controller,
             str(target),
@@ -168,10 +169,7 @@ def build_manipulation_assembly(
                 values.pop("post_close_hold_steps", 12)
             ),
             held_gripper_action=float(
-                values.pop("held_gripper_action", 1.0)
-            ),
-            disable_collisions_during_transport=bool(
-                values.pop("disable_collisions_during_transport", False)
+                values.pop("held_gripper_action", 0.0)
             ),
         )
         if values:
@@ -208,13 +206,9 @@ def build_manipulation_assembly(
         def release_to_physics() -> dict[str, Any]:
             in_region_before_release = bool(env.can_in_place_region())
             held_object = getattr(controller, "_virtual_held_object", None)
-            attachment_active = bool(
-                getattr(controller, "_wr01_hold_enabled", False)
-            )
             ready = bool(
                 in_region_before_release
                 and held_object == str(target)
-                and attachment_active
             )
             handoff.update(
                 {
@@ -222,11 +216,11 @@ def build_manipulation_assembly(
                     "performed": ready,
                     "can_in_place_region_before_release": in_region_before_release,
                     "held_object": held_object,
-                    "attachment_active": attachment_active,
+                    "mode": "physical_contact_hold",
+                    "simulation_state_modified": False,
                 }
             )
             if ready:
-                controller._wr01_hold_enabled = False
                 controller._clear_virtual_held_object(str(target))
             return {
                 "pass": ready,

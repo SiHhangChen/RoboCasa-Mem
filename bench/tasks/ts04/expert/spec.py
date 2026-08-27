@@ -20,15 +20,43 @@ def build_expert_plan(inputs: ExpertPlanInputs):
     stages = []
     for fixture in fixtures:
         stages.extend([
-            navigate(f"{fixture}_station", name=f"navigate_{fixture}"),
-            operate("open_fixture", fixture, name=f"open_{fixture}", metadata=actions.drawer_open_metadata),
-            operate("inspect_fixture", fixture, name=f"inspect_{fixture}", metadata=actions.inspect_metadata),
-            operate("close_fixture", fixture, name=f"close_{fixture}", metadata=actions.drawer_close_metadata),
+            navigate("drawer_station", name=f"navigate_{fixture}"),
+            operate(
+                "open_fixture",
+                fixture,
+                name=f"open_{fixture}",
+                metadata=actions.drawer_open_metadata,
+            ),
+            operate(
+                "inspect_fixture",
+                fixture,
+                name=f"inspect_{fixture}",
+                metadata=actions.inspect_metadata,
+            ),
+            operate(
+                "close_fixture",
+                fixture,
+                name=f"close_{fixture}",
+                metadata=actions.drawer_close_metadata,
+            ),
+            operate(
+                "retreat_and_return_arm_after_drawer",
+                fixture,
+                name=f"return_arm_after_{fixture}",
+            ),
         ])
-    stages.extend([
-        navigate("completion_button_station", name="navigate_completion_button"),
-        operate("press_completion_button", "completion_button", name="press_completion_button", metadata=actions.completion_button_metadata),
-    ])
+    stages.append(
+        navigate("completion_button_station", name="navigate_completion_button")
+    )
+    for press_index in range(1, search_count + 1):
+        stages.append(
+            operate(
+                "press_completion_button",
+                "completion_button",
+                name=f"press_completion_button_{press_index}_of_{search_count}",
+                metadata=actions.completion_button_metadata,
+            )
+        )
     return finish_plan(
         episode,
         stages,
@@ -37,7 +65,7 @@ def build_expert_plan(inputs: ExpertPlanInputs):
             "fixture_order": list(fixtures),
             "target_fixture": target_fixture,
             "search_count": search_count,
-            "required_button_presses": 1,
+            "required_button_presses": search_count,
         },
     )
 

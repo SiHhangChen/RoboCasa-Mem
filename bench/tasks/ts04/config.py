@@ -24,7 +24,7 @@ from bench.tasks.ts04.domain.contracts import (
 
 PACKAGE_ROOT = Path(__file__).resolve().parent
 DEFAULT_TASK_CONFIG_FILE = PACKAGE_ROOT / "resources" / "task.yaml"
-DEFAULT_INITIAL_STATION_ID = "cabinet_slot_1_station"
+DEFAULT_INITIAL_STATION_ID = "drawer_station"
 
 
 def load_task_config(path: str | Path = DEFAULT_TASK_CONFIG_FILE) -> TaskConfig:
@@ -285,6 +285,8 @@ def load_task_config(path: str | Path = DEFAULT_TASK_CONFIG_FILE) -> TaskConfig:
             "gripper_action",
             "near_miss_position_tolerance",
             "press_depth_threshold",
+            "release_depth_threshold",
+            "release_dwell_steps",
             "require_physical_button_motion",
         },
         "operations.completion_button fields",
@@ -458,6 +460,10 @@ def resolve_action_config(*, operations: Mapping[str, Any]) -> ActionConfig:
         "press_depth_threshold": float(
             button_values.get("press_depth_threshold", 0.004)
         ),
+        "release_depth_threshold": float(
+            button_values.get("release_depth_threshold", 0.001)
+        ),
+        "release_dwell_steps": int(button_values.get("release_dwell_steps", 2)),
         "require_physical_button_motion": bool(
             button_values.get("require_physical_button_motion", True)
         ),
@@ -476,6 +482,16 @@ def resolve_action_config(*, operations: Mapping[str, Any]) -> ActionConfig:
         raise ValueError(
             "TS04 completion-button press_depth_threshold must be in (0, 0.012]"
         )
+    if not (
+        0.0
+        <= button_metadata["release_depth_threshold"]
+        < button_metadata["press_depth_threshold"]
+    ):
+        raise ValueError(
+            "TS04 completion-button release threshold must be below press threshold"
+        )
+    if button_metadata["release_dwell_steps"] < 1:
+        raise ValueError("TS04 completion-button release_dwell_steps must be positive")
     return ActionConfig(
         drawer_open_metadata=open_metadata,
         inspect_metadata={"dwell_steps": dwell_steps},

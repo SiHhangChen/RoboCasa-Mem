@@ -203,7 +203,13 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--boundaries", type=Path, required=True)
-    parser.add_argument("--episodes-root", type=Path, required=True)
+    parser.add_argument(
+        "--episodes-root",
+        type=Path,
+        action="append",
+        required=True,
+        help="Native episode directory; repeat for collections split across roots.",
+    )
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--seeds", default=None, help="optional comma-separated filter")
     parser.add_argument("--task-id", default=None)
@@ -238,10 +244,17 @@ def main() -> None:
                     raise ValueError(f"seed {seed} is missing from {args.seed_registry}")
                 record = dict(record)
                 record["episode_index"] = seed_registry[seed]
-            episode_dir = args.episodes_root / f"seed_{record['seed']:06d}_attempt_00"
-            if not episode_dir.exists():
-                print(f"WARN: missing episode dir {episode_dir}, skipping", file=sys.stderr)
+            episode_name = f"seed_{record['seed']:06d}_attempt_00"
+            matches = [root / episode_name for root in args.episodes_root if (root / episode_name).exists()]
+            if not matches:
+                print(
+                    f"WARN: missing episode dir {episode_name} under all supplied roots, skipping",
+                    file=sys.stderr,
+                )
                 continue
+            if len(matches) > 1:
+                raise ValueError(f"episode {episode_name} exists under multiple roots: {matches}")
+            episode_dir = matches[0]
             recorded_total = recorded_total_frames(episode_dir)
             out = label_episode(record, config, recorded_total)
             fp.write(json.dumps(out, sort_keys=True) + "\n")

@@ -1,0 +1,9 @@
+{
+  "default_select": "last",
+  "rules": [
+    {
+      "pattern": "^pick up the cup from the (left|right) side of the dining table$",
+      "select": "first"
+    }
+  ]
+}

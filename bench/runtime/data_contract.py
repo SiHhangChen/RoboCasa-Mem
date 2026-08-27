@@ -16,6 +16,7 @@ STATE_SCHEMA = "membench.robot_state37.v2"
 STATE_DIM = 37
 ACTION_SCHEMA = "membench.pandaomron_hybrid13.v2"
 ACTION_DIM = 13
+GRIPPER_ACTION_DEADBAND = 0.1
 OBSERVATION_PROFILE = "rgbd_v3"
 NATIVE_EPISODE_SCHEMA = "membench.episode/v2"
 POLICY_PROTOCOL_VERSION = "membench-policy/v2"
@@ -120,7 +121,12 @@ def action_schema_metadata() -> dict[str, Any]:
         "dim": ACTION_DIM,
         "axes": [axis.to_dict() for axis in ACTION_AXES],
         "torso_mapping_meters": [-0.05, 0.05],
-        "gripper_convention": {"open": -1.0, "closed": 1.0},
+        "gripper_convention": {
+            "open": -1.0,
+            "closed": 1.0,
+            "hold": 0.0,
+            "deadband": GRIPPER_ACTION_DEADBAND,
+        },
     }
 
 
@@ -133,6 +139,17 @@ def state_schema_metadata() -> dict[str, Any]:
         "quaternion_sign_policy": QUATERNION_SIGN_POLICY,
         "eef_pose_frame": "base",
     }
+
+
+def normalize_gripper_command(value: Any) -> np.ndarray:
+    """Map continuous policy noise to the ternary gripper command contract."""
+
+    command = np.asarray(value)
+    return np.where(
+        np.abs(command) <= GRIPPER_ACTION_DEADBAND,
+        0.0,
+        np.sign(command),
+    ).astype(command.dtype, copy=False)
 
 
 def validate_action(action: Any, *, dtype: Any = np.float32) -> np.ndarray:
@@ -161,6 +178,9 @@ def validate_action(action: Any, *, dtype: Any = np.float32) -> np.ndarray:
             # Saturate rather than reject; the simulator controllers remain the
             # clipping authority, consistent with absolute joint targets above.
             value[start:stop] = np.clip(value[start:stop], low, high)
+    # RoboSuite's Panda gripper consumes the sign of a nonzero command.  Keep
+    # regression noise around zero as an explicit hold command instead.
+    value[7] = normalize_gripper_command(value[7])
     return np.ascontiguousarray(value, dtype=dtype)
 
 
@@ -194,6 +214,7 @@ __all__ = [
     "ACTION_AXES",
     "ACTION_DIM",
     "ACTION_SCHEMA",
+    "GRIPPER_ACTION_DEADBAND",
     "OBSERVATION_PROFILE",
     "PANDA_ARM_JOINT_LIMITS_RAD",
     "NATIVE_EPISODE_SCHEMA",
@@ -205,6 +226,7 @@ __all__ = [
     "STATE_SCHEMA",
     "action_schema_metadata",
     "contract_metadata",
+    "normalize_gripper_command",
     "state_schema_metadata",
     "validate_action",
     "validate_state",

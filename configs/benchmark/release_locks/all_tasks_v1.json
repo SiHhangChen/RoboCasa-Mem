@@ -3,10 +3,10 @@
     {
       "action_schema": "membench.pandaomron_hybrid13.v2",
       "allow_partial_calibration": false,
-      "config_hash": "sha256:6b03795922b4e13f6388631acc828bee9be257d0dabdd1494804e01d2585d091",
+      "config_hash": "sha256:757792cd42a703bd9e0e35ce4fff5a4b86de6c470408fc43d9d4cf2b262dd116",
       "control_frequency_hz": 20,
       "env_split": "pretrain",
-      "episode_identity": "sha256:024d1348dbf57567b7314b7587fcab5997cbc64d2d38282c1cc1fbc4e5109c47",
+      "episode_identity": "sha256:3b5a7e26aa133bec86412485fa7c9bbc53ac9ba31b6b874fcb79d2269347f5f3",
       "facts": {
         "drawer_order": [
           "drawer_left",
@@ -18,7 +18,7 @@
       },
       "initialization": {
         "allow_partial_calibration": false,
-        "config_hash": "sha256:6b03795922b4e13f6388631acc828bee9be257d0dabdd1494804e01d2585d091",
+        "config_hash": "sha256:757792cd42a703bd9e0e35ce4fff5a4b86de6c470408fc43d9d4cf2b262dd116",
         "controller": {
           "max_joint_step": 0.015
         },
@@ -62,7 +62,7 @@
       },
       "release_facts": {
         "allow_partial_calibration": false,
-        "config_hash": "sha256:6b03795922b4e13f6388631acc828bee9be257d0dabdd1494804e01d2585d091",
+        "config_hash": "sha256:757792cd42a703bd9e0e35ce4fff5a4b86de6c470408fc43d9d4cf2b262dd116",
         "controller": {
           "max_joint_step": 0.015
         },
@@ -97,18 +97,18 @@
     {
       "action_schema": "membench.pandaomron_hybrid13.v2",
       "allow_partial_calibration": false,
-      "config_hash": "sha256:8773d494379fd0a6a92f2cf91903554035efe56959fac61b6113d0013d87c570",
+      "config_hash": "sha256:2c951a4fb3666953b0db652f21531437565d1f9947e4868df87c6dbeda36269b",
       "control_frequency_hz": 20,
       "env_split": "pretrain",
-      "episode_identity": "sha256:3c2d2eaa680288696f05459586265bcaae14037b7cc2d229e19f4b0931406b2a",
+      "episode_identity": "sha256:a49e1b97beefefb6d168fb70e5f8b554ce8915ab666e8c3cc6f65c8a5829ba24",
       "facts": {
-        "max_horizon": 3200,
+        "max_horizon": 3600,
         "route": "L1",
         "seed": 0
       },
       "initialization": {
         "allow_partial_calibration": false,
-        "config_hash": "sha256:8773d494379fd0a6a92f2cf91903554035efe56959fac61b6113d0013d87c570",
+        "config_hash": "sha256:2c951a4fb3666953b0db652f21531437565d1f9947e4868df87c6dbeda36269b",
         "controller": {
           "max_joint_step": 0.025
         },
@@ -116,7 +116,7 @@
         "resource_hash": "sha256:b7d86b358a8e9433a1a207841f4e5091636156bd5e0328adece5eedcbd4e6381",
         "task_id": "TM02"
       },
-      "max_horizon": 3200,
+      "max_horizon": 3600,
       "observation": {
         "camera_aliases": [
           "agentview_left",
@@ -152,7 +152,7 @@
       },
       "release_facts": {
         "allow_partial_calibration": false,
-        "config_hash": "sha256:8773d494379fd0a6a92f2cf91903554035efe56959fac61b6113d0013d87c570",
+        "config_hash": "sha256:2c951a4fb3666953b0db652f21531437565d1f9947e4868df87c6dbeda36269b",
         "controller": {
           "max_joint_step": 0.025
         },
@@ -737,10 +737,10 @@
     {
       "action_schema": "membench.pandaomron_hybrid13.v2",
       "allow_partial_calibration": false,
-      "config_hash": "sha256:5ec643ce0086c13c6600a210ba5637a66e32dd8271f47bb705fc6c333422096a",
+      "config_hash": "sha256:84d42f58d77a8e62cdacba365d39f22eb656c2d522b8f1a2808368e3f5074042",
       "control_frequency_hz": 20,
       "env_split": "pretrain",
-      "episode_identity": "sha256:ac51cb834391dbdd49f4bb6765a08cf209cea7e0eecc6157f2e0e028cb4b2463",
+      "episode_identity": "sha256:0929394e16ff9ebf7633c3169054912f0f28f6ac0f018c402a4a9a8741a1ef3e",
       "facts": {
         "demo_fixture_order": [
           "cabinet_slot_0",
@@ -751,12 +751,12 @@
         "target_fixture": "cabinet_slot_1"
       },
       "initialization": {
-        "config_hash": "sha256:5ec643ce0086c13c6600a210ba5637a66e32dd8271f47bb705fc6c333422096a",
+        "config_hash": "sha256:84d42f58d77a8e62cdacba365d39f22eb656c2d522b8f1a2808368e3f5074042",
         "controller": {
-          "max_joint_step": 0.015
+          "max_joint_step": 0.025
         },
         "order_profile_id": "left_right",
-        "resource_hash": "sha256:4d60e5d3d02751a44d2565fc7018464bad876941b21633f17ab7699cad4efdce",
+        "resource_hash": "sha256:a5ba7603d20a626022b8505f0cbea0735180eb0d9154c132bded615becd1a420",
         "target_fixture": "cabinet_slot_1",
         "task_id": "TS04",
         "task_revision": "TS04-v1"
@@ -785,28 +785,28 @@
       "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
       "options": {},
       "prompt": {
-        "initial": "Exactly one of the two drawers contains a bright red cube. Search without revisiting drawers and close each inspected drawer. As soon as the cube is found and its drawer is closed, stop opening drawers and press the completion button once.",
-        "policy": "Search the drawers for the red cube, closing each drawer after inspection. Stop after finding and closing its drawer, then press the completion button once."
+        "initial": "Exactly one of the two drawers contains a bright red cube. Search without revisiting drawers and close each inspected drawer. As soon as the cube is found and its drawer is closed, stop opening drawers. If finding it required inspecting k drawers, press the completion button exactly k times, releasing it between successive presses.",
+        "policy": "Search the drawers for the red cube, closing each drawer after inspection. Stop after finding and closing its drawer, then press the completion button once for each drawer you inspected."
       },
       "public": {
         "env_name": "TS04InspectTwoDrawers",
         "layout_id": 24,
-        "prompt": "Search the drawers for the red cube, closing each drawer after inspection. Stop after finding and closing its drawer, then press the completion button once.",
+        "prompt": "Search the drawers for the red cube, closing each drawer after inspection. Stop after finding and closing its drawer, then press the completion button once for each drawer you inspected.",
         "scene_seed": 0,
         "style_id": 24
       },
       "release_facts": {
-        "config_hash": "sha256:5ec643ce0086c13c6600a210ba5637a66e32dd8271f47bb705fc6c333422096a",
+        "config_hash": "sha256:84d42f58d77a8e62cdacba365d39f22eb656c2d522b8f1a2808368e3f5074042",
         "controller": {
-          "max_joint_step": 0.015
+          "max_joint_step": 0.025
         },
         "order_profile_id": "left_right",
-        "resource_hash": "sha256:4d60e5d3d02751a44d2565fc7018464bad876941b21633f17ab7699cad4efdce",
+        "resource_hash": "sha256:a5ba7603d20a626022b8505f0cbea0735180eb0d9154c132bded615becd1a420",
         "target_fixture": "cabinet_slot_1",
         "task_id": "TS04",
         "task_revision": "TS04-v1"
       },
-      "resource_hash": "sha256:4d60e5d3d02751a44d2565fc7018464bad876941b21633f17ab7699cad4efdce",
+      "resource_hash": "sha256:a5ba7603d20a626022b8505f0cbea0735180eb0d9154c132bded615becd1a420",
       "resources": {
         "drawer_grasp_pose": "bench/tasks/ts04/resources/poses/cabinet_slot_1_hook_pose.json",
         "manual_base_path": "bench/tasks/ts04/resources/navigation/manual_base_path_layout24_style24_seed0.json",
@@ -2026,7 +2026,7 @@
       "variant": "memory"
     }
   ],
-  "lock_hash": "sha256:7ab98263ba856318153cd4b86f1b55c8ee0c0b1f8c2ea58e92cacf823291b2b5",
+  "lock_hash": "sha256:fe9675c2e770e12eba2e88204d17436ec8ad605e9668ca668ac059b9dda742a7",
   "release_id": "all_tasks_v1",
   "schema_version": "membench.release_lock/v2"
 }

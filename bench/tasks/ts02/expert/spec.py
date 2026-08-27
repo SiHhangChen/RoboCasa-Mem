@@ -21,7 +21,7 @@ def build_expert_plan(inputs: ExpertPlanInputs):
     for fixture in fixtures:
         stages.extend(
             [
-                navigate(f"{fixture}_station", name=f"navigate_{fixture}"),
+                navigate("drawer_station", name=f"navigate_{fixture}"),
                 operate(
                     "open_fixture",
                     fixture,
@@ -39,6 +39,11 @@ def build_expert_plan(inputs: ExpertPlanInputs):
                     fixture,
                     name=f"close_{fixture}",
                     metadata=actions.drawer_close_metadata,
+                ),
+                operate(
+                    "retreat_and_return_arm_after_drawer",
+                    fixture,
+                    name=f"return_arm_after_{fixture}",
                 ),
             ]
         )

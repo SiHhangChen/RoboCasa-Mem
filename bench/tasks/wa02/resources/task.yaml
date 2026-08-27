@@ -123,6 +123,11 @@ navigation:
   use_station_base_poses: true
 
 manipulation:
+  gripper:
+    # Match WA-05's physical horizontal-grasp contact model. Each cup remains
+    # a free MuJoCo body; these values only improve real finger contact.
+    force_limit: 20.0
+    pad_friction: [2.0, 0.05, 0.0001]
   pick_place:
     orientation_mode: object-y-topdown
     mug_orientation_mode: mug-body-side
@@ -186,6 +191,14 @@ operations:
     grasp_approach_sector:
       center_deg: 180.0
       half_width_deg: 60.0
+    by_cup:
+      cup_A:
+        # cup_A is the left cup. cup_B lies approximately along world -Y from
+        # it, so this half-plane admits pregrasp points only on cup_A's right side.
+        grasp_approach_sector:
+          center_deg: -90.0
+          half_width_deg: 90.0
+      cup_B: {}
     pregrasp_height: 0.18
     # The middle cup can leave the arm just below the 15-degree orientation
     # gate after the default hold. Give the joint controller time to converge
@@ -237,13 +250,12 @@ operations:
     # A nonzero horizontal entry distance is required for the sector to affect
     # the physical approach path rather than only the post-release exit.
     placement_entry_standoff: 0.10
-    # After opening, lift vertically clear of the cup before translating. This
-    # avoids the low 14 cm horizontal sweep that tipped slot_1's cup. Keep the
-    # cup anchored through the vertical lift, then release it during the short
-    # high ring exit once the TCP has 6 cm of horizontal separation.
+    # After opening, lift vertically clear of the freely simulated cup before
+    # translating. This avoids the low horizontal sweep that tipped slot_1's cup.
     post_release_clearance_distance: 0.0
     post_release_clearance_z_offset: 0.22
-    release_separation_assist_distance: 0.06
+    # Keep the cup free after release; do not pin or attach it to the EEF.
+    release_separation_assist_distance: 0.0
     placement_exit_standoff: 0.08
     # The generic manipulation runtime otherwise adds ten stationary control
     # frames after every placement segment.  These shorter task-owned holds

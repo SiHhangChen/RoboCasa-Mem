@@ -819,8 +819,8 @@ def _runtime_config(
     planner_config = MplibPlannerConfig(**planner_values)
     return ManipulationRuntimeConfig(
         execute=bool(execute),
-        max_joint_step=float(runtime_values.pop("max_joint_step", 0.015)),
-        settle_steps=int(runtime_values.pop("settle_steps", 20)),
+        max_joint_step=float(runtime_values.pop("max_joint_step", 0.025)),
+        settle_steps=int(runtime_values.pop("settle_steps", 10)),
         position_threshold=float(runtime_values.pop("position_threshold", 0.04)),
         orientation_threshold_deg=float(
             runtime_values.pop("orientation_threshold_deg", 8.0)

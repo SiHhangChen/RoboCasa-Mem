@@ -398,6 +398,93 @@ def test_terminal_settle_scopes_strict_tolerances_and_restores_path_defaults():
     assert result["terminal_yaw_tolerance"] == 0.02
 
 
+def test_move_to_uses_pass_through_tolerance_only_for_intermediate_samples(monkeypatch):
+    executor = _executor()
+    executor.path_file = Path("manual_path.json")
+    executor.samples = [
+        ManualBasePathSample(index=i, xy=np.array([float(i), 0.0]), yaw=0.0)
+        for i in range(3)
+    ]
+    executor.station_targets = {"drawer": 2}
+    executor.route_mode = "bidirectional"
+    executor.current_index = 0
+    executor.intermediate_xy_tolerance = 0.12
+    executor.intermediate_yaw_tolerance = 0.20
+    executor.env = SimpleNamespace(
+        robots=[
+            SimpleNamespace(
+                composite_controller=SimpleNamespace(
+                    part_controllers={"right": object()}
+                )
+            )
+        ]
+    )
+    observed: list[tuple[int, float | None, float | None]] = []
+
+    monkeypatch.setattr(manual_path, "qpos_for_controller", lambda env, right: np.zeros(7))
+    monkeypatch.setattr(manual_path, "base_yaw", lambda obs: float(obs["yaw"]))
+
+    def move_segment(obs, *, target, xy_tolerance, yaw_tolerance, **kwargs):
+        del obs, kwargs
+        observed.append((target.index, xy_tolerance, yaw_tolerance))
+        return {
+            "robot0_base_pos": np.array([target.xy[0], target.xy[1], 0.7]),
+            "yaw": target.yaw,
+        }, {"primitive": "translate", "pass": True, "steps": 1}
+
+    def settle(obs, **kwargs):
+        del kwargs
+        return obs, {"primitive": "settle_current_sample", "pass": True, "steps": 0}
+
+    executor._move_segment = move_segment
+    executor._settle_at_sample_with_tolerances = settle
+    obs = {
+        "robot0_base_pos": np.array([0.0, 0.0, 0.7]),
+        "yaw": 0.0,
+    }
+
+    _, result = executor.move_to(obs, "drawer")
+
+    assert observed == [(1, 0.12, 0.20), (2, 0.03, 0.06)]
+    assert [segment["terminal_segment"] for segment in result["segments"][:2]] == [
+        False,
+        True,
+    ]
+    assert result["pass"] is True
+
+
+def test_move_segment_scopes_local_tolerances_and_restores_defaults():
+    executor = _executor()
+    observed: list[tuple[float, float]] = []
+
+    def execute(obs, **kwargs):
+        del kwargs
+        observed.append((executor.xy_tolerance, executor.yaw_tolerance))
+        return obs, {"primitive": "translate", "pass": True}
+
+    executor._move_segment_with_tolerances = execute
+    obs = {
+        "robot0_base_pos": np.array([0.0, 0.0, 0.7]),
+        "yaw": 0.0,
+    }
+    source = ManualBasePathSample(index=0, xy=np.zeros(2), yaw=0.0)
+    target = ManualBasePathSample(index=1, xy=np.ones(2), yaw=0.5)
+
+    executor._move_segment(
+        obs,
+        source=source,
+        target=target,
+        arm_qpos=np.zeros(7),
+        gripper_action=-1.0,
+        xy_tolerance=0.12,
+        yaw_tolerance=0.20,
+    )
+
+    assert observed == [(0.12, 0.20)]
+    assert executor.xy_tolerance == 0.03
+    assert executor.yaw_tolerance == 0.06
+
+
 def test_spatial_graph_routes_directly_between_station_vertices():
     executor = _executor()
     executor.route_mode = "spatial_graph"

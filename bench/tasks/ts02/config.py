@@ -24,7 +24,7 @@ from bench.tasks.ts02.domain.contracts import (
 
 PACKAGE_ROOT = Path(__file__).resolve().parent
 DEFAULT_TASK_CONFIG_FILE = PACKAGE_ROOT / "resources" / "task.yaml"
-DEFAULT_INITIAL_STATION_ID = "cabinet_slot_1_station"
+DEFAULT_INITIAL_STATION_ID = "drawer_station"
 
 
 def load_task_config(path: str | Path = DEFAULT_TASK_CONFIG_FILE) -> TaskConfig:

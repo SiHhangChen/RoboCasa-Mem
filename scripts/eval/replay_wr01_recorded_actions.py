@@ -48,6 +48,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seeds", default=None)
     parser.add_argument("--max-steps", type=int, default=None)
     parser.add_argument("--require-episode-identity", action="store_true")
+    parser.add_argument("--record-video", action="store_true")
+    parser.add_argument(
+        "--video-cameras",
+        default="agentview_left,agentview_right,eye_in_hand",
+    )
+    parser.add_argument("--video-fps", type=int, default=20)
     return parser.parse_args()
 
 
@@ -146,10 +152,61 @@ def _action_stats(actions: np.ndarray) -> dict[str, list[float]]:
     }
 
 
+class _ReplayVideoWriter:
+    def __init__(self, output_dir: Path, cameras: tuple[str, ...], fps: int) -> None:
+        self.output_dir = output_dir
+        self.cameras = cameras
+        self.fps = int(fps)
+        self._writers: dict[str, Any] = {}
+        self.frame_counts = {camera: 0 for camera in cameras}
+
+    def append(self, frames: dict[str, np.ndarray]) -> None:
+        try:
+            import cv2
+        except ImportError as exc:
+            raise RuntimeError("OpenCV is required when --record-video is set") from exc
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        for camera in self.cameras:
+            image = np.asarray(frames[camera])
+            if image.dtype != np.uint8 or image.ndim != 3 or image.shape[2] != 3:
+                raise ValueError(f"video frame {camera!r} must be uint8 HWC RGB")
+            writer = self._writers.get(camera)
+            if writer is None:
+                height, width = image.shape[:2]
+                path = self.output_dir / f"{camera}.mp4"
+                writer = cv2.VideoWriter(
+                    str(path),
+                    cv2.VideoWriter_fourcc(*"mp4v"),
+                    self.fps,
+                    (width, height),
+                )
+                if not writer.isOpened():
+                    raise RuntimeError(f"could not open video writer: {path}")
+                self._writers[camera] = writer
+            writer.write(cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+            self.frame_counts[camera] += 1
+
+    def close(self) -> None:
+        for writer in self._writers.values():
+            writer.release()
+        self._writers.clear()
+
+
 def main() -> int:
     args = parse_args()
     if args.max_steps is not None and args.max_steps <= 0:
         raise ValueError("--max-steps must be positive")
+    video_cameras = tuple(
+        dict.fromkeys(
+            camera.strip()
+            for camera in str(args.video_cameras).split(",")
+            if camera.strip()
+        )
+    )
+    if args.record_video and not video_cameras:
+        raise ValueError("--record-video requires at least one camera")
+    if args.video_fps <= 0:
+        raise ValueError("--video-fps must be positive")
     root = args.dataset_root.expanduser().resolve()
     output = args.output_run.expanduser().resolve()
     episodes = _discover(root, _parse_seeds(args.seeds))
@@ -172,6 +229,11 @@ def main() -> int:
             "evaluator_profile": EVALUATOR_PROFILE,
             "execution_mode": "action_only_physics",
             "expert_runtime": False,
+        },
+        "artifacts": {
+            "record_video": bool(args.record_video),
+            "video_cameras": list(video_cameras) if args.record_video else [],
+            "video_fps": int(args.video_fps),
         },
     }
     (output / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
@@ -205,6 +267,11 @@ def main() -> int:
         success_step: int | None = None
         diagnostics: dict[str, Any] = {}
         error: str | None = None
+        video = _ReplayVideoWriter(
+            output / f"seed_{seed:06d}" / "videos",
+            video_cameras if args.record_video else (),
+            args.video_fps,
+        )
         try:
             descriptor = api.build_descriptor(episode, execute=True)
             runtime = RoboCasaRuntimeFactory(api).create_from_descriptor(
@@ -213,6 +280,18 @@ def main() -> int:
             replay_actions = actions if args.max_steps is None else actions[: args.max_steps]
             for step, action in enumerate(replay_actions, start=1):
                 transition = runtime.step(action)
+                if args.record_video:
+                    frames: dict[str, np.ndarray] = {}
+                    for alias in video_cameras:
+                        source_key = descriptor.sensors.observation_key(alias)
+                        if source_key not in transition.observation:
+                            raise KeyError(
+                                f"missing camera alias {alias!r} (expected {source_key!r})"
+                            )
+                        frames[alias] = np.ascontiguousarray(
+                            transition.observation[source_key]
+                        )
+                    video.append(frames)
                 consumed = step
                 diagnostics = dict(transition.diagnostics.details or {})
                 if transition.diagnostics.success and success_step is None:
@@ -240,6 +319,7 @@ def main() -> int:
         finally:
             if runtime is not None:
                 runtime.close()
+            video.close()
         result = {
             "seed": seed,
             "attempt": int(item.get("attempt", 0)),
@@ -254,6 +334,7 @@ def main() -> int:
             "recorded_episode_identity": recorded_identity,
             "episode_identity_matches": recorded_identity is not None and recorded_identity == episode.identity,
             "action_stats": _action_stats(actions[:consumed]),
+            "video_frame_counts": dict(video.frame_counts),
             "diagnostics": diagnostics,
         }
         results.append(result)

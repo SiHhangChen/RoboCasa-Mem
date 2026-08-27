@@ -18,6 +18,7 @@ from bench.tasks.tm02.prompts import resolve_prompt_spec
 
 def _environment(config: Any, scene: Any, plan: Any, resources: Mapping[str, Any]) -> Mapping[str, Any]:
     del plan, resources
+    gripper = dict(config.manipulation.get("gripper", {}))
     return {
         "water_button_world_xyz": scene.water_button_world_xyz,
         "completion_button_world_xyz": scene.completion_button_world_xyz,
@@ -30,6 +31,11 @@ def _environment(config: Any, scene: Any, plan: Any, resources: Mapping[str, Any
         "can_name": scene.can_name,
         "can_xml": scene.can_xml,
         "can_scale": scene.can_scale,
+        "gripper_force_limit": float(gripper.get("force_limit", 20.0)),
+        "gripper_pad_friction": tuple(
+            float(value)
+            for value in gripper.get("pad_friction", (2.0, 0.05, 0.0001))
+        ),
         "observer_config": asdict(resolve_observer_config(config)),
     }
 
@@ -48,12 +54,22 @@ def _release_facts(config: Any, episode: Any, resources: Mapping[str, Any], opti
     }
 
 
+def _initialize(descriptor: Any, env: Any, observation: Mapping[str, Any]):
+    """Apply canonical contact physics before the non-recorded base setup."""
+
+    env.configure_canonical_physics()
+    updated, initialization, metadata, targets = path_base_initialization(
+        apply_manual_path_initial_base_pose
+    )(descriptor, env, observation)
+    return updated, initialization, metadata, targets
+
+
 _ADAPTER = TaskRuntimeAdapter(
     task_id="TM02", load_task_config=load_task_config, resolve_task_options=resolve_task_options,
     scene=standard_scene(resolve_scene_config, uses_seed=False), plan=standard_plan(resolve_episode_plan),
     actions=config_actions(resolve_action_config), navigation=manual_navigation(build_navigation_config),
     prompt=variant_prompt(resolve_prompt_spec), environment=_environment,
-    initialize=path_base_initialization(apply_manual_path_initial_base_pose),
+    initialize=_initialize,
     diagnostics=default_diagnostics, success=default_success, close=default_close,
     validate_descriptor=_validate, release_facts=_release_facts,
     expert_runtime=build_operation_handlers,

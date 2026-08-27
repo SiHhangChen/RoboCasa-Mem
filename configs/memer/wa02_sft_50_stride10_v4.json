@@ -1,0 +1,40 @@
+{
+  "source_dataset": "lerobot_data/memer/wa02_200seeds_v061_subtasks_v4",
+  "output_dir": "outputs/memer/wa02_sft_50_stride10_v4",
+  "annotation_dir": "outputs/memer/wa02_annotations_v4",
+  "camera_layout_config": "configs/memer/wa02_rgb_camera_layout.json",
+  "keyframe_rule_file": "configs/memer/wa02_keyframe_rules.json",
+  "instruction_source": "meta/tasks.parquet (requested temperature only; starting-cup and dining-table-side choices remain hidden demonstration outcomes)",
+  "selection_seed": 20260825,
+  "episode_indices": [
+    1, 6, 13, 16, 20, 21, 27, 28, 30, 34,
+    36, 37, 39, 40, 49, 51, 52, 53, 55, 64,
+    74, 81, 84, 90, 91, 96, 98, 99, 103, 109,
+    110, 114, 118, 130, 134, 135, 137, 139, 151, 153,
+    167, 168, 171, 172, 184, 185, 189, 192, 198, 199
+  ],
+  "physical_demonstration_strata": {
+    "hot-left_request-cold_swap-0": 6,
+    "hot-left_request-cold_swap-1": 6,
+    "hot-left_request-hot_swap-0": 7,
+    "hot-left_request-hot_swap-1": 6,
+    "hot-right_request-cold_swap-0": 6,
+    "hot-right_request-cold_swap-1": 7,
+    "hot-right_request-hot_swap-0": 6,
+    "hot-right_request-hot_swap-1": 6
+  },
+  "task_marginals": {
+    "requested_hot": 25,
+    "requested_cold": 25
+  },
+  "sampling": {
+    "frame_subsample": 5,
+    "timestep_stride": 10,
+    "boundary_window": 0,
+    "boundary_stride": 5,
+    "recent_frames_length": 8,
+    "keyframes_length": 8,
+    "prediction_horizon": 2
+  },
+  "generated_examples": 12144
+}

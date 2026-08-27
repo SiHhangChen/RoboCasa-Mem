@@ -1,0 +1,26 @@
+{
+  "source_dataset": "lerobot_data/memer/wx01_200seeds_v061_subtasks_v2",
+  "output_dir": "outputs/memer/wx01_sft_50_stride10_v2",
+  "annotation_dir": "outputs/memer/wx01_annotations_v2",
+  "camera_layout_config": "configs/memer/wx01_rgb_camera_layout.json",
+  "keyframe_rule_file": "configs/memer/wx01_keyframe_rules.json",
+  "instruction_source": "meta/tasks.parquet (the fixed WX01 instruction; the four semantic stages are represented by current_subtask labels)",
+  "selection_seed": 20260825,
+  "episode_indices": [
+    1, 5, 9, 13, 17, 19, 23, 24, 26, 35,
+    40, 44, 46, 49, 57, 65, 68, 69, 71, 72,
+    73, 75, 79, 81, 86, 88, 89, 91, 94, 109,
+    113, 116, 118, 120, 127, 139, 143, 147, 159, 163,
+    165, 169, 170, 173, 176, 184, 185, 187, 194, 195
+  ],
+  "sampling": {
+    "frame_subsample": 5,
+    "timestep_stride": 10,
+    "boundary_window": 0,
+    "boundary_stride": 5,
+    "recent_frames_length": 8,
+    "keyframes_length": 8,
+    "prediction_horizon": 2
+  },
+  "generated_examples": 4153
+}

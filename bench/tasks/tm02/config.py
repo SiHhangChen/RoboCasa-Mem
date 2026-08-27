@@ -172,6 +172,11 @@ def resolve_observer_config(config: TaskConfig) -> ObserverConfig:
 
 def resolve_action_config(config: TaskConfig) -> ActionConfig:
     operations = config.operations
+    can_pick = dict(_mapping(operations, "can_pick"))
+    if "disable_collisions_during_transport" in can_pick:
+        raise ValueError(
+            "TM02 is action-only; disable_collisions_during_transport is forbidden"
+        )
     water = dict(_mapping(operations, "water_button"))
     water.update(
         {
@@ -188,7 +193,7 @@ def resolve_action_config(config: TaskConfig) -> ActionConfig:
             _mapping(operations, "completion_button")
         ),
         cabinet_open_metadata=dict(_mapping(operations, "cabinet_open")),
-        can_pick_metadata=dict(_mapping(operations, "can_pick")),
+        can_pick_metadata=can_pick,
         can_place_metadata=dict(_mapping(operations, "can_place")),
         cabinet_close_metadata=dict(_mapping(operations, "cabinet_close")),
         return_arm_metadata=dict(_mapping(operations, "return_arm")),

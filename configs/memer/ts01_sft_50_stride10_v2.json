@@ -73,7 +73,7 @@
   "sampling": {
     "frame_subsample": 5,
     "timestep_stride": 10,
-    "boundary_window": 50,
+    "boundary_window": 0,
     "boundary_stride": 5,
     "recent_frames_length": 8,
     "keyframes_length": 8,

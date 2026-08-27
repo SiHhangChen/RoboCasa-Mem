@@ -159,6 +159,12 @@ class BaseDriverAdapter:
                 rotate_xy_tolerance=float(
                     getattr(self._nav_config, "manual_base_path_rotate_xy_tolerance", 0.10)
                 ),
+                intermediate_xy_tolerance=getattr(
+                    self._nav_config, "manual_base_path_intermediate_xy_tolerance", None
+                ),
+                intermediate_yaw_tolerance=getattr(
+                    self._nav_config, "manual_base_path_intermediate_yaw_tolerance", None
+                ),
                 velocity_limits=BaseVelocityLimits.from_navigation_config(self._nav_config),
             )
         return self._manual_base_path_executor

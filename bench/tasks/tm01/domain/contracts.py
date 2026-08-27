@@ -13,16 +13,15 @@ TASK_ID = "TM01"
 ENV_NAME = "TM01BoilWaterAndInspectTwoDrawers"
 AXIS = "TQ-M"
 CANONICAL_PROMPT = (
-    "First, use the stove's own control knob to turn on the burner under the "
-    "pot. While the water heats, inspect each of the two drawers once: open "
-    "it, look inside, and close it. After completing one drawer, you may "
-    "either turn off the burner with the same stove knob before inspecting "
-    "the other drawer, or inspect the other drawer before turning off the "
-    "burner. When the burner is off and both drawers have been inspected and "
-    "closed, press either green completion button."
+    "You have two tasks to complete. Task A: use the stove's control knob to "
+    "turn on the heating function and heat the water, then turn off the heating "
+    "after the water has heated for a while. Task B: go to the other side of "
+    "the workspace and inspect both drawers, opening each drawer, looking "
+    "inside, and closing it. After both tasks are complete, press either green "
+    "button at the two ends to indicate completion."
 )
 CANONICAL_PROMPT_SHA256 = (
-    "974942e3a87f7f412bb890cde2bdcd8b26f2e84656163352a41fcac8e86bfd7a"
+    "3d6c2d5997d6b1f0f00f39e2294915df6eb8ad3e497b7197d302531b9631b6f3"
 )
 DRAWER_NAMES = ("drawer_left", "drawer_right")
 KNOB_ID = "front_right"

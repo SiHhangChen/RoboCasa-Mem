@@ -1,0 +1,9 @@
+{
+  "default_select": "last",
+  "rules": [
+    {
+      "pattern": "^open the (upper|lower) cabinet door$",
+      "select": "first"
+    }
+  ]
+}

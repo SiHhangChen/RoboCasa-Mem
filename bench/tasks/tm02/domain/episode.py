@@ -35,7 +35,7 @@ DEFAULT_CAN_PLACE_REGION_WORLD_XYZ = (0.30, -2.42, 0.925)
 DEFAULT_CAN_PLACE_REGION_SIZE_XY = (0.22, 0.20)
 
 
-def sample_episode_plan(seed: int, *, max_horizon: int = 3200) -> EpisodePlan:
+def sample_episode_plan(seed: int, *, max_horizon: int = 3600) -> EpisodePlan:
     """Alternate L1/L2 demonstrations without changing the success target."""
 
     horizon = int(max_horizon)
@@ -52,7 +52,7 @@ def sample_episode_plan(seed: int, *, max_horizon: int = 3200) -> EpisodePlan:
 def resolve_episode_plan(
     *,
     seed: int,
-    max_horizon: int = 3200,
+    max_horizon: int = 3600,
     route: str | Route | None = None,
     **_: Any,
 ) -> EpisodePlan:

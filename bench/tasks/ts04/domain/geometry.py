@@ -10,12 +10,11 @@ import numpy as np
 from bench.tasks.ts04.domain.contracts import FIXTURE_NAMES
 
 
-DEFAULT_DRAWER_SPACING = 0.50
+DEFAULT_DRAWER_SPACING = 0.25
 DEFAULT_DRAWER_WORLD_YAW_DEG = 180.0
 DEFAULT_DRAWER_WORLD_XYZS = (
-    (4.10, -2.37, 1.1363333333333332),
     (4.60, -2.37, 1.1363333333333332),
-    (5.10, -2.37, 1.1363333333333332),
+    (4.85, -2.37, 1.1363333333333332),
 )
 MINIMUM_DRAWER_SEPARATION = 0.25
 
@@ -28,7 +27,7 @@ def normalize_drawer_world_xyzs(
     """Validate and normalize one world XYZ per fixture."""
 
     if isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
-        raise ValueError("drawer_world_xyzs must be a sequence of three XYZ values")
+        raise ValueError("drawer_world_xyzs must be a sequence of drawer XYZ values")
     rows = tuple(tuple(float(component) for component in row) for row in value)
     count = int(expected_count)
     if count < 2:

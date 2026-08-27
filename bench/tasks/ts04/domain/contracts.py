@@ -21,10 +21,10 @@ FIXTURE_DISPLAY_NAMES = {
     "cabinet_slot_1": "right",
 }
 DRAWER_WORLD_XYZS = (
-    (4.10, -2.37, 1.1363333333333332),
     (4.60, -2.37, 1.1363333333333332),
+    (4.85, -2.37, 1.1363333333333332),
 )
-COMPLETION_BUTTON_WORLD_XYZ = (4.35, -2.06, 0.92)
+COMPLETION_BUTTON_WORLD_XYZ = (3.85, -2.06, 0.92)
 
 @dataclass(frozen=True)
 class EpisodePlan:

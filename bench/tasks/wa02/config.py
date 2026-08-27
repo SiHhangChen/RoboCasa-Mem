@@ -282,6 +282,8 @@ def resolve_action_config(*, config: TaskConfig) -> ActionConfig:
 
     operations = config.operations
     cup_pick = dict(_section(operations, "cup_pick"))
+    cup_pick_by_cup = _section(cup_pick, "by_cup")
+    cup_pick.pop("by_cup", None)
     cup_pick_navigation_xy_tolerance = float(
         cup_pick.pop("navigation_xy_tolerance", 0.03)
     )
@@ -296,6 +298,25 @@ def resolve_action_config(*, config: TaskConfig) -> ActionConfig:
     ):
         raise ValueError("WA-02 cup-pick yaw tolerance must be positive and finite")
     cup_pick = _resolve_grasp_approach_sector(cup_pick)
+    cup_pick_metadata_by_cup: dict[str, Mapping[str, Any]] = {}
+    for cup_id in CUP_IDS:
+        override = dict(_section(cup_pick_by_cup, cup_id))
+        forbidden = sorted(
+            set(override)
+            & {"navigation_xy_tolerance", "navigation_yaw_tolerance_rad", "by_cup"}
+        )
+        if forbidden:
+            raise ValueError(
+                f"WA-02 cup_pick.by_cup.{cup_id} cannot override: "
+                + ", ".join(forbidden)
+            )
+        merged = {**cup_pick, **override}
+        if "grasp_approach_sector" in override:
+            # The base sector is already normalized with diagnostic fields;
+            # replace it with the raw per-cup declaration before validating.
+            merged["grasp_approach_sector"] = override["grasp_approach_sector"]
+            merged = _resolve_grasp_approach_sector(merged)
+        cup_pick_metadata_by_cup[cup_id] = merged
     sensor_faucets = dict(_section(operations, "sensor_faucets"))
     held_fill = dict(_section(operations, "held_fill"))
     held_fill_navigation_xy_tolerance = float(
@@ -343,6 +364,7 @@ def resolve_action_config(*, config: TaskConfig) -> ActionConfig:
         }
     return ActionConfig(
         cup_pick_metadata=cup_pick,
+        cup_pick_metadata_by_cup=cup_pick_metadata_by_cup,
         cup_pick_navigation_xy_tolerance=cup_pick_navigation_xy_tolerance,
         cup_pick_navigation_yaw_tolerance=cup_pick_navigation_yaw_tolerance,
         sensor_faucet_metadata=sensor_faucets,

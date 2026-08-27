@@ -29,14 +29,12 @@ from bench.tasks.tm01.domain.contracts import (
 STOVE_STATION = "stove_station"
 STOVE_SIDE_COMPLETION_STATION = "stove_side_completion_station"
 DRAWER_SIDE_COMPLETION_STATION = "drawer_side_completion_station"
-DRAWER_LEFT_STATION = "drawer_left_station"
-DRAWER_RIGHT_STATION = "drawer_right_station"
+DRAWER_STATION = "drawer_station"
 STATION_IDS = (
     STOVE_STATION,
     STOVE_SIDE_COMPLETION_STATION,
     DRAWER_SIDE_COMPLETION_STATION,
-    DRAWER_LEFT_STATION,
-    DRAWER_RIGHT_STATION,
+    DRAWER_STATION,
 )
 
 
@@ -134,7 +132,7 @@ def station_specs(env: Any) -> dict[str, dict[str, Any]]:
 
     stove = getattr(env, "stove", None)
     left = env.cabinet_for_drawer("drawer_left")
-    right = env.cabinet_for_drawer("drawer_right")
+    center = env.cabinet_for_drawer("drawer_right")
     return {
         STOVE_STATION: {
             "station_id": STOVE_STATION,
@@ -157,19 +155,12 @@ def station_specs(env: Any) -> dict[str, dict[str, Any]]:
             "source_fixture": getattr(left, "name", "drawer_left"),
             "source_object_or_phase": DRAWER_SIDE_COMPLETION_BUTTON,
         },
-        DRAWER_LEFT_STATION: {
-            "station_id": DRAWER_LEFT_STATION,
-            "fixture": left,
-            "anchor_xy": _xy(getattr(left, "pos", None)),
-            "source_fixture": getattr(left, "name", "drawer_left"),
-            "source_object_or_phase": "drawer_left",
-        },
-        DRAWER_RIGHT_STATION: {
-            "station_id": DRAWER_RIGHT_STATION,
-            "fixture": right,
-            "anchor_xy": _xy(getattr(right, "pos", None)),
-            "source_fixture": getattr(right, "name", "drawer_right"),
-            "source_object_or_phase": "drawer_right",
+        DRAWER_STATION: {
+            "station_id": DRAWER_STATION,
+            "fixture": center,
+            "anchor_xy": _xy(getattr(center, "pos", None)),
+            "source_fixture": getattr(center, "name", "drawer_right"),
+            "source_object_or_phase": "compact_drawer_group",
         },
     }
 
@@ -233,8 +224,7 @@ def _button_xy(env: Any, name: str) -> np.ndarray | None:
 
 
 __all__ = [
-    "DRAWER_LEFT_STATION",
-    "DRAWER_RIGHT_STATION",
+    "DRAWER_STATION",
     "DRAWER_SIDE_COMPLETION_STATION",
     "NavigationAssembly",
     "STATION_IDS",

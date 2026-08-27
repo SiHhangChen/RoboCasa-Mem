@@ -1,0 +1,37 @@
+{
+  "source_dataset": "lerobot_data/memer/wa03_200seeds_v061_subtasks_v2",
+  "output_dir": "outputs/memer/wa03_sft_50_stride10_v2",
+  "annotation_dir": "outputs/memer/wa03_annotations_v2",
+  "camera_layout_config": "configs/memer/wa03_rgb_camera_layout.json",
+  "keyframe_rule_file": "configs/memer/wa03_keyframe_rules.json",
+  "high_level_instruction": "Start at the coffee machine with three identical prepared coffees. Add one sugar cube to any one coffee, carry all three coffees to the dining counter, and identify the coffee you sugared.",
+  "selection_seed": 20260825,
+  "episode_indices": [
+    0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+    10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+    20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
+    30, 32, 34, 35, 36, 37, 38, 39, 40, 42,
+    44, 46, 49, 50, 51, 56, 57, 59, 66, 67
+  ],
+  "selection": "50 episodes stratified by first-delivery coffee identity and final sugared-cup dining slot; five or six examples per each of the nine combinations.",
+  "strata": {
+    "first_coffee_A+final_center": 6,
+    "first_coffee_A+final_left": 6,
+    "first_coffee_A+final_right": 6,
+    "first_coffee_B+final_center": 6,
+    "first_coffee_B+final_left": 6,
+    "first_coffee_B+final_right": 5,
+    "first_coffee_C+final_center": 5,
+    "first_coffee_C+final_left": 5,
+    "first_coffee_C+final_right": 5
+  },
+  "sampling": {
+    "frame_subsample": 5,
+    "timestep_stride": 10,
+    "boundary_window": 0,
+    "boundary_stride": 5,
+    "recent_frames_length": 8,
+    "keyframes_length": 8,
+    "prediction_horizon": 2
+  }
+}

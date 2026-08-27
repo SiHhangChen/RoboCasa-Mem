@@ -1,4 +1,4 @@
-"""Calibrated item insertion and held-object support for TM02."""
+"""Calibrated, action-only physical item insertion for TM02."""
 
 from __future__ import annotations
 
@@ -14,66 +14,8 @@ from bench.tasks.tm02.execution.calibration import (
 )
 
 
-def install_held_item_follow_assist(env: Any, controller: Any) -> None:
-    """Keep a validated item attachment stable during arm and mobile-base motion."""
-
-    controller._wr01_hold_enabled = False
-    controller._wr01_collision_state = {}
-    original_step = env.step
-
-    def step_with_wr01_attachment(action: Any):
-        resolved_action = _neutralize_held_close_command(env, action, controller)
-        result = original_step(resolved_action)
-        held = controller._virtual_held_object
-        transform = controller._virtual_object_from_eef
-        if bool(controller._wr01_hold_enabled) and held is not None and transform is not None:
-            pose_world = controller.stage_executor.current_eef_site_world() @ transform
-            _set_object_pose_matrix(env, held, pose_world)
-        if bool(controller._wr01_hold_enabled) and held is not None:
-            obs = env._get_observations(force_update=True)
-            if isinstance(result, tuple) and len(result) == 5:
-                return obs, result[1], result[2], result[3], result[4]
-            return obs, result[1], result[2], result[3]
-        return result
-
-    env.step = step_with_wr01_attachment
-
-
-def _neutralize_held_close_command(
-    env: Any,
-    action: Any,
-    controller: Any,
-) -> Any:
-    """Preserve the validated jaw target instead of repeatedly squeezing in transit."""
-
-    if not bool(controller._wr01_hold_enabled):
-        return action
-    indexes = getattr(
-        env.robots[0].composite_controller,
-        "_action_split_indexes",
-        {},
-    )
-    bounds = indexes.get("right_gripper")
-    if bounds is None:
-        return action
-    start, end = (int(bounds[0]), int(bounds[1]))
-    values = np.asarray(action, dtype=float)
-    if values.ndim != 1 or start < 0 or end > values.size or start >= end:
-        return action
-    if not np.any(values[start:end] > 0.0):
-        return action
-    neutral = values.copy()
-    neutral[start:end] = np.minimum(neutral[start:end], 0.0)
-    return neutral
-
-
-def adopt_picked_item(
-    controller: Any,
-    item_id: str,
-    *,
-    disable_collisions: bool,
-) -> dict[str, Any]:
-    """Enable the transport assist only after the shared physical pick passed."""
+def adopt_picked_item(controller: Any, item_id: str) -> dict[str, Any]:
+    """Publish a physical grasp to the planner without changing simulation state."""
 
     if (
         controller._virtual_held_object != str(item_id)
@@ -84,14 +26,12 @@ def adopt_picked_item(
             "reason": "validated_pick_did_not_publish_held_transform",
             "object_name": str(item_id),
         }
-    if disable_collisions:
-        _disable_object_collisions(controller, item_id)
-    controller._wr01_hold_enabled = True
     return {
         "pass": True,
         "object_name": str(item_id),
-        "mode": "validated_pick_attachment",
-        "collisions_disabled": bool(disable_collisions),
+        "mode": "physical_contact_hold",
+        "collisions_disabled": False,
+        "simulation_state_modified": False,
     }
 
 
@@ -109,13 +49,13 @@ def place_item_with_calibration(
     """Move through the validated cabinet entry corridor, release, and retreat."""
 
     execute = bool(controller.runtime_config.execute)
-    if execute and not bool(controller._wr01_hold_enabled):
+    if execute and controller._virtual_held_object != str(item_id):
         return {
             "primitive": "place_in_storage",
             "object_name": item_id,
             "level": level,
             "pass": False,
-            "reason": "item_hold_assist_not_active",
+            "reason": "physical_pick_not_validated",
         }
     preinsert_world, preinsert_info = resolve_anchor_pose_world(controller.env, preinsert_file)
     release_world, release_info = resolve_anchor_pose_world(controller.env, release_file)
@@ -145,9 +85,7 @@ def place_item_with_calibration(
                 record_trajectory=(name == "release"),
             )
             stage["planning_attempt"] = attempt
-            if bool(stage.get("pass", False)):
-                break
-            if stage.get("failure_phase") != "plan":
+            if bool(stage.get("pass", False)) or stage.get("failure_phase") != "plan":
                 break
         assert stage is not None
         stages.append(stage)
@@ -161,26 +99,17 @@ def place_item_with_calibration(
     physics_handoff: dict[str, Any] = {"pass": False, "skipped": True}
     retreat: dict[str, Any] = {"pass": False, "skipped": True}
     if released:
-        # Keep the validated transport attachment active only while the jaws open.
-        # Collisions remain disabled during this short clearance window so the
-        # formerly closed fingers cannot eject the item when contacts are restored.
         release_command = without_obs(
             controller.run_gripper_command(-1.0, controller.runtime_config.release_steps)
         )
-        restored_geom_count = _restore_object_collisions(controller, item_id)
-        velocity_reset = _zero_object_free_joint_velocity(controller, item_id)
-        controller._wr01_hold_enabled = False
         controller._clear_virtual_held_object(item_id)
         physics_handoff = {
             "pass": True,
             "skipped": False,
             "object_name": str(item_id),
-            "restored_collision_geom_count": int(restored_geom_count),
-            "velocity_reset": velocity_reset,
+            "mode": "action_only_physics",
+            "simulation_state_modified": False,
         }
-        # Let gravity and cabinet contacts settle the released item before the
-        # arm moves away. This preserves the shared release -> settle -> retreat
-        # lifecycle and prevents the visible post-release suspension.
         release_settle = without_obs(
             controller.run_gripper_command(-1.0, max(0, int(release_settle_steps)))
         )
@@ -228,72 +157,4 @@ def place_item_with_calibration(
     }
 
 
-def _disable_object_collisions(controller: Any, object_name: str) -> None:
-    state = controller._wr01_collision_state.setdefault(str(object_name), [])
-    if state:
-        return
-    obj = controller.env.objects[str(object_name)]
-    for geom_name in list(obj.contact_geoms or []):
-        geom_id = int(controller.env.sim.model.geom_name2id(geom_name))
-        state.append(
-            (
-                geom_id,
-                int(controller.env.sim.model.geom_contype[geom_id]),
-                int(controller.env.sim.model.geom_conaffinity[geom_id]),
-            )
-        )
-        controller.env.sim.model.geom_contype[geom_id] = 0
-        controller.env.sim.model.geom_conaffinity[geom_id] = 0
-
-
-def _restore_object_collisions(controller: Any, object_name: str) -> int:
-    state = list(
-        controller._wr01_collision_state.get(str(object_name), [])
-    )
-    for geom_id, contype, conaffinity in state:
-        controller.env.sim.model.geom_contype[geom_id] = int(contype)
-        controller.env.sim.model.geom_conaffinity[geom_id] = int(conaffinity)
-    controller._wr01_collision_state[str(object_name)] = []
-    controller.env.sim.forward()
-    return len(state)
-
-
-def _zero_object_free_joint_velocity(
-    controller: Any,
-    object_name: str,
-) -> dict[str, Any]:
-    """Reset only the released object's free-joint velocity at physics handoff."""
-
-    obj = controller.env.objects[str(object_name)]
-    joint_name = str(obj.joints[0])
-    qvel = np.asarray(
-        controller.env.sim.data.get_joint_qvel(joint_name),
-        dtype=float,
-    ).reshape(-1)
-    if qvel.size == 0 or not np.all(np.isfinite(qvel)):
-        raise ValueError(f"invalid free-joint velocity for {object_name!r}")
-    initial_norm = float(np.linalg.norm(qvel))
-    controller.env.sim.data.set_joint_qvel(joint_name, np.zeros_like(qvel))
-    controller.env.sim.forward()
-    return {
-        "joint_name": joint_name,
-        "dof_count": int(qvel.size),
-        "initial_norm": initial_norm,
-        "final_norm": 0.0,
-    }
-
-
-def _set_object_pose_matrix(env: Any, object_name: str, pose_world: np.ndarray) -> None:
-    matrix = np.asarray(pose_world, dtype=float).reshape(4, 4)
-    # MuJoCo free-joint qpos stores quaternions as wxyz.
-    from bench.execution.planning import pose_from_matrix
-
-    pose = pose_from_matrix(matrix)
-    env.set_object_pose(object_name, pose["p"], pose["q_xyzw"])
-
-
-__all__ = [
-    "adopt_picked_item",
-    "install_held_item_follow_assist",
-    "place_item_with_calibration",
-]
+__all__ = ["adopt_picked_item", "place_item_with_calibration"]

@@ -433,15 +433,15 @@ def _runtime_config(
     )
     return ManipulationRuntimeConfig(
         execute=bool(execute),
-        max_joint_step=float(values.get("max_joint_step", 0.015)),
-        settle_steps=int(values.get("settle_steps", 20)),
+        max_joint_step=float(values.get("max_joint_step", 0.025)),
+        settle_steps=int(values.get("settle_steps", 10)),
         position_threshold=float(values.get("position_threshold", 0.10)),
         orientation_threshold_deg=float(values.get("orientation_threshold_deg", 20.0)),
         qpos_threshold=float(values.get("qpos_threshold", 0.18)),
         open_steps=int(values.get("open_steps", 20)),
-        close_steps=int(values.get("close_steps", 40)),
-        release_steps=int(values.get("release_steps", 20)),
-        release_settle_steps=int(values.get("release_settle_steps", 40)),
+        close_steps=int(values.get("close_steps", 30)),
+        release_steps=int(values.get("release_steps", 10)),
+        release_settle_steps=int(values.get("release_settle_steps", 20)),
         planner_args=planner_config.planner_args(),
         static_scene_options=dict(static_scene),
     )

@@ -25,17 +25,18 @@ from bench.tasks.ts04.domain.geometry import station_id_for_fixture
 
 
 COMPLETION_BUTTON_STATION = "completion_button_station"
-STATION_IDS = tuple(station_id_for_fixture(name) for name in FIXTURE_NAMES) + (
-    COMPLETION_BUTTON_STATION,
-)
+DRAWER_STATION = "drawer_station"
+STATION_IDS = (DRAWER_STATION, COMPLETION_BUTTON_STATION)
 STATION_ALIASES: dict[Any, str] = {
-    fixture: station_id_for_fixture(fixture) for fixture in FIXTURE_NAMES
+    fixture: DRAWER_STATION for fixture in FIXTURE_NAMES
 }
 STATION_ALIASES.update({station: station for station in STATION_IDS})
 STATION_ALIASES.update(
     {
-        "cabinet": station_id_for_fixture(FIXTURE_NAMES[1]),
-        "storage_cabinet": station_id_for_fixture(FIXTURE_NAMES[1]),
+        **{station_id_for_fixture(fixture): DRAWER_STATION for fixture in FIXTURE_NAMES},
+        "cabinet": DRAWER_STATION,
+        "storage_cabinet": DRAWER_STATION,
+        "drawer": DRAWER_STATION,
         "completion_button": COMPLETION_BUTTON_STATION,
     }
 )
@@ -70,32 +71,29 @@ def build_navigation_config(
 
 
 def station_specs(env: Any) -> dict[str, dict[str, Any]]:
-    """Build one independently anchored station for every drawer."""
+    """Build one shared station for the compact drawer group and one button station."""
 
     result: dict[str, dict[str, Any]] = {}
     fixture_names = tuple(getattr(env, "fixture_names", FIXTURE_NAMES))
-    for fixture_name in fixture_names:
-        fixture = env.cabinet_for_slot(fixture_name)
-        anchor = _slot_anchor_xy(env, fixture_name)
-        fallback = fixture_xy(fixture)
-        result[station_id_for_fixture(fixture_name)] = {
-            "station_id": station_id_for_fixture(fixture_name),
-            "fixture": fixture,
-            "anchor_xy": anchor if anchor is not None else fallback,
-            "nominal_xy": _fixture_front_xy(fixture),
-            "source_fixture": safe_name(fixture),
-            "source_object_or_phase": fixture_name,
-            "stand_off": 0.75,
-            "tangential_offsets": (0.0,),
-        }
-    reference_fixture_name = fixture_names[1]
+    reference_fixture_name = fixture_names[len(fixture_names) // 2]
     center_fixture = env.cabinet_for_slot(reference_fixture_name)
+    center_anchor = _slot_anchor_xy(env, reference_fixture_name)
+    result[DRAWER_STATION] = {
+        "station_id": DRAWER_STATION,
+        "fixture": center_fixture,
+        "anchor_xy": center_anchor if center_anchor is not None else fixture_xy(center_fixture),
+        "nominal_xy": _fixture_front_xy(center_fixture),
+        "source_fixture": safe_name(center_fixture),
+        "source_object_or_phase": "compact_drawer_group",
+        "stand_off": 0.75,
+        "tangential_offsets": (0.0,),
+    }
     try:
         button_xy = np.asarray(
             env.completion_button_position(), dtype=float
         ).reshape(-1)[:2]
     except Exception:
-        button_xy = _slot_anchor_xy(env, reference_fixture_name)
+        button_xy = center_anchor
     result[COMPLETION_BUTTON_STATION] = {
         "station_id": COMPLETION_BUTTON_STATION,
         "fixture": center_fixture,
@@ -161,15 +159,14 @@ def build_navigation_assembly(
 
 
 def _station_aliases(fixture_names: tuple[str, ...]) -> dict[Any, str]:
-    station_ids = tuple(station_id_for_fixture(name) for name in fixture_names)
-    aliases: dict[Any, str] = {
-        fixture: station_id_for_fixture(fixture) for fixture in fixture_names
-    }
-    aliases.update({station: station for station in station_ids})
+    aliases: dict[Any, str] = {fixture: DRAWER_STATION for fixture in fixture_names}
+    aliases.update({station: station for station in STATION_IDS})
     aliases.update(
         {
-            "cabinet": station_id_for_fixture(fixture_names[1]),
-            "storage_cabinet": station_id_for_fixture(fixture_names[1]),
+            **{station_id_for_fixture(fixture): DRAWER_STATION for fixture in fixture_names},
+            "cabinet": DRAWER_STATION,
+            "storage_cabinet": DRAWER_STATION,
+            "drawer": DRAWER_STATION,
             "completion_button": COMPLETION_BUTTON_STATION,
             COMPLETION_BUTTON_STATION: COMPLETION_BUTTON_STATION,
         }
@@ -196,6 +193,7 @@ def _fixture_front_xy(fixture: Any) -> np.ndarray | None:
 __all__ = [
     "NavigationAssembly",
     "COMPLETION_BUTTON_STATION",
+    "DRAWER_STATION",
     "STATION_ALIASES",
     "STATION_IDS",
     "build_navigation_assembly",

@@ -1,0 +1,43 @@
+{
+  "task_id": "WR-05",
+  "spatial_reference": "Upper/lower name the two fixed WR05 open-shelf levels. Plate left/right name the two fixed task-local regions beside the serving plate, not left/right in an arbitrary camera image.",
+  "keyframes_from_record": true,
+  "subtasks": {
+    "pick_ketchup_lower": {"label": "pick up the ketchup bottle from the lower shelf", "keyframe": "last"},
+    "pick_ketchup_upper": {"label": "pick up the ketchup bottle from the upper shelf", "keyframe": "last"},
+    "place_ketchup_plate_left": {"label": "place the ketchup bottle upright on the left side of the serving plate", "keyframe": "last"},
+    "place_ketchup_plate_right": {"label": "place the ketchup bottle upright on the right side of the serving plate", "keyframe": "last"},
+    "pick_mustard_lower": {"label": "pick up the mustard bottle from the lower shelf", "keyframe": "last"},
+    "pick_mustard_upper": {"label": "pick up the mustard bottle from the upper shelf", "keyframe": "last"},
+    "place_mustard_plate_left": {"label": "place the mustard bottle upright on the left side of the serving plate", "keyframe": "last"},
+    "place_mustard_plate_right": {"label": "place the mustard bottle upright on the right side of the serving plate", "keyframe": "last"},
+    "pick_ketchup_plate_left": {"label": "pick up the ketchup bottle from the left side of the serving plate", "keyframe": "last"},
+    "pick_ketchup_plate_right": {"label": "pick up the ketchup bottle from the right side of the serving plate", "keyframe": "last"},
+    "return_ketchup_lower": {"label": "return the ketchup bottle upright to the lower shelf", "keyframe": "last"},
+    "return_ketchup_upper": {"label": "return the ketchup bottle upright to the upper shelf", "keyframe": "last"},
+    "pick_mustard_plate_left": {"label": "pick up the mustard bottle from the left side of the serving plate", "keyframe": "last"},
+    "pick_mustard_plate_right": {"label": "pick up the mustard bottle from the right side of the serving plate", "keyframe": "last"},
+    "return_mustard_lower": {"label": "return the mustard bottle upright to the lower shelf", "keyframe": "last"},
+    "return_mustard_upper": {"label": "return the mustard bottle upright to the upper shelf", "keyframe": "last"}
+  },
+  "stage_prefixes": {
+    "pick_ketchup_original": ["observe_condiment_shelf", "navigate_to_ketchup_original_level", "pick_ketchup_from_original_level", "stow_ketchup_after_shelf_pick", "normalize_transport_posture_after_ketchup_shelf_pick"],
+    "place_ketchup_plate": ["navigate_ketchup_to_plate_stage", "place_ketchup_at_", "return_arm_after_ketchup_plate_stage"],
+    "pick_mustard_original": ["navigate_to_mustard_original_level", "pick_mustard_from_original_level", "stow_mustard_after_shelf_pick", "normalize_transport_posture_after_mustard_shelf_pick"],
+    "place_mustard_plate": ["navigate_mustard_to_plate_stage", "place_mustard_at_", "return_arm_after_mustard_plate_stage"],
+    "pick_ketchup_plate": ["navigate_to_ketchup_staged_item", "pick_ketchup_from_plate_stage", "stow_ketchup_for_return"],
+    "return_ketchup_original": ["navigate_ketchup_to_remembered_level", "return_ketchup_to_original_level", "return_arm_after_ketchup_home_place"],
+    "pick_mustard_plate": ["navigate_to_mustard_staged_item", "pick_mustard_from_plate_stage", "stow_mustard_for_return"],
+    "return_mustard_original": ["navigate_mustard_to_remembered_level", "return_mustard_to_original_level", "return_arm_after_mustard_home_place"]
+  },
+  "dynamic_stage_labels": {
+    "pick_ketchup_original": {"field": "ketchup_original_level", "values": {"lower": "pick_ketchup_lower", "upper": "pick_ketchup_upper"}},
+    "place_ketchup_plate": {"field": "ketchup_plate_side", "values": {"left": "place_ketchup_plate_left", "right": "place_ketchup_plate_right"}},
+    "pick_mustard_original": {"field": "mustard_original_level", "values": {"lower": "pick_mustard_lower", "upper": "pick_mustard_upper"}},
+    "place_mustard_plate": {"field": "mustard_plate_side", "values": {"left": "place_mustard_plate_left", "right": "place_mustard_plate_right"}},
+    "pick_ketchup_plate": {"field": "ketchup_plate_side", "values": {"left": "pick_ketchup_plate_left", "right": "pick_ketchup_plate_right"}},
+    "return_ketchup_original": {"field": "ketchup_original_level", "values": {"lower": "return_ketchup_lower", "upper": "return_ketchup_upper"}},
+    "pick_mustard_plate": {"field": "mustard_plate_side", "values": {"left": "pick_mustard_plate_left", "right": "pick_mustard_plate_right"}},
+    "return_mustard_original": {"field": "mustard_original_level", "values": {"lower": "return_mustard_lower", "upper": "return_mustard_upper"}}
+  }
+}

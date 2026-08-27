@@ -1,0 +1,30 @@
+{
+  "source_dataset": "lerobot_data/memer/tm02_200seeds_v061_subtasks_v2",
+  "output_dir": "outputs/memer/tm02_sft_50_stride10_v2",
+  "annotation_dir": "outputs/memer/tm02_annotations_v2",
+  "camera_layout_config": "configs/memer/tm02_rgb_camera_layout.json",
+  "keyframe_rule_file": "configs/memer/tm02_keyframe_rules.json",
+  "instruction_source": "meta/tasks.parquet (the fixed two-task TM02 instruction; the order of faucet-off and cabinet-close is represented by current_subtask labels and visual history)",
+  "selection_seed": 20260826,
+  "episode_indices": [
+    8, 10, 15, 18, 22, 26, 27, 28, 29, 30,
+    31, 32, 36, 37, 38, 44, 52, 54, 59, 61,
+    65, 69, 73, 75, 78, 100, 102, 117, 120, 125,
+    127, 130, 135, 136, 137, 139, 144, 149, 152, 154,
+    157, 160, 161, 163, 167, 175, 190, 191, 192, 195
+  ],
+  "route_marginals": {
+    "L1_faucet_off_before_cabinet_close": 25,
+    "L2_cabinet_close_before_faucet_off": 25
+  },
+  "sampling": {
+    "frame_subsample": 5,
+    "timestep_stride": 10,
+    "boundary_window": 0,
+    "boundary_stride": 5,
+    "recent_frames_length": 8,
+    "keyframes_length": 8,
+    "prediction_horizon": 2
+  },
+  "generated_examples": 16325
+}

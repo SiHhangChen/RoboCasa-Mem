@@ -80,6 +80,8 @@ class ManualBasePathExecutor:
         yaw_gain: float = 2.0,
         nearest_yaw_weight: float = 0.20,
         rotate_xy_tolerance: float = 0.10,
+        intermediate_xy_tolerance: float | None = None,
+        intermediate_yaw_tolerance: float | None = None,
         velocity_limits: BaseVelocityLimits | None = None,
     ) -> None:
         self.env = env
@@ -111,6 +113,18 @@ class ManualBasePathExecutor:
         self.yaw_gain = float(yaw_gain)
         self.nearest_yaw_weight = float(nearest_yaw_weight)
         self.rotate_xy_tolerance = max(0.0, float(rotate_xy_tolerance))
+        self.intermediate_xy_tolerance = (
+            None if intermediate_xy_tolerance is None else float(intermediate_xy_tolerance)
+        )
+        self.intermediate_yaw_tolerance = (
+            None if intermediate_yaw_tolerance is None else float(intermediate_yaw_tolerance)
+        )
+        for name, value in (
+            ("intermediate_xy_tolerance", self.intermediate_xy_tolerance),
+            ("intermediate_yaw_tolerance", self.intermediate_yaw_tolerance),
+        ):
+            if value is not None and (not np.isfinite(value) or value <= 0.0):
+                raise ValueError(f"manual base {name} must be positive and finite")
         self.velocity_limits = (
             velocity_limits if velocity_limits is not None and velocity_limits.enabled else None
         )
@@ -258,13 +272,25 @@ class ManualBasePathExecutor:
         for source_index, target_index_item in zip(route, route[1:]):
             source = self.samples[int(source_index)]
             target = self.samples[int(target_index_item)]
+            is_terminal = int(target_index_item) == int(target_index)
             current_obs, segment = self._move_segment(
                 current_obs,
                 source=source,
                 target=target,
                 arm_qpos=arm_qpos,
                 gripper_action=resolved_gripper_action,
+                xy_tolerance=(
+                    resolved_terminal_xy_tolerance
+                    if is_terminal
+                    else getattr(self, "intermediate_xy_tolerance", None)
+                ),
+                yaw_tolerance=(
+                    resolved_terminal_yaw_tolerance
+                    if is_terminal
+                    else getattr(self, "intermediate_yaw_tolerance", None)
+                ),
             )
+            segment["terminal_segment"] = bool(is_terminal)
             segments.append(segment)
             if not bool(segment.get("pass", False)):
                 break
@@ -343,6 +369,12 @@ class ManualBasePathExecutor:
             "final_yaw_error": final_yaw_error,
             "path_xy_tolerance": float(self.xy_tolerance),
             "path_yaw_tolerance": float(self.yaw_tolerance),
+            "intermediate_xy_tolerance": getattr(
+                self, "intermediate_xy_tolerance", None
+            ),
+            "intermediate_yaw_tolerance": getattr(
+                self, "intermediate_yaw_tolerance", None
+            ),
             "terminal_xy_tolerance": float(resolved_terminal_xy_tolerance),
             "terminal_yaw_tolerance": float(resolved_terminal_yaw_tolerance),
             "holding_motion": held_motion,
@@ -422,6 +454,48 @@ class ManualBasePathExecutor:
         return list(range(int(start_index), int(target_index) + step, step))
 
     def _move_segment(
+        self,
+        obs: dict[str, Any],
+        *,
+        source: ManualBasePathSample,
+        target: ManualBasePathSample,
+        arm_qpos: np.ndarray,
+        gripper_action: float,
+        xy_tolerance: float | None = None,
+        yaw_tolerance: float | None = None,
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Execute one edge using terminal or pass-through tolerances."""
+
+        resolved_xy_tolerance = (
+            self.xy_tolerance if xy_tolerance is None else float(xy_tolerance)
+        )
+        resolved_yaw_tolerance = (
+            self.yaw_tolerance if yaw_tolerance is None else float(yaw_tolerance)
+        )
+        if (
+            not np.isfinite(resolved_xy_tolerance)
+            or resolved_xy_tolerance <= 0.0
+            or not np.isfinite(resolved_yaw_tolerance)
+            or resolved_yaw_tolerance <= 0.0
+        ):
+            raise ValueError("manual base segment tolerances must be positive and finite")
+        original_xy_tolerance = self.xy_tolerance
+        original_yaw_tolerance = self.yaw_tolerance
+        self.xy_tolerance = resolved_xy_tolerance
+        self.yaw_tolerance = resolved_yaw_tolerance
+        try:
+            return self._move_segment_with_tolerances(
+                obs,
+                source=source,
+                target=target,
+                arm_qpos=arm_qpos,
+                gripper_action=gripper_action,
+            )
+        finally:
+            self.xy_tolerance = original_xy_tolerance
+            self.yaw_tolerance = original_yaw_tolerance
+
+    def _move_segment_with_tolerances(
         self,
         obs: dict[str, Any],
         *,

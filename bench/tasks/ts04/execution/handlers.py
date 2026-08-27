@@ -5,6 +5,14 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+import numpy as np
+
+from bench.execution.planning import (
+    matrix_from_base_obs,
+    matrix_from_site_pose,
+    pose_from_matrix,
+)
+
 from bench.tasks.ts04.domain.semantics import (
     close_precondition_checks,
     completion_button_precondition_checks,
@@ -20,6 +28,7 @@ from bench.tasks.ts04.execution.manipulation import (
     locked_base_post_step_callback,
     open_drawer_physically,
 )
+from bench.tasks.ts04.execution.geometry import resolve_drawer_motion_frame
 
 
 def build_stage_handlers(
@@ -34,6 +43,11 @@ def build_stage_handlers(
         ),
         "close_fixture": lambda target, **kwargs: close_fixture(
             controller, str(target), **kwargs
+        ),
+        "retreat_and_return_arm_after_drawer": (
+            lambda target, **kwargs: retreat_and_return_arm_after_drawer(
+                controller, str(target), **kwargs
+            )
         ),
         "press_completion_button": lambda target, **kwargs: press_completion_button(
             controller, str(target), **kwargs
@@ -116,15 +130,18 @@ def open_fixture(
     physically_open = bool(
         actuation.get("pass", False) and fraction >= float(env.open_threshold)
     )
-    result = env.record_open_event(
-        fixture_name,
-        drawer_open=physically_open,
-        failure_reason=(
-            None
-            if physically_open
-            else str(actuation.get("reason") or "drawer_not_open")
-        ),
-    )
+    if physically_open and env.semantic_state.active_fixture == fixture_name:
+        result = _observer_committed_result(env, "open_fixture", fixture_name)
+    else:
+        result = env.record_open_event(
+            fixture_name,
+            drawer_open=physically_open,
+            failure_reason=(
+                None
+                if physically_open
+                else str(actuation.get("reason") or "drawer_not_open")
+            ),
+        )
     result.update(
         {
             "actuation_mode": mode,
@@ -146,10 +163,18 @@ def inspect_fixture(
     env = controller.env
     known = fixture_name in env.fixture_names
     fraction = float(env.slot_open_fraction(fixture_name)) if known else 0.0
-    result = env.record_inspection_event(
-        fixture_name,
-        drawer_open=known and fraction >= float(env.open_threshold),
-    )
+    if (
+        known
+        and fraction >= float(env.open_threshold)
+        and env.semantic_state.active_fixture == fixture_name
+        and env.semantic_state.inspected_active_fixture
+    ):
+        result = _observer_committed_result(env, "inspect_fixture", fixture_name)
+    else:
+        result = env.record_inspection_event(
+            fixture_name,
+            drawer_open=known and fraction >= float(env.open_threshold),
+        )
     result.update(
         {
             "dwell_steps": int(dwell_steps),
@@ -206,15 +231,19 @@ def close_fixture(
     physically_closed = bool(
         actuation.get("pass", False) and fraction <= float(env.closed_threshold)
     )
-    result = env.record_close_event(
-        fixture_name,
-        drawer_closed=physically_closed,
-        failure_reason=(
-            None
-            if physically_closed
-            else str(actuation.get("reason") or "drawer_not_closed")
-        ),
-    )
+    history = env.semantic_state.completed_fixture_history
+    if physically_closed and history and history[-1] == fixture_name:
+        result = _observer_committed_result(env, "close_fixture", fixture_name)
+    else:
+        result = env.record_close_event(
+            fixture_name,
+            drawer_closed=physically_closed,
+            failure_reason=(
+                None
+                if physically_closed
+                else str(actuation.get("reason") or "drawer_not_closed")
+            ),
+        )
     result.update(
         {
             "actuation_mode": mode,
@@ -240,6 +269,100 @@ def close_fixture(
                 arm.get("reason") or arm.get("failure_reason") or "arm_reset_failed"
             )
     return result
+
+
+def retreat_and_return_arm_after_drawer(
+    controller: Any,
+    fixture_name: str,
+    *,
+    retreat_distance: float = 0.125,
+    release_steps: int = 10,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Clear the closed drawer handle before resetting the arm posture."""
+
+    del kwargs
+    env = controller.env
+    if fixture_name not in tuple(env.fixture_names):
+        return {
+            "primitive": "drawer_post_close_retreat_and_return",
+            "fixture": fixture_name,
+            "pass": False,
+            "reason": "unknown_ts04_fixture",
+        }
+    if not bool(getattr(controller.runtime_config, "execute", False)):
+        retreat = {"pass": True, "dry_run": True, "steps": 0}
+        arm_return = controller.return_arm_to_regular_pose(
+            stage=f"ts04_post_close_return_to_regular_pose_{fixture_name}",
+            gripper_action=-1.0,
+        )
+        return {
+            "primitive": "drawer_post_close_retreat_and_return",
+            "fixture": fixture_name,
+            "retreat": retreat,
+            "arm_return": arm_return,
+            "checks": {
+                "retreat_executed": True,
+                "arm_returned": bool(arm_return.get("pass", False)),
+            },
+            "pass": bool(arm_return.get("pass", False)),
+        }
+
+    controller.refresh_obs()
+    fixture = env.cabinet_for_slot(fixture_name)
+    current_world = np.asarray(matrix_from_site_pose(env, env.robots[0]), dtype=float)
+    frame = resolve_drawer_motion_frame(
+        fixture_yaw=float(fixture.rot),
+        current_eef_rotation_world=current_world[:3, :3],
+        hook_orientation_blend=0.0,
+    )
+    retreat_world = current_world.copy()
+    retreat_world[:3, 3] += frame.open_direction_world * max(
+        0.0, float(retreat_distance)
+    )
+    target_base = np.linalg.inv(matrix_from_base_obs(controller.obs)) @ retreat_world
+    retreat = controller.stage_executor.run(
+        pose_from_matrix(target_base),
+        stage=f"ts04_{fixture_name}_post_close_retreat",
+        gripper_action=-1.0,
+        post_step_callback=locked_base_post_step_callback(env),
+    )
+    controller._sync_obs(controller.stage_executor.obs)
+    if not bool(retreat.get("pass", False)):
+        return {
+            "primitive": "drawer_post_close_retreat_and_return",
+            "fixture": fixture_name,
+            "retreat": retreat,
+            "pass": False,
+            "reason": "ts04_drawer_post_close_retreat_failed",
+        }
+    release = controller.driver.run_gripper(
+        arm_qpos=controller.driver.current_arm_qpos(),
+        gripper_action=-1.0,
+        steps=max(0, int(release_steps)),
+        post_step_callback=locked_base_post_step_callback(env),
+    )
+    controller._sync_obs(release["obs"])
+    arm_return = controller.return_arm_to_regular_pose(
+        stage=f"ts04_post_close_return_to_regular_pose_{fixture_name}",
+        gripper_action=-1.0,
+        post_step_callback=locked_base_post_step_callback(env),
+    )
+    checks = {
+        "retreat_executed": bool(retreat.get("pass", False)),
+        "release_executed": int(release.get("steps", 0)) == max(0, int(release_steps)),
+        "arm_returned": bool(arm_return.get("pass", False)),
+    }
+    return {
+        "primitive": "drawer_post_close_retreat_and_return",
+        "fixture": fixture_name,
+        "retreat": retreat,
+        "release_gripper": {key: value for key, value in release.items() if key != "obs"},
+        "arm_return": arm_return,
+        "checks": checks,
+        "pass": bool(all(checks.values())),
+        "reason": None if all(checks.values()) else "ts04_drawer_post_close_return_failed",
+    }
 
 
 def press_completion_button(
@@ -276,6 +399,7 @@ def press_completion_button(
             button_physically_pressed=False,
             all_drawers_closed=all_closed,
         )
+    press_count_before = int(env.semantic_state.completion_button_press_count)
     actuation = press_completion_button_physically(
         controller,
         prepress_z_offset=float(prepress_z_offset),
@@ -296,13 +420,22 @@ def press_completion_button(
         actuation.get("physical_button_motion_observed", False)
         and actuation.get("pass", False)
     )
-    semantic = env.record_completion_button_event(
-        button_physically_pressed=physical_motion,
-        all_drawers_closed=_all_drawers_closed(env),
-        failure_reason=str(
-            actuation.get("reason") or "completion_button_not_physically_pressed"
-        ),
-    )
+    if (
+        physical_motion
+        and env.semantic_state.completion_button_press_count == press_count_before + 1
+        and not env.semantic_state.invalid_completion_button_press
+    ):
+        semantic = _observer_committed_result(
+            env, "press_completion_button", "completion_button"
+        )
+    else:
+        semantic = env.record_completion_button_event(
+            button_physically_pressed=physical_motion,
+            all_drawers_closed=_all_drawers_closed(env),
+            failure_reason=str(
+                actuation.get("reason") or "completion_button_not_physically_pressed"
+            ),
+        )
     checks = {
         "physical_press_operation": bool(actuation.get("pass", False)),
         "physical_button_motion": physical_motion,
@@ -336,10 +469,31 @@ def _all_drawers_closed(env: Any) -> bool:
     )
 
 
+def _observer_committed_result(
+    env: Any,
+    primitive: str,
+    fixture: str,
+) -> dict[str, Any]:
+    """Avoid double commits when contact execution already crossed an edge."""
+
+    result = {
+        "primitive": str(primitive),
+        "fixture": str(fixture),
+        "checks": {"physical_event_observer_committed": True},
+        "pass": True,
+        "reason": None,
+    }
+    diagnostics = getattr(env, "inspection_diagnostics", None)
+    if callable(diagnostics):
+        result["diagnostics"] = diagnostics()
+    return result
+
+
 __all__ = [
     "build_stage_handlers",
     "close_fixture",
     "inspect_fixture",
     "open_fixture",
     "press_completion_button",
+    "retreat_and_return_arm_after_drawer",
 ]

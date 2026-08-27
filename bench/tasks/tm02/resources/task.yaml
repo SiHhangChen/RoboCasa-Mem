@@ -6,16 +6,14 @@ task:
   display_name: Fill Pot and Retrieve Can
   description: Fill a sink-side pot while retrieving a can, then finish both threads.
   canonical_prompt: >-
-    First, press the blue water button beside the sink to turn on the faucet
-    and fill the pot already in the sink. While the pot fills, retrieve the can
-    from the cabinet: open the sliding door, take out the can, and place it in
-    the marked area. After placing the can, you may either return to the sink
-    and press the same blue button to turn off the faucet before closing the
-    cabinet door, or close the cabinet door before returning to turn off the
-    faucet. When the faucet is off, the can is in the marked area, and the
-    cabinet door is closed, press the red completion button beside the sink
-    to finish the task.
-  canonical_prompt_sha256: 5690a5f6c1f68ad05a37a36d91c844643df53031f80ed9c8b2634e46e0a16f4a
+    You have two tasks to complete. Task A: press the blue water button beside
+    the sink to turn on the faucet and fill the pot already in the sink, then
+    press the same blue button to turn off the faucet after the pot has filled
+    for a while. Task B: go to the cabinet, open the sliding door, take out the
+    can, place it in the marked area, and close the cabinet door. After both
+    tasks are complete, press the red completion button beside the sink to
+    indicate completion.
+  canonical_prompt_sha256: 10fdaf85133b54744b92c82883e7b34a6815e7341b095cdbf31c25f2c075d67b
   success_conditions:
     - legal_event_route
     - faucet_on_once
@@ -62,7 +60,9 @@ scene:
 
 episode:
   plan_balance: seed_parity
-  max_horizon: 3200
+  # Pure action recordings reach success at steps 3290 and 3206; keep 248
+  # steps of headroom for the longer route under the 20 Hz controller.
+  max_horizon: 3600
 
 initial_state:
   robot_base_source: TM02.manual_base_path
@@ -149,6 +149,9 @@ manipulation:
   static_scene:
     enabled: false
     validate_collisions: false
+  gripper:
+    force_limit: 20.0
+    pad_friction: [2.0, 0.05, 0.0001]
 
 operations:
   water_button:
@@ -191,8 +194,7 @@ operations:
     grasp_inward_offset: 0.0042
     close_gripper_steps: 6
     post_close_hold_steps: 12
-    held_gripper_action: 1.0
-    disable_collisions_during_transport: false
+    held_gripper_action: 0.0
   can_place:
     require_release: true
     target_region: can_place_region

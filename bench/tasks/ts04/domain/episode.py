@@ -7,21 +7,26 @@ from typing import Any
 
 import numpy as np
 
-from bench.tasks.ts04.domain.contracts import EpisodePlan, SceneConfig, TaskDefinition, FIXTURE_NAMES, FIXTURE_DISPLAY_NAMES
 from bench.tasks.ts04.domain.contracts import (
     COMPLETION_BUTTON_WORLD_XYZ,
     DISPLAY_NAME,
     DRAWER_WORLD_XYZS,
+    EpisodePlan,
     ENV_NAME,
     FIXTURE_DISPLAY_NAMES,
     FIXTURE_NAMES,
+    SceneConfig,
+    TaskDefinition,
     TASK_ID,
 )
 
 
 TARGET_FIXTURE_SEED_SALT = 0x54533454
 
-def normalize_drawer_world_xyzs(value: Any, *, expected_count: int) -> tuple[tuple[float, float, float], ...]:
+
+def normalize_drawer_world_xyzs(
+    value: Any, *, expected_count: int
+) -> tuple[tuple[float, float, float], ...]:
     rows = tuple(tuple(float(v) for v in row) for row in value)
     if len(rows) != expected_count or any(len(row) != 3 for row in rows):
         raise ValueError("invalid TS04 drawer positions")
@@ -90,7 +95,7 @@ def resolve_task_definition(**values: Any) -> TaskDefinition:
         description=str(
             values.get(
                 "description",
-                "Search two drawers for a red cube and stop when it is found.",
+                "Search two drawers for a red cube and report the search length.",
             )
         ),
         success_conditions=conditions,
@@ -115,7 +120,12 @@ def resolve_scene_config(*, seed: int, env_split: str, **values: Any) -> SceneCo
     closed_threshold = float(values.get("closed_threshold", 0.08))
     if not 0 <= closed_threshold < open_threshold <= 1:
         raise ValueError("TS04 requires closed_threshold < open_threshold")
-    button = tuple(float(v) for v in values.get("completion_button_world_xyz", COMPLETION_BUTTON_WORLD_XYZ))
+    button = tuple(
+        float(v)
+        for v in values.get(
+            "completion_button_world_xyz", COMPLETION_BUTTON_WORLD_XYZ
+        )
+    )
     if len(button) != 3 or not np.all(np.isfinite(button)):
         raise ValueError("TS04 completion button position must be finite xyz")
     return SceneConfig(

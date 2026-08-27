@@ -13,18 +13,16 @@ TASK_ID = "TM02"
 ENV_NAME = "TM02FillPotAndRetrieveCan"
 AXIS = "TQ-M"
 CANONICAL_PROMPT = (
-    "First, press the blue water button beside the sink to turn on the faucet "
-    "and fill the pot already in the sink. While the pot fills, retrieve the "
-    "can from the cabinet: open the sliding door, take out the can, and place "
-    "it in the marked area. After placing the can, you may either return to "
-    "the sink and press the same blue button to turn off the faucet before "
-    "closing the cabinet door, or close the cabinet door before returning to "
-    "turn off the faucet. When the faucet is off, the can is in the marked "
-    "area, and the cabinet door is closed, press the red completion button "
-    "beside the sink to finish the task."
+    "You have two tasks to complete. Task A: press the blue water button "
+    "beside the sink to turn on the faucet and fill the pot already in the "
+    "sink, then press the same blue button to turn off the faucet after the "
+    "pot has filled for a while. Task B: go to the cabinet, open the sliding "
+    "door, take out the can, place it in the marked area, and close the "
+    "cabinet door. After both tasks are complete, press the red completion "
+    "button beside the sink to indicate completion."
 )
 CANONICAL_PROMPT_SHA256 = (
-    "5690a5f6c1f68ad05a37a36d91c844643df53031f80ed9c8b2634e46e0a16f4a"
+    "10fdaf85133b54744b92c82883e7b34a6815e7341b095cdbf31c25f2c075d67b"
 )
 
 POT_NAME = "pot"

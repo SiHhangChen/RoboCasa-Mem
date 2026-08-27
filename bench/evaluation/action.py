@@ -7,6 +7,7 @@ from collections import deque
 import numpy as np
 
 from bench.policy.protocol.errors import ErrorCode, ProtocolError
+from bench.runtime.data_contract import normalize_gripper_command
 
 
 ACTION_DIM = 13
@@ -21,7 +22,9 @@ def validate_action13(action: np.ndarray) -> np.ndarray:
         )
     if not np.all(np.isfinite(value)):
         raise ProtocolError(ErrorCode.INFERENCE_ERROR, "Action contains non-finite values")
-    return np.ascontiguousarray(value)
+    value = np.array(value, copy=True, order="C")
+    value[7] = normalize_gripper_command(value[7])
+    return value
 
 
 def validate_action_chunk(
@@ -47,7 +50,9 @@ def validate_action_chunk(
             ErrorCode.INFERENCE_ERROR,
             "Action chunk contains non-finite values",
         )
-    return np.ascontiguousarray(value)
+    value = np.array(value, copy=True, order="C")
+    value[:, 7] = normalize_gripper_command(value[:, 7])
+    return value
 
 
 class ActionChunkQueue:

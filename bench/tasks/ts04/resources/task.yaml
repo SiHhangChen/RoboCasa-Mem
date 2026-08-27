@@ -4,7 +4,7 @@ schema_version: 1
 task:
   id: TS04
   display_name: Inspect Two Drawers
-  description: Search two drawers for a hidden red cube, closing each inspected drawer, then stop and press the completion button once.
+  description: Search two drawers for a hidden red cube, close every inspected drawer, then press the completion button once per inspected drawer.
   success_conditions:
     - target_found
     - search_stopped_at_target
@@ -19,7 +19,7 @@ task:
     - no_close_before_inspect
     - no_search_after_target
     - completion_button_pressed
-    - completion_button_pressed_once
+    - completion_button_count_matches_search_count
     - no_invalid_completion_button_press
 
 scene:
@@ -30,12 +30,13 @@ scene:
   scene_seed: 0
   fixture_names: [cabinet_slot_0, cabinet_slot_1]
   drawer_world_xyzs:
-    - [4.10, -2.37, 1.1363333333333332]
     - [4.60, -2.37, 1.1363333333333332]
+    - [4.85, -2.37, 1.1363333333333332]
   drawer_world_yaw_deg: 180.0
-  # TM01-style spring-loaded green button on the front edge of the tabletop,
-  # centered in the free gap between the left and center cabinets.
-  completion_button_world_xyz: [4.35, -2.06, 0.92]
+  # Keep the same fixed completion-button position as compact TS02. With the
+  # two TS04 drawers using TS02's first two compact slots, it remains on the
+  # right side of the whole drawer group.
+  completion_button_world_xyz: [3.85, -2.06, 0.92]
   open_threshold: 0.70
   closed_threshold: 0.08
 
@@ -114,8 +115,9 @@ manipulation:
     qpos_step: 0.02
     rrt_range: 0.1
   runtime:
-    max_joint_step: 0.015
-    settle_steps: 20
+    # Match TS02's conservative accelerated drawer profile.
+    max_joint_step: 0.025
+    settle_steps: 10
     position_threshold: 0.10
     orientation_threshold_deg: 20.0
     qpos_threshold: 0.18
@@ -171,6 +173,8 @@ operations:
     near_miss_position_tolerance: 0.09
     # The plunger has 12 mm of travel; require at least 4 mm of measured motion.
     press_depth_threshold: 0.004
+    release_depth_threshold: 0.001
+    release_dwell_steps: 2
     require_physical_button_motion: true
 
 recording:

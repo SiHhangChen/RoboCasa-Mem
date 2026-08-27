@@ -1,0 +1,70 @@
+{
+  "task_id": "TM02",
+  "spatial_reference": "The blue water button and red completion button are fixed task-local controls beside the sink. The cabinet, marked can-placement region, and button colors are world/task semantics, not positions in an arbitrary camera image.",
+  "high_level_instruction": "You have two tasks to complete. Task A: press the blue water button beside the sink to turn on the faucet and fill the pot already in the sink, then press the same blue button to turn off the faucet after the pot has filled for a while. Task B: go to the cabinet, open the sliding door, take out the can, place it in the marked area, and close the cabinet door. After both tasks are complete, press the red completion button beside the sink to indicate completion.",
+  "subtasks": {
+    "turn_on_faucet": {
+      "label": "press the blue water button to turn on the faucet",
+      "keyframe": "last"
+    },
+    "open_cabinet": {
+      "label": "open the sliding cabinet door",
+      "keyframe": "last"
+    },
+    "retrieve_can": {
+      "label": "take the can out of the cabinet",
+      "keyframe": "last"
+    },
+    "place_can": {
+      "label": "place the can in the marked area",
+      "keyframe": "last"
+    },
+    "turn_off_faucet": {
+      "label": "press the blue water button to turn off the faucet",
+      "keyframe": "last"
+    },
+    "close_cabinet": {
+      "label": "close the sliding cabinet door",
+      "keyframe": "last"
+    },
+    "press_completion_button": {
+      "label": "press the red completion button beside the sink",
+      "keyframe": "last"
+    }
+  },
+  "stage_prefixes": {
+    "turn_on_faucet": [
+      "navigate_sink_A1",
+      "press_blue_water_button_on",
+      "return_arm_after_A1"
+    ],
+    "open_cabinet": [
+      "navigate_cabinet_door_B1",
+      "open_cabinet_door_B1",
+      "return_arm_after_cabinet_open"
+    ],
+    "retrieve_can": [
+      "navigate_can_retrieval_B1",
+      "pick_can_from_cabinet_B1"
+    ],
+    "place_can": [
+      "navigate_can_place_region_B1",
+      "place_and_release_can_B1",
+      "return_arm_after_B1"
+    ],
+    "turn_off_faucet": [
+      "navigate_sink_A2",
+      "press_blue_water_button_off",
+      "return_arm_after_A2"
+    ],
+    "close_cabinet": [
+      "navigate_cabinet_door_B2",
+      "close_cabinet_door_B2",
+      "return_arm_after_B2"
+    ],
+    "press_completion_button": [
+      "navigate_red_completion_button",
+      "press_red_completion_button"
+    ]
+  }
+}

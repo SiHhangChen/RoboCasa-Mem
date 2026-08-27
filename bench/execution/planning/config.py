@@ -72,6 +72,17 @@ def _path_mapping_value(
     return Path(value)
 
 
+def _optional_float_mapping_value(
+    sources: tuple[Mapping[str, Any] | None, ...],
+    name: str,
+    default: float | None,
+) -> float | None:
+    value = _mapping_value(sources, name, default)
+    if value is None or value == "":
+        return None
+    return float(value)
+
+
 def navigation_config_from_mapping(
     options: Mapping[str, Any] | None = None,
     kwargs: Mapping[str, Any] | None = None,
@@ -190,6 +201,16 @@ def navigation_config_from_mapping(
                 "manual_base_path_yaw_tolerance",
                 cfg.manual_base_path_yaw_tolerance,
             )
+        ),
+        manual_base_path_intermediate_xy_tolerance=_optional_float_mapping_value(
+            sources,
+            "manual_base_path_intermediate_xy_tolerance",
+            cfg.manual_base_path_intermediate_xy_tolerance,
+        ),
+        manual_base_path_intermediate_yaw_tolerance=_optional_float_mapping_value(
+            sources,
+            "manual_base_path_intermediate_yaw_tolerance",
+            cfg.manual_base_path_intermediate_yaw_tolerance,
         ),
         manual_base_path_segment_yaw_threshold=float(
             _mapping_value(
@@ -622,6 +643,10 @@ class NavigationConfig:
     manual_base_path_start_index: int = 1
     manual_base_path_xy_tolerance: float = 0.09      # 0.07->0.09，放宽容差减少末端震荡
     manual_base_path_yaw_tolerance: float = 0.10     # 0.08->0.10
+    # Optional pass-through tolerances for non-terminal measured-path samples.
+    # None preserves the historical per-sample behavior for other tasks.
+    manual_base_path_intermediate_xy_tolerance: float | None = None
+    manual_base_path_intermediate_yaw_tolerance: float | None = None
     manual_base_path_segment_yaw_threshold: float = 0.12  # 0.25->0.12，更早插入旋转段
     manual_base_path_max_rotate_steps: int = 350
     manual_base_path_max_translate_steps: int = 900

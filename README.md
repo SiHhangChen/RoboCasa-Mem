@@ -163,6 +163,19 @@ test -f robocasa/robocasa/models/assets/objects/objaverse/cup/cup_2/model.xml
 
 该命令没有输出且退出码为 0 表示检查通过。
 
+如果需要在多台机器之间复制而不携带 RoboCasa 的完整资产下载，可以使用仓库内
+的最小资产收集器。它会根据所有任务的固定 layout/style、fixture registry 和
+代码中的固定物体引用，解析出完整的 mesh/texture 依赖，并记录 SHA-256：
+
+```bash
+python scripts/tools/collect_sim_assets.py \
+  --manifest /tmp/membench-sim-assets.json \
+  --tar /tmp/membench-sim-assets.tar.gz
+```
+
+当前固定任务集合生成的包约为 0.489 GiB（压缩后约 225 MiB）。完整说明、恢复
+命令和校验脚本见 [`docs/sim_asset_bundle.md`](docs/sim_asset_bundle.md)。
+
 ## 6. 配置渲染后端
 
 每个新终端在运行仿真前都要进入仓库、激活环境并设置渲染变量。

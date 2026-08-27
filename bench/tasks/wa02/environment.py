@@ -46,6 +46,8 @@ DEFAULT_SENSOR_FAUCET_LAYOUT_FILE = (
     / "sensor_faucet_layout_layout15_style34_seed0.json"
 )
 IDENTICAL_WATER_CUP_XML = f"{assets_root}/objects/objaverse/cup/cup_2/model.xml"
+# Keep the shared cup asset physically identical to WA-05.
+WATER_CUP_OBJECT_SCALE = (0.75, 0.75, 0.85)
 TEMPERATURES = ("hot", "cold")
 DEFAULT_CUP_SAMPLING_REGIONS = {
     "cup_A": {
@@ -79,6 +81,8 @@ class WA02ServeHotColdWaterCups(Kitchen):
         service_threshold: float = 0.12,
         cup_upright_threshold_deg: float = 15.0,
         cup_placement_seed: int = 0,
+        gripper_force_limit: float = 20.0,
+        gripper_pad_friction: tuple[float, float, float] = (2.0, 0.05, 0.0001),
         cup_sampling_regions: Mapping[str, Any] | None = None,
         cup_region_constraints: Mapping[str, Any] | None = None,
         *args: Any,
@@ -95,6 +99,18 @@ class WA02ServeHotColdWaterCups(Kitchen):
         self.service_threshold = float(service_threshold)
         self.cup_upright_threshold_deg = float(cup_upright_threshold_deg)
         self._cup_placement_seed = int(cup_placement_seed)
+        self.gripper_force_limit = float(gripper_force_limit)
+        self.gripper_pad_friction = tuple(
+            float(value) for value in gripper_pad_friction
+        )
+        if not np.isfinite(self.gripper_force_limit) or self.gripper_force_limit <= 0.0:
+            raise ValueError("gripper_force_limit must be finite and positive")
+        if (
+            len(self.gripper_pad_friction) != 3
+            or not np.all(np.isfinite(self.gripper_pad_friction))
+            or any(value <= 0.0 for value in self.gripper_pad_friction)
+        ):
+            raise ValueError("gripper_pad_friction must contain three positive finite values")
         self._cup_sampling_regions = resolve_cup_sampling_regions(
             DEFAULT_CUP_SAMPLING_REGIONS
             if cup_sampling_regions is None
@@ -204,6 +220,7 @@ class WA02ServeHotColdWaterCups(Kitchen):
                 dict(
                     name=cup_id,
                     obj_groups=IDENTICAL_WATER_CUP_XML,
+                    object_scale=WATER_CUP_OBJECT_SCALE,
                     graspable=True,
                     init_robot_here=cup_id == "cup_A",
                     reset_region=deepcopy(self._cup_counter_reset_region),
@@ -222,6 +239,35 @@ class WA02ServeHotColdWaterCups(Kitchen):
                 )
             )
         return configs
+
+    def configure_canonical_physics(self) -> None:
+        """Apply WA-05's real-contact gripper settings to each free cup body."""
+
+        gripper = self.robots[0].gripper["right"]
+        for actuator_name in list(gripper.actuators):
+            actuator_id = int(self.sim.model.actuator_name2id(actuator_name))
+            self.sim.model.actuator_forcelimited[actuator_id] = 1
+            self.sim.model.actuator_forcerange[actuator_id] = [
+                -self.gripper_force_limit,
+                self.gripper_force_limit,
+            ]
+        contact_names = {
+            *gripper.important_geoms["left_finger"],
+            *gripper.important_geoms["right_finger"],
+        }
+        for geom_name in contact_names:
+            geom_id = int(self.sim.model.geom_name2id(geom_name))
+            self.sim.model.geom_friction[geom_id] = self.gripper_pad_friction
+            self.sim.model.geom_condim[geom_id] = 4
+            self.sim.model.geom_solref[geom_id] = (0.001, 1.0)
+            self.sim.model.geom_solimp[geom_id] = (0.999, 0.999, 0.001, 0.5, 2.0)
+        for cup_id in CUP_IDS:
+            for geom_name in self.objects[cup_id].contact_geoms or ():
+                geom_id = int(self.sim.model.geom_name2id(geom_name))
+                self.sim.model.geom_friction[geom_id] = (1.0, 0.005, 0.0001)
+                self.sim.model.geom_condim[geom_id] = 4
+                self.sim.model.geom_solref[geom_id] = (0.001, 1.0)
+                self.sim.model.geom_solimp[geom_id] = (0.999, 0.999, 0.001, 0.5, 2.0)
 
     def _reset_internal(self) -> None:
         """Install independently seeded cup samples before reset settling."""
@@ -1484,5 +1530,6 @@ def _temperature(value: str) -> str:
 
 __all__ = [
     "IDENTICAL_WATER_CUP_XML",
+    "WATER_CUP_OBJECT_SCALE",
     "WA02ServeHotColdWaterCups",
 ]

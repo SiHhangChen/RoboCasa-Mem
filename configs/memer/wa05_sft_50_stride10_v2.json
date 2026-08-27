@@ -1,0 +1,30 @@
+{
+  "source_dataset": "lerobot_data/memer/wa05_200seeds_v061_subtasks_v2",
+  "output_dir": "outputs/memer/wa05_sft_50_stride10_v2",
+  "annotation_dir": "outputs/memer/wa05_annotations_v2",
+  "camera_layout_config": "configs/memer/wa05_rgb_camera_layout.json",
+  "keyframe_rule_file": "configs/memer/wa05_keyframe_rules.json",
+  "instruction_source": "meta/tasks.parquet (generic WA05 instruction; hot/cold answer is represented by the current subtask label)",
+  "selection_seed": 20260825,
+  "episode_indices": [
+    0, 5, 9, 12, 16, 18, 22, 24, 25, 26,
+    35, 40, 44, 46, 48, 56, 64, 68, 69, 70,
+    73, 75, 79, 80, 86, 87, 88, 89, 91, 95,
+    108, 109, 112, 113, 117, 118, 121, 126, 139, 142,
+    143, 147, 161, 162, 168, 169, 173, 177, 187, 195
+  ],
+  "temperature_marginals": {
+    "hot": 25,
+    "cold": 25
+  },
+  "sampling": {
+    "frame_subsample": 5,
+    "timestep_stride": 10,
+    "boundary_window": 0,
+    "boundary_stride": 5,
+    "recent_frames_length": 8,
+    "keyframes_length": 8,
+    "prediction_horizon": 2
+  },
+  "generated_examples": 5953
+}

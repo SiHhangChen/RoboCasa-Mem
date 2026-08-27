@@ -246,7 +246,9 @@ operations:
     post_release_clearance_distance: 0.0
     post_release_clearance_z_offset: 0.22
     release_separation_assist_distance: 0.06
-    placement_exit_standoff: 0.08
+    # Keep the horizontal exit long enough to satisfy the 6 cm release
+    # separation assist even on the inner service slots.
+    placement_exit_standoff: 0.12
     # The generic manipulation runtime otherwise adds ten stationary control
     # frames after every placement segment.  These shorter task-owned holds
     # still leave the strict Cartesian checks active at entry / place and keep
@@ -308,7 +310,8 @@ operations:
     boundary_max_steps: 450
     target_base_yaw: -0.038
     yaw_hold_gain: 0.30
-    lift_offset: 0.03
+    # Raise the filled cup well above the counter before service navigation.
+    lift_offset: 0.10
     lift_position_tolerance: 0.003
     lift_correction_attempts: 2
     settle_steps: 4

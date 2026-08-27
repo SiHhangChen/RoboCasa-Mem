@@ -5,7 +5,7 @@
     "layout_id": 39,
     "style_id": 24,
     "seed": 0,
-    "description": "User-calibrated layout-39 island graph with a clockwise loop, direct completion-button bypass branches, and drawer operation stations using TM01 task-owned drawer operation stations.",
+    "description": "User-calibrated layout-39 island graph with a clockwise loop, direct completion-button bypass branches, and one shared station for the compact two-drawer group.",
     "source": "outputs/tm01_manual_path_raw_20260731.json",
     "stove_side_completion_button_world_xyz": [
       4.3,
@@ -69,7 +69,7 @@
       }
     },
     "completion_button_stove_side": 1,
-    "drawer_right_station": {
+    "drawer_station": {
       "index": 7,
       "routes": {
         "0": [
@@ -97,38 +97,10 @@
         ]
       }
     },
+    "drawer_left_station": 7,
+    "drawer_right_station": 7,
+    "drawer_left": 7,
     "drawer_right": 7,
-    "drawer_left_station": {
-      "index": 8,
-      "routes": {
-        "0": [
-          0,
-          19,
-          3,
-          4,
-          5,
-          6,
-          7,
-          8
-        ],
-        "18": [
-          18,
-          0,
-          19,
-          3,
-          4,
-          5,
-          6,
-          7,
-          8
-        ],
-        "7": [
-          7,
-          8
-        ]
-      }
-    },
-    "drawer_left": 8,
     "drawer_side_completion_station": {
       "index": 11,
       "routes": {
@@ -215,16 +187,16 @@
     },
     {
       "index": 7,
-      "name": "drawer_right_station",
+      "name": "drawer_station",
       "xy": [
-        4.6,
+        4.85,
         -1.37
       ],
       "yaw": -1.5707963267948966
     },
     {
       "index": 8,
-      "name": "drawer_left_station",
+      "name": "drawer_group_lateral",
       "xy": [
         4.124,
         -1.37

@@ -1,0 +1,84 @@
+{
+  "task_id": "WA-02",
+  "spatial_reference": "The starting cups have no task-level left/right identity: one is picked first and the other is the remaining cup. The two placements share the dining-table region to the left of the sink. Final left/right names the two fixed task-local positions on that dining table, not directions in an arbitrary camera image.",
+  "subtasks": {
+    "pick_first": {
+      "label": "pick up the first cup",
+      "keyframe": "last"
+    },
+    "fill_hot": {
+      "label": "fill the held cup with hot water",
+      "keyframe": "last"
+    },
+    "place_table": {
+      "label": "place the held cup on the dining table to the left of the sink",
+      "keyframe": "last"
+    },
+    "pick_remaining": {
+      "label": "return to the starting counter and pick up the remaining cup",
+      "keyframe": "last"
+    },
+    "fill_cold": {
+      "label": "fill the held cup with cold water",
+      "keyframe": "last"
+    },
+    "select_left": {
+      "label": "pick up the cup from the left side of the dining table",
+      "keyframe": "first"
+    },
+    "select_right": {
+      "label": "pick up the cup from the right side of the dining table",
+      "keyframe": "first"
+    }
+  },
+  "keyframes_from_record": true,
+  "stage_prefixes": {
+    "pick_first": [
+      "navigate_pick_first_",
+      "pick_first_",
+      "return_to_regular_after_pick_first_"
+    ],
+    "fill_hot": [
+      "navigate_fill_first_hot_",
+      "sensor_fill_first_hot_",
+      "return_after_fill_first_hot_",
+      "lift_after_sink_exit_first_hot_"
+    ],
+    "place_table": [
+      "navigate_service_first_",
+      "place_first_",
+      "verify_and_record_first_",
+      "return_after_service_first_",
+      "navigate_service_second_",
+      "place_second_",
+      "verify_and_record_second_",
+      "return_after_service_second_"
+    ],
+    "pick_remaining": [
+      "navigate_pick_second_",
+      "pick_second_",
+      "return_to_regular_after_pick_second_"
+    ],
+    "fill_cold": [
+      "navigate_fill_second_cold_",
+      "sensor_fill_second_cold_",
+      "return_after_fill_second_cold_",
+      "lift_after_sink_exit_second_cold_"
+    ],
+    "select": [
+      "verify_both_cups_staged_before_final_pick",
+      "navigate_final_pick_",
+      "physical_final_pick_",
+      "record_final_take_"
+    ]
+  },
+  "dynamic_stage_labels": {
+    "select": {
+      "field": "requested_service_side",
+      "values": {
+        "left": "select_left",
+        "right": "select_right"
+      }
+    }
+  }
+}

@@ -57,9 +57,9 @@ class SemanticState:
 
     @property
     def required_button_presses(self) -> int:
-        """TS04 uses one completion confirmation after the target is closed."""
+        """The search length k, defined only after the target drawer is closed."""
 
-        return 1 if self.target_found else 0
+        return len(self.completed_fixture_history) if self.target_found else 0
 
     @property
     def next_check_step(self) -> int | str:
@@ -123,7 +123,7 @@ class SuccessReport:
     no_close_before_inspect: bool
     no_search_after_target: bool
     completion_button_pressed: bool
-    completion_button_pressed_once: bool
+    completion_button_count_matches_search_count: bool
     no_invalid_completion_button_press: bool
 
     @property
@@ -158,7 +158,7 @@ def completion_button_precondition_checks(
     *,
     all_drawers_closed: bool,
 ) -> dict[str, bool]:
-    """Accept one completion press after the target drawer is closed."""
+    """Accept one press while fewer than k physical presses are recorded."""
 
     history = state.completed_fixture_history
     return {
@@ -299,7 +299,7 @@ def record_completion_button_attempt(
     button_physically_pressed: bool,
     failure_reason: str | None = None,
 ) -> TransitionReport:
-    """Record the single TS04 completion-button press."""
+    """Record one debounced physical press and finish exactly on press k."""
 
     state.completion_button_attempted = True
     state.completion_button_attempt_count += 1
@@ -362,8 +362,9 @@ def evaluate_success(
         no_close_before_inspect=not state.close_before_inspect_detected,
         no_search_after_target=not state.search_after_target_detected,
         completion_button_pressed=state.completion_button_pressed,
-        completion_button_pressed_once=(
-            state.target_found and state.completion_button_press_count == 1
+        completion_button_count_matches_search_count=(
+            state.target_found
+            and state.completion_button_press_count == state.required_button_presses
         ),
         no_invalid_completion_button_press=(not state.invalid_completion_button_press),
     )
@@ -384,8 +385,8 @@ def failure_attribution(
         return "target_not_found"
     if not report.all_fixtures_closed:
         return "fixture_left_open"
-    if not report.completion_button_pressed_once:
-        return "completion_button_was_not_pressed_exactly_once"
+    if not report.completion_button_count_matches_search_count:
+        return "completion_button_count_does_not_match_search_count"
     if not report.completion_button_pressed:
         return "completion_button_sequence_incomplete"
     return "low_level_or_unknown"
@@ -423,7 +424,7 @@ def diagnostics(
         "inspected_active_fixture": bool(state.inspected_active_fixture),
         "current_slot_states": fractions,
         "num_checked": state.num_checked,
-        "search_count": len(state.completed_fixture_history),
+        "search_count": state.required_button_presses,
         "required_button_presses": state.required_button_presses,
         "next_check_step": state.next_check_step,
         "duplicate_fixture_check": state.duplicate_fixture_check,

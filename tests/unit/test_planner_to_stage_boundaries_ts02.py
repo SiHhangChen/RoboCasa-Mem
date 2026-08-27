@@ -62,8 +62,8 @@ def test_ts02_stage_names_use_one_repeatable_button_label(
         "seed": 0,
         "search_count": search_count,
         "keyframes": [
-            *[4 * drawer_number - 1 for drawer_number in range(1, search_count + 1)],
-            4 * search_count,
+            *[5 * drawer_number - 1 for drawer_number in range(1, search_count + 1)],
+            5 * search_count,
         ],
         "stages": [
             {"name": name, "end_frame": index + 1}
@@ -75,15 +75,15 @@ def test_ts02_stage_names_use_one_repeatable_button_label(
     expected_drawer_indices = [2, 0, 1][:search_count]
     expected = []
     for drawer_index in expected_drawer_indices:
-        expected.extend([drawer_index] * 4)
+        expected.extend([drawer_index] * 5)
     # Navigation plus all K press-and-release stages stay in one high-level
     # subtask. The environment decides whether another press is required.
     expected.extend([3] * (search_count + 1))
 
     assert labeled["subtask_indices"] == expected
     assert labeled["keyframes"] == [
-        *[4 * drawer_number - 1 for drawer_number in range(1, search_count + 1)],
-        4 * search_count,
+        *[5 * drawer_number - 1 for drawer_number in range(1, search_count + 1)],
+        5 * search_count,
     ]
 
 

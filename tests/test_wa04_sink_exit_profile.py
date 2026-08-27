@@ -77,9 +77,13 @@ def test_wa04_uses_bounded_fast_sink_exit_and_short_service_settles() -> None:
     assert sink_exit["boundary_profile_deceleration"] == pytest.approx(2.0)
     assert sink_exit["boundary_profile_target_overshoot"] == pytest.approx(0.008)
     assert sink_exit["boundary_max_steps"] == 450
+    assert sink_exit["lift_offset"] == pytest.approx(0.10)
     assert sink_exit["settle_steps"] == 4
 
     for metadata in actions.service_place_metadata_by_slot.values():
+        assert metadata["placement_exit_standoff"] >= metadata[
+            "release_separation_assist_distance"
+        ]
         assert metadata["entry_settle_steps"] == 2
         assert metadata["place_settle_steps"] == 3
         assert metadata["clearance_settle_steps"] == 2

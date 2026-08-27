@@ -38,7 +38,7 @@ class CatalogEntry:
 
 _ENTRIES: tuple[CatalogEntry, ...] = (
     CatalogEntry("TM01", "tm01", "TM01BoilWaterAndInspectTwoDrawers", "1.0.0", 3200),
-    CatalogEntry("TM02", "tm02", "TM02FillPotAndRetrieveCan", "1.0.0", 3200),
+    CatalogEntry("TM02", "tm02", "TM02FillPotAndRetrieveCan", "1.0.0", 3600),
     CatalogEntry("TM03", "tm03", "TM03BoilWaterInspectDrawersAndRunToasterOven", "1.0.0", 4800),
     CatalogEntry("TM04", "tm04", "TM04FillPotRetrieveCanAndAddTwoSugars", "1.0.0", 5200),
     CatalogEntry("TS01", "ts01", "TS01AddKSugarToHotChocolate", "1.0.0", 2800),

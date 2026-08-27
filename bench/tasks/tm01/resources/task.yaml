@@ -5,14 +5,13 @@ task:
   display_name: Boil Water and Inspect Two Drawers
   description: Turn on the stove, inspect two drawers, turn it off, and submit.
   canonical_prompt: >-
-    First, use the stove's own control knob to turn on the burner under the
-    pot. While the water heats, inspect each of the two drawers once: open it,
-    look inside, and close it. After completing one drawer, you may either turn
-    off the burner with the same stove knob before inspecting the other drawer,
-    or inspect the other drawer before turning off the burner. When the burner
-    is off and both drawers have been inspected and closed, press either green
-    completion button.
-  canonical_prompt_sha256: 974942e3a87f7f412bb890cde2bdcd8b26f2e84656163352a41fcac8e86bfd7a
+    You have two tasks to complete. Task A: use the stove's control knob to turn
+    on the heating function and heat the water, then turn off the heating after
+    the water has heated for a while. Task B: go to the other side of the
+    workspace and inspect both drawers, opening each drawer, looking inside,
+    and closing it. After both tasks are complete, press either green button at
+    the two ends to indicate completion.
+  canonical_prompt_sha256: 3d6c2d5997d6b1f0f00f39e2294915df6eb8ad3e497b7197d302531b9631b6f3
   success_conditions:
     - legal_event_route
     - native_knob_on_once
@@ -40,8 +39,8 @@ scene:
   scene_seed: 0
   drawer_names: [drawer_left, drawer_right]
   drawer_world_xyzs:
-    - [4.10, -2.37, 1.1363333333333332]
     - [4.60, -2.37, 1.1363333333333332]
+    - [4.85, -2.37, 1.1363333333333332]
   drawer_world_yaw_deg: 180.0
   task_added_button_names:
     - completion_button_drawer_side
@@ -131,10 +130,17 @@ navigation:
   # drawer-to-drawer lateral move.
   manual_base_path_xy_tolerance: 0.030
   manual_base_path_yaw_tolerance: 0.06
+  # Transit samples are pass-through waypoints; only the requested station is
+  # docked precisely. This removes long convergence pauses on the measured route.
+  manual_base_path_intermediate_xy_tolerance: 0.12
+  manual_base_path_intermediate_yaw_tolerance: 0.20
   use_station_base_poses: false
   use_station_astar_paths: false
 manipulation:
   planner:
+    # Keep MPlib in the canonical membench environment. RoboCasa/MuJoCo is
+    # provided by the recording process; the planner subprocess consumes only
+    # the serialized kinematic request.
     conda_env: membench
     subprocess_timeout_s: 60.0
     planning_time: 5.0
@@ -142,11 +148,15 @@ manipulation:
     qpos_step: 0.02
     rrt_range: 0.1
   runtime:
-    max_joint_step: 0.015
-    settle_steps: 20
+    max_joint_step: 0.025
+    settle_steps: 10
     position_threshold: 0.10
     orientation_threshold_deg: 20.0
     qpos_threshold: 0.18
+    open_steps: 20
+    close_steps: 30
+    release_steps: 10
+    release_settle_steps: 20
   static_scene:
     enabled: false
     validate_collisions: false

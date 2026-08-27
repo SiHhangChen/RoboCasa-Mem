@@ -134,6 +134,11 @@ class WA04ServeUniqueTemperatureCupAmongThree(Kitchen):
         }
         self._sensor_faucet_affinity_by_cup: dict[str, str] = {}
         self._water_stream_intercept_trace: dict[str, Any] = {}
+        # Track which cup currently intercepts each stream so a settled faucet
+        # is not re-forwarded during every environment step.
+        self._sensor_stream_intercepted_for: dict[str, str | None] = {
+            temperature: None for temperature in TEMPERATURES
+        }
         self._selection_armed_by_cup: dict[str, bool] = {
             cup: False for cup in CUP_IDS
         }
@@ -826,6 +831,8 @@ class WA04ServeUniqueTemperatureCupAmongThree(Kitchen):
             intercepted = bool(
                 truncated_half_height < original_half_height - 1.0e-6
             )
+            if intercepted:
+                self._sensor_stream_intercepted_for[temp] = cup
             result = {
                 "restored": False,
                 "intercepted": intercepted,
@@ -954,6 +961,8 @@ class WA04ServeUniqueTemperatureCupAmongThree(Kitchen):
                     self._active_sensor_faucets.add(temp)
                     self._sensor_cup_by_temperature[temp] = cup
                     self._set_sensor_stream_visibility(temp, visible=True)
+                    if self._sensor_stream_intercepted_for.get(temp) != cup:
+                        self.set_water_stream_intercept(cup, temp)
                 elif was_active:
                     self._active_sensor_faucets.discard(temp)
                     self._sensor_cup_by_temperature[temp] = None
@@ -1134,6 +1143,7 @@ class WA04ServeUniqueTemperatureCupAmongThree(Kitchen):
         )
         self.sim.model.site_pos[site_id] = original_pos
         self.sim.model.site_size[site_id][1] = original_half_height
+        self._sensor_stream_intercepted_for[_temperature(temperature)] = None
         return {
             "temperature": _temperature(temperature),
             "restored": True,

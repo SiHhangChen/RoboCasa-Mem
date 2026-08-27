@@ -10,11 +10,11 @@ import numpy as np
 from bench.tasks.ts02.domain.contracts import FIXTURE_NAMES
 
 
-DEFAULT_DRAWER_SPACING = 0.50
+DEFAULT_DRAWER_SPACING = 0.25
 DEFAULT_DRAWER_WORLD_YAW_DEG = 180.0
 DEFAULT_DRAWER_WORLD_XYZS = (
-    (4.10, -2.37, 1.1363333333333332),
     (4.60, -2.37, 1.1363333333333332),
+    (4.85, -2.37, 1.1363333333333332),
     (5.10, -2.37, 1.1363333333333332),
 )
 MINIMUM_DRAWER_SEPARATION = 0.25
@@ -66,7 +66,12 @@ def minimum_drawer_separation(
 
 
 def station_id_for_fixture(fixture_name: str) -> str:
-    """Map a task fixture identifier to its dedicated navigation station."""
+    """Return the legacy station alias for a task fixture identifier.
+
+    TS02 now uses one shared ``drawer_station`` for the compact drawer group;
+    callers that still construct ``<fixture>_station`` names are normalized to
+    that shared station by the task navigation layer.
+    """
 
     name = str(fixture_name)
     if name not in FIXTURE_NAMES:

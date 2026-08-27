@@ -30,13 +30,13 @@ scene:
   scene_seed: 0
   fixture_names: [cabinet_slot_0, cabinet_slot_1, cabinet_slot_2]
   drawer_world_xyzs:
-    - [4.10, -2.37, 1.1363333333333332]
     - [4.60, -2.37, 1.1363333333333332]
+    - [4.85, -2.37, 1.1363333333333332]
     - [5.10, -2.37, 1.1363333333333332]
   drawer_world_yaw_deg: 180.0
   # WA02-style spring-loaded green button on the front edge of the tabletop,
-  # centered in the free gap between the left and center cabinets.
-  completion_button_world_xyz: [4.35, -2.06, 0.92]
+  # kept at the right side of the compact drawer group.
+  completion_button_world_xyz: [3.85, -2.06, 0.92]
   open_threshold: 0.70
   closed_threshold: 0.08
 
@@ -82,8 +82,8 @@ navigation:
   base_tolerance: 0.025
   base_yaw_tolerance: 0.06
   base_max_steps: 1500
-  # The first request follows the calibrated start/forward/turn route. Later
-  # cabinet-to-cabinet requests use direct physical translation edges.
+  # The first request follows the calibrated start/forward/turn route to the
+  # shared compact-drawer station; repeated drawer checks reuse that station.
   manual_base_path_enabled: true
   manual_base_path_start_index: 0
   manual_base_path_xy_tolerance: 0.030
@@ -115,15 +115,18 @@ manipulation:
     qpos_step: 0.02
     rrt_range: 0.1
   runtime:
-    max_joint_step: 0.015
-    settle_steps: 20
+    # Match TS04's conservative accelerated drawer profile. The faster
+    # 0.035 / 8 profile can leave drawers insufficiently seated before the
+    # robot navigates to the completion button.
+    max_joint_step: 0.025
+    settle_steps: 10
     position_threshold: 0.10
     orientation_threshold_deg: 20.0
     qpos_threshold: 0.18
     open_steps: 20
-    close_steps: 40
-    release_steps: 20
-    release_settle_steps: 40
+    close_steps: 30
+    release_steps: 10
+    release_settle_steps: 20
   static_scene:
     enabled: false
     validate_collisions: false

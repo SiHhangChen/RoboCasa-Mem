@@ -1,0 +1,10 @@
+{
+  "camera_keys": [
+    "observation.images.robot0_agentview_left",
+    "observation.images.robot0_agentview_right",
+    "observation.images.robot0_eye_in_hand"
+  ],
+  "view_width": 224,
+  "view_height": 224,
+  "notes": "WX01 stacked RGB layout: agentview_left, agentview_right, eye_in_hand. The remembered cup spot is an episode-specific world target, not a camera-image direction."
+}

@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import json
 import xml.etree.ElementTree as ET
 
 import pytest
 
 from bench.execution.contracts import OperateStage
+from bench.execution.contracts import NavigateStage
 from bench.tasks import TaskCatalog, resolve_builtin_task_plugin
 from bench.tasks.contracts import EpisodeRequest, ExpertPlanInputs
+from bench.tasks.ts02.config import load_task_config as load_ts02_task_config
 from bench.tasks.ts04.button_asset import (
     TS04_BUTTON_FIXED_PARTS,
     TS04_BUTTON_GLOW_RGBA,
@@ -15,6 +18,7 @@ from bench.tasks.ts04.button_asset import (
     add_ts04_button_asset,
     ts04_button_geom_names,
 )
+from bench.tasks.ts04.config import load_task_config
 from bench.tasks.ts04.domain.contracts import FIXTURE_NAMES
 from bench.tasks.ts04.domain.episode import sample_target_fixture
 from bench.tasks.ts04.domain.semantics import (
@@ -26,6 +30,7 @@ from bench.tasks.ts04.domain.semantics import (
     record_inspection_attempt,
     record_open_attempt,
 )
+from bench.tasks.ts04.physical_events import PhysicalSample, TS04PhysicalObserver
 from bench.tasks.ts04.target_object import (
     TARGET_OBJECT_DRAWER_POS,
     TARGET_OBJECT_GEOM_NAME,
@@ -65,6 +70,62 @@ def test_ts04_completion_button_uses_tm01_decorative_style() -> None:
     assert root.find(f".//joint[@name='{joint_name}']").get("range") == (
         f"-{TS04_BUTTON_MAX_TRAVEL_M:.3f} 0"
     )
+
+
+def test_ts04_completion_button_is_right_of_all_drawers_and_navigation_matches() -> None:
+    config = load_task_config()
+    button_xyz = tuple(config.scene["completion_button_world_xyz"])
+    drawer_xyzs = tuple(tuple(row) for row in config.scene["drawer_world_xyzs"])
+    assert button_xyz == pytest.approx((3.85, -2.06, 0.92))
+    assert button_xyz[0] < min(row[0] for row in drawer_xyzs)
+
+    station_path = config.path(config.resources["station_poses"])
+    route_path = config.path(config.resources["manual_base_path"])
+    assert station_path is not None
+    assert route_path is not None
+    stations = json.loads(station_path.read_text(encoding="utf-8"))
+    route = json.loads(route_path.read_text(encoding="utf-8"))
+    completion_station = stations["stations"]["completion_button_station"]["samples"][0]
+    completion_route = next(
+        sample
+        for sample in route["samples"]
+        if sample["name"] == "completion_button_station"
+    )
+    assert tuple(stations["completion_button_world_xyz"]) == button_xyz
+    assert tuple(completion_station["button_world_xyz"]) == button_xyz
+    assert completion_station["base_xy"][0] == pytest.approx(button_xyz[0])
+    assert completion_route["xy"][0] == pytest.approx(button_xyz[0])
+
+
+def test_ts04_drawers_match_ts02_compact_spacing_and_shared_station() -> None:
+    ts04 = load_task_config()
+    ts02 = load_ts02_task_config()
+    drawer_xyzs = tuple(tuple(row) for row in ts04.scene["drawer_world_xyzs"])
+    ts02_drawer_xyzs = tuple(tuple(row) for row in ts02.scene["drawer_world_xyzs"])
+    expected = ((4.60, -2.37, 1.1363333333333332), (4.85, -2.37, 1.1363333333333332))
+    assert all(
+        actual == pytest.approx(want)
+        for actual, want in zip(drawer_xyzs, expected)
+    )
+    assert all(
+        actual == pytest.approx(want)
+        for actual, want in zip(drawer_xyzs, ts02_drawer_xyzs[:2])
+    )
+    assert drawer_xyzs[1][0] - drawer_xyzs[0][0] == pytest.approx(0.25)
+    station_path = ts04.path(ts04.resources["station_poses"])
+    assert station_path is not None
+    stations = json.loads(station_path.read_text(encoding="utf-8"))
+    drawer_station = stations["stations"]["drawer_station"]["samples"][0]
+    assert drawer_station["base_xy"] == pytest.approx([4.85, -1.37])
+
+
+def test_ts02_and_ts04_share_accelerated_safe_arm_profile() -> None:
+    ts02 = load_ts02_task_config()
+    ts04 = load_task_config()
+    for config in (ts02, ts04):
+        runtime = config.manipulation["runtime"]
+        assert runtime["max_joint_step"] == pytest.approx(0.025)
+        assert runtime["settle_steps"] == 10
 
 
 def test_ts04_red_cube_is_ten_centimetres_and_attached_to_one_drawer() -> None:
@@ -118,26 +179,110 @@ def _complete_drawer_cycle(state: SemanticState, fixture: str) -> None:
     assert record_close_attempt(state, fixture, drawer_closed=True).passed
 
 
-def test_ts04_stops_searching_after_target_and_requires_one_button_press() -> None:
-    target, remaining = FIXTURE_NAMES
+@pytest.mark.parametrize("search_count", (1, 2))
+def test_ts04_stops_searching_after_target_and_requires_search_length_presses(
+    search_count: int,
+) -> None:
+    target = FIXTURE_NAMES[search_count - 1]
+    remaining = (
+        FIXTURE_NAMES[search_count] if search_count < len(FIXTURE_NAMES) else None
+    )
     state = SemanticState(FIXTURE_NAMES, target)
     closed = PhysicalState({name: 0.0 for name in FIXTURE_NAMES})
 
-    _complete_drawer_cycle(state, target)
+    for fixture in FIXTURE_NAMES[:search_count]:
+        _complete_drawer_cycle(state, fixture)
     assert state.target_found
-    assert state.completed_fixture_history == [target]
+    assert state.required_button_presses == search_count
+    for press_index in range(search_count):
+        assert record_completion_button_attempt(
+            state,
+            all_drawers_closed=True,
+            button_physically_pressed=True,
+        ).passed
+        assert evaluate_success(state, closed).success is (
+            press_index + 1 == search_count
+        )
+    assert evaluate_success(state, closed).success
+
+    if remaining is not None:
+        report = record_open_attempt(state, remaining, drawer_open=True)
+        assert not report.passed
+        assert report.reason == "search_continued_after_target_found"
+        assert state.search_after_target_detected
+        assert not evaluate_success(state, closed).success
+
+
+def test_ts04_extra_button_press_invalidates_exact_search_count() -> None:
+    state = SemanticState(FIXTURE_NAMES, FIXTURE_NAMES[0])
+    closed = PhysicalState({name: 0.0 for name in FIXTURE_NAMES})
+    _complete_drawer_cycle(state, FIXTURE_NAMES[0])
     assert record_completion_button_attempt(
         state,
         all_drawers_closed=True,
         button_physically_pressed=True,
     ).passed
-    assert evaluate_success(state, closed).success
 
-    report = record_open_attempt(state, remaining, drawer_open=True)
+    report = record_completion_button_attempt(
+        state,
+        all_drawers_closed=True,
+        button_physically_pressed=True,
+    )
+
     assert not report.passed
-    assert report.reason == "search_continued_after_target_found"
-    assert state.search_after_target_detected
+    assert report.reason == "completion_button_pressed_too_many_times"
     assert not evaluate_success(state, closed).success
+
+
+def test_ts04_physical_observer_requires_release_between_search_count_presses() -> None:
+    observer = TS04PhysicalObserver(
+        fixture_names=FIXTURE_NAMES,
+        target_fixture=FIXTURE_NAMES[1],
+        drawer_open_threshold=0.70,
+        drawer_closed_threshold=0.08,
+        button_pressed_threshold_m=0.004,
+        button_released_threshold_m=0.001,
+        button_release_dwell_steps=2,
+    )
+
+    def sample(
+        step: int,
+        first_drawer: float,
+        second_drawer: float,
+        button: float,
+    ) -> PhysicalSample:
+        return PhysicalSample(
+            step,
+            {
+                FIXTURE_NAMES[0]: first_drawer,
+                FIXTURE_NAMES[1]: second_drawer,
+            },
+            button,
+        )
+
+    observer.reset(sample(0, 0.0, 0.0, 0.0))
+    observer.observe(sample(1, 0.75, 0.0, 0.0))
+    observer.observe(sample(2, 0.0, 0.0, 0.0))
+    observer.observe(sample(3, 0.0, 0.75, 0.0))
+    observer.observe(sample(4, 0.0, 0.0, 0.0))
+    assert observer.state.required_button_presses == 2
+
+    observer.observe(sample(5, 0.0, 0.0, 0.006))
+    observer.observe(sample(6, 0.0, 0.0, 0.0))
+    observer.observe(sample(7, 0.0, 0.0, 0.006))
+    assert observer.state.completion_button_press_count == 1
+
+    observer.observe(sample(8, 0.0, 0.0, 0.0))
+    observer.observe(sample(9, 0.0, 0.0, 0.0))
+    observer.observe(sample(10, 0.0, 0.0, 0.006))
+    assert observer.state.completion_button_press_count == 2
+    assert observer.state.completion_button_pressed
+
+
+def test_ts04_config_exposes_button_release_debounce() -> None:
+    button = load_task_config().operations["completion_button"]
+    assert button["release_depth_threshold"] < button["press_depth_threshold"]
+    assert button["release_dwell_steps"] >= 1
 
 
 @pytest.mark.parametrize("seed", (0, 2))
@@ -158,7 +303,16 @@ def test_ts04_expert_plan_ends_at_target(seed: int) -> None:
     assert operations.count("open_fixture") == search_count
     assert operations.count("inspect_fixture") == search_count
     assert operations.count("close_fixture") == search_count
-    assert operations.count("press_completion_button") == 1
+    assert operations.count("retreat_and_return_arm_after_drawer") == search_count
+    assert operations.count("press_completion_button") == search_count
+    navigation_targets = [
+        stage.target.station_id
+        for stage in plan.stages
+        if isinstance(stage, NavigateStage)
+    ]
+    assert navigation_targets[:search_count] == ["drawer_station"] * search_count
+    assert navigation_targets[-1] == "completion_button_station"
     assert plan.metadata["fixture_order"] == list(full_order[:search_count])
     assert plan.metadata["target_fixture"] == target
     assert plan.metadata["search_count"] == search_count
+    assert plan.metadata["required_button_presses"] == search_count

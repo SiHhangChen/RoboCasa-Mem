@@ -168,6 +168,10 @@ LeRobot 使用 `action[13]`，不再拆成 `action_0` … `action_12`。
 | 11:12 | `torso_delta_command` | torso 归一化 delta，映射约 `[-0.05,+0.05] m` |
 | 12:13 | `base_mode` | `>0` 为 base mode，否则 arm mode |
 
+夹爪命令在策略输出后、进入 RoboSuite 前按 `0.1` deadband 恢复为录制数据的
+三值语义：`|x| <= 0.1` 映射为 `0`（保持），`x > 0.1` 映射为 `+1`（闭合），
+`x < -0.1` 映射为 `-1`（打开）。
+
 每个轴的名称、slice、单位、输入范围、controller 以及 absolute/delta/velocity 语义都会写入
 HDF5 和 LeRobot metadata。所有 action 都在写入和执行前进行 13D/finiteness/range 校验。
 

@@ -189,6 +189,8 @@ class TM02FillPotAndRetrieveCan(Kitchen):
         can_name: str = CAN_NAME,
         can_xml: str = RED_CAN_XML,
         can_scale: float = 0.90,
+        gripper_force_limit: float = 20.0,
+        gripper_pad_friction: tuple[float, float, float] = (2.0, 0.05, 0.0001),
         observer_config: ObserverConfig | Mapping[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
@@ -228,6 +230,18 @@ class TM02FillPotAndRetrieveCan(Kitchen):
             )
         self.can_xml = RED_CAN_XML
         self.can_scale = float(can_scale)
+        self.gripper_force_limit = float(gripper_force_limit)
+        self.gripper_pad_friction = tuple(
+            float(value) for value in gripper_pad_friction
+        )
+        if not np.isfinite(self.gripper_force_limit) or self.gripper_force_limit <= 0.0:
+            raise ValueError("TM02 gripper force limit must be positive and finite")
+        if (
+            len(self.gripper_pad_friction) != 3
+            or not np.all(np.isfinite(self.gripper_pad_friction))
+            or any(value <= 0.0 for value in self.gripper_pad_friction)
+        ):
+            raise ValueError("TM02 gripper pad friction must contain 3 positive values")
         # WR01 retrieval helpers address the single TM02 cabinet as its lower
         # storage level. Keeping the same public relation avoids duplicating the
         # validated cabinet-front primitive.
@@ -334,6 +348,46 @@ class TM02FillPotAndRetrieveCan(Kitchen):
                 ),
             ),
         ]
+
+    def configure_canonical_physics(self) -> None:
+        """Apply the shared real-contact gripper settings used by WR03."""
+
+        gripper = self.robots[0].gripper["right"]
+        for actuator_name in list(gripper.actuators):
+            actuator_id = int(self.sim.model.actuator_name2id(actuator_name))
+            self.sim.model.actuator_forcelimited[actuator_id] = 1
+            self.sim.model.actuator_forcerange[actuator_id] = [
+                -self.gripper_force_limit,
+                self.gripper_force_limit,
+            ]
+        contact_names = {
+            *gripper.important_geoms["left_finger"],
+            *gripper.important_geoms["right_finger"],
+        }
+        for geom_name in contact_names:
+            geom_id = int(self.sim.model.geom_name2id(geom_name))
+            self.sim.model.geom_friction[geom_id] = self.gripper_pad_friction
+            self.sim.model.geom_condim[geom_id] = 4
+            self.sim.model.geom_solref[geom_id] = (0.001, 1.0)
+            self.sim.model.geom_solimp[geom_id] = (
+                0.999,
+                0.999,
+                0.001,
+                0.5,
+                2.0,
+            )
+        for geom_name in self.objects[self.can_name].contact_geoms or ():
+            geom_id = int(self.sim.model.geom_name2id(geom_name))
+            self.sim.model.geom_friction[geom_id] = (1.0, 0.005, 0.0001)
+            self.sim.model.geom_condim[geom_id] = 4
+            self.sim.model.geom_solref[geom_id] = (0.001, 1.0)
+            self.sim.model.geom_solimp[geom_id] = (
+                0.999,
+                0.999,
+                0.001,
+                0.5,
+                2.0,
+            )
 
     def edit_model_xml(self, xml_str: str) -> str:
         xml_str = super().edit_model_xml(xml_str)
@@ -799,7 +853,7 @@ class TM02FillPotAndRetrieveCan(Kitchen):
         position: Any,
         quat_xyzw: Any | None = None,
     ) -> None:
-        """WR01-compatible free-joint pose helper for reset and held transport."""
+        """WR01-compatible free-joint pose helper used during reset only."""
 
         obj = self.objects[str(object_name)]
         qpos = np.asarray(

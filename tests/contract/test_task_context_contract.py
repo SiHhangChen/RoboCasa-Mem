@@ -40,7 +40,7 @@ def test_all_plugins_expose_canonical_runtime_and_expert_apis(task_id: str) -> N
     ("suite_name", "expected_horizon"),
     [
         ("tm01_smoke_v1.yaml", 3200),
-        ("tm02_smoke_v1.yaml", 3200),
+        ("tm02_smoke_v1.yaml", 3600),
         ("tm03_smoke_v1.yaml", 4800),
         ("tm04_smoke_v1.yaml", 5200),
         ("ts01_smoke_v1.yaml", 2800),

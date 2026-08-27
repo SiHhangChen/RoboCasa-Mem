@@ -1,0 +1,9 @@
+{
+  "default_select": "last",
+  "rules": [
+    {
+      "pattern": "^press the (red|blue) button for (hot|cold) water$",
+      "select": "first"
+    }
+  ]
+}

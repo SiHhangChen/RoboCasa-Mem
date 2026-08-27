@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+import numpy as np
+
 from bench.tasks.ts02.domain.semantics import (
     close_precondition_checks,
     completion_button_precondition_checks,
@@ -20,6 +22,8 @@ from bench.tasks.ts02.execution.manipulation import (
     locked_base_post_step_callback,
     open_drawer_physically,
 )
+from bench.execution.planning import matrix_from_base_obs, matrix_from_site_pose, pose_from_matrix
+from bench.tasks.ts02.execution.geometry import resolve_drawer_motion_frame
 
 
 def build_stage_handlers(
@@ -33,6 +37,9 @@ def build_stage_handlers(
             controller, str(target), **kwargs
         ),
         "close_fixture": lambda target, **kwargs: close_fixture(
+            controller, str(target), **kwargs
+        ),
+        "retreat_and_return_arm_after_drawer": lambda target, **kwargs: retreat_and_return_arm_after_drawer(
             controller, str(target), **kwargs
         ),
         "press_completion_button": lambda target, **kwargs: press_completion_button(
@@ -260,6 +267,94 @@ def close_fixture(
                 arm.get("reason") or arm.get("failure_reason") or "arm_reset_failed"
             )
     return result
+
+
+def retreat_and_return_arm_after_drawer(
+    controller: Any,
+    fixture_name: str,
+    *,
+    retreat_distance: float = 0.125,
+    release_steps: int = 10,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Clear the closed drawer handle before resetting the arm posture."""
+    del kwargs
+    env = controller.env
+    if fixture_name not in tuple(env.fixture_names):
+        return {
+            "primitive": "drawer_post_close_retreat_and_return",
+            "fixture": fixture_name,
+            "pass": False,
+            "reason": "unknown_ts02_fixture",
+        }
+    if not bool(getattr(controller.runtime_config, "execute", False)):
+        retreat = {"pass": True, "dry_run": True, "steps": 0}
+        arm_return = controller.return_arm_to_regular_pose(
+            stage=f"ts02_post_close_return_to_regular_pose_{fixture_name}",
+            gripper_action=-1.0,
+        )
+        return {
+            "primitive": "drawer_post_close_retreat_and_return",
+            "fixture": fixture_name,
+            "retreat": retreat,
+            "arm_return": arm_return,
+            "checks": {"retreat_executed": True, "arm_returned": bool(arm_return.get("pass", False))},
+            "pass": bool(arm_return.get("pass", False)),
+        }
+
+    controller.refresh_obs()
+    fixture = env.cabinet_for_slot(fixture_name)
+    current_world = np.asarray(matrix_from_site_pose(env, env.robots[0]), dtype=float)
+    frame = resolve_drawer_motion_frame(
+        fixture_yaw=float(fixture.rot),
+        current_eef_rotation_world=current_world[:3, :3],
+        hook_orientation_blend=0.0,
+    )
+    retreat_world = current_world.copy()
+    retreat_world[:3, 3] += frame.open_direction_world * max(0.0, float(retreat_distance))
+    target_base = np.linalg.inv(matrix_from_base_obs(controller.obs)) @ retreat_world
+    retreat = controller.stage_executor.run(
+        pose_from_matrix(target_base),
+        stage=f"ts02_{fixture_name}_post_close_retreat",
+        gripper_action=-1.0,
+        post_step_callback=locked_base_post_step_callback(env),
+    )
+    controller._sync_obs(controller.stage_executor.obs)
+    if not bool(retreat.get("pass", False)):
+        return {
+            "primitive": "drawer_post_close_retreat_and_return",
+            "fixture": fixture_name,
+            "retreat": retreat,
+            "pass": False,
+            "reason": "ts02_drawer_post_close_retreat_failed",
+        }
+    release = controller.driver.run_gripper(
+        arm_qpos=controller.driver.current_arm_qpos(),
+        gripper_action=-1.0,
+        steps=max(0, int(release_steps)),
+        post_step_callback=locked_base_post_step_callback(env),
+    )
+    controller._sync_obs(release["obs"])
+    arm_return = controller.return_arm_to_regular_pose(
+        stage=f"ts02_post_close_return_to_regular_pose_{fixture_name}",
+        gripper_action=-1.0,
+        post_step_callback=locked_base_post_step_callback(env),
+    )
+    checks = {
+        "retreat_executed": bool(retreat.get("pass", False)),
+        "release_executed": int(release.get("steps", 0)) == max(0, int(release_steps)),
+        "arm_returned": bool(arm_return.get("pass", False)),
+    }
+    return {
+        "primitive": "drawer_post_close_retreat_and_return",
+        "fixture": fixture_name,
+        "retreat": retreat,
+        "release_gripper": {key: value for key, value in release.items() if key != "obs"},
+        "arm_return": arm_return,
+        "checks": checks,
+        "pass": bool(all(checks.values())),
+        "reason": None if all(checks.values()) else "ts02_drawer_post_close_return_failed",
+    }
 
 
 def press_completion_button(

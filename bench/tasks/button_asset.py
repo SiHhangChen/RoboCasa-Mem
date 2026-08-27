@@ -28,6 +28,93 @@ BUTTON_RGBA = "0.22 0.72 0.32 1"
 BUTTON_GLOW_RGBA = "0.26 0.84 0.38 1"
 
 
+def add_compact_temperature_button_asset(
+    parent: ET.Element,
+    *,
+    geom_name: str,
+    pos: Sequence[float],
+    color_rgba: str,
+    joint_name: str | None = None,
+) -> None:
+    """Install the compact pressable button used by the original WA-02 scene."""
+
+    name = str(geom_name)
+    position = tuple(float(item) for item in pos)
+    if len(position) != 3:
+        raise ValueError("compact button position must contain exactly three values")
+    resolved_joint_name = str(joint_name or f"{name}_press_joint")
+    body = ET.SubElement(
+        parent,
+        "body",
+        {
+            "name": f"{name}_body",
+            "pos": " ".join(f"{item:.6f}" for item in position),
+        },
+    )
+    visual_only = {"contype": "0", "conaffinity": "0", "group": "1"}
+    ET.SubElement(
+        body,
+        "geom",
+        {
+            "name": f"{name}_base",
+            "type": "box",
+            "pos": "0 0 0.020",
+            "size": "0.016 0.025 0.020",
+            "rgba": "0.10 0.11 0.12 1",
+            **visual_only,
+        },
+    )
+    plunger = ET.SubElement(
+        body,
+        "body",
+        {
+            "name": f"{name}_plunger",
+            "pos": "0 0 0",
+            # Preserve the original compact joint parameters without allowing
+            # the 20 g plunger to sag through the 4 mm press threshold at rest.
+            "gravcomp": "1",
+        },
+    )
+    ET.SubElement(
+        plunger,
+        "inertial",
+        {
+            "pos": "0 0 0.074",
+            "mass": "0.020",
+            "diaginertia": "0.00002 0.00002 0.00002",
+        },
+    )
+    ET.SubElement(
+        plunger,
+        "joint",
+        {
+            "name": resolved_joint_name,
+            "type": "slide",
+            "axis": "0 0 1",
+            "limited": "true",
+            "range": "-0.012 0",
+            "springref": "0",
+            "stiffness": "18",
+            "damping": "2",
+        },
+    )
+    ET.SubElement(
+        plunger,
+        "geom",
+        {
+            "name": name,
+            "type": "cylinder",
+            "pos": "0 0 0.075",
+            "size": "0.012 0.008",
+            "rgba": str(color_rgba),
+            "contype": "1",
+            "conaffinity": "1",
+            "group": "1",
+            "friction": "0.8 0.005 0.0001",
+        },
+    )
+
+
 def button_geom_names(geom_name: str) -> tuple[str, ...]:
     """Return every geom installed for one completion button."""
 
@@ -220,6 +307,7 @@ __all__ = [
     "BUTTON_MAX_TRAVEL_M",
     "BUTTON_MOVING_PARTS",
     "BUTTON_RGBA",
+    "add_compact_temperature_button_asset",
     "add_button_asset",
     "button_geom_names",
 ]

@@ -1,0 +1,9 @@
+{
+  "default_select": "last",
+  "rules": [
+    {
+      "pattern": "^pick up the coffee cup in the (left|center|right) dining placement zone$",
+      "select": "first"
+    }
+  ]
+}
