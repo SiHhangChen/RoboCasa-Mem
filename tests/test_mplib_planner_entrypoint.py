@@ -78,6 +78,44 @@ def test_planner_defaults_to_isolated_membench_environment(monkeypatch) -> None:
     assert captured["command"][:5] == ["conda", "run", "-n", "membench", "python"]
 
 
+def test_planner_uses_configured_python(monkeypatch, tmp_path: Path) -> None:
+    captured: dict[str, object] = {}
+    configured_python = tmp_path / "python"
+    configured_python.touch()
+
+    def fake_run(command, **kwargs):
+        captured["command"] = command
+        return SimpleNamespace(returncode=0, stdout="{}", stderr="")
+
+    monkeypatch.setenv("MEMBENCH_MPLIB_PYTHON", str(configured_python))
+    monkeypatch.setattr(mplib_planner.subprocess, "run", fake_run)
+    code, result = mplib_planner.run_mplib_planner_subprocess(
+        script_path=PLANNER_SCRIPT,
+        plan_request={},
+    )
+
+    assert code == 0
+    assert result == {}
+    assert captured["command"][0] == str(configured_python)
+
+
+def test_model_discovery_uses_configured_maniskill_assets(monkeypatch, tmp_path: Path) -> None:
+    panda_dir = tmp_path / "panda"
+    panda_dir.mkdir()
+    (panda_dir / "panda_v2.urdf").write_text("<robot name='panda'/>")
+    (panda_dir / "panda_v2.srdf").write_text("<robot name='panda'/>")
+    monkeypatch.setenv("MEMBENCH_MANISKILL_PANDA_DIR", str(panda_dir))
+
+    candidates = mplib_planner.discover_model_candidates()
+
+    configured = [candidate for candidate in candidates if candidate.get("source") == "mani_skill"]
+    assert len(configured) == 1
+    assert configured[0]["urdf"] == str(panda_dir / "panda_v2.urdf")
+    assert configured[0]["srdf"] == str(panda_dir / "panda_v2.srdf")
+    assert configured[0]["urdf_exists"] is True
+    assert configured[0]["srdf_exists"] is True
+
+
 def test_planner_skips_candidate_without_srdf_and_uses_complete_model() -> None:
     calls: list[dict[str, object]] = []
     planner = object()

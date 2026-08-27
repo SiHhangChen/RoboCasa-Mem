@@ -8,11 +8,13 @@ import pytest
 
 from bench.tasks.ts03.domain.contracts import PROFILE_IDS, profile_for_id
 from bench.tasks.ts03.evaluation import (
+    REPORT_STAGE_ORDER,
     STAGE_ORDER,
     TASK_EVALUATOR_METADATA_KEY,
     TS03EvaluationSnapshot,
     TS03Evaluator,
     diagnostics_for_runtime,
+    report_stages_for_runtime,
     success_for_runtime,
 )
 
@@ -291,5 +293,69 @@ def test_runtime_callbacks_use_the_ts03_task_local_evaluator() -> None:
     assert diagnostics["stage_checks"]["sugar_1"]
     assert diagnostics["effective_stage_checks"]["sugar_2"]
     assert not success_for_runtime(runtime, {})
+    assert report_stages_for_runtime(runtime)["order"] == list(REPORT_STAGE_ORDER)
     assert diagnostics_for_runtime(runtime) == diagnostics
 
+
+@pytest.mark.parametrize("profile_id", PROFILE_IDS)
+def test_public_report_uses_profile_applicability_and_hides_button(
+    profile_id: str,
+) -> None:
+    profile = profile_for_id(profile_id)
+    evaluator = _evaluator(profile_id)
+    result = evaluator.result()
+    for count in range(1, profile.target_sugar_count + 1):
+        result = evaluator.observe(
+            _snapshot(count, profile_id=profile_id, count=count)
+        )
+
+    report = result.to_report_stages()
+
+    assert report["task_id"] == "TS03"
+    assert report["profile_id"] == "TS03/report-v1"
+    assert report["order"] == ["sugar_1", "sugar_2", "success"]
+    assert "button" not in report["stages"]
+    assert report["stages"]["sugar_1"] == {
+        "applicable": True,
+        "passed": True,
+        "first_pass_step": 1,
+    }
+    assert report["stages"]["sugar_2"] == {
+        "applicable": profile.target_sugar_count == 2,
+        "passed": True if profile.target_sugar_count == 2 else None,
+        "first_pass_step": 2 if profile.target_sugar_count == 2 else None,
+    }
+    assert report["stages"]["success"] == {
+        "applicable": True,
+        "passed": False,
+        "first_pass_step": None,
+    }
+
+    success_step = profile.target_sugar_count + 1
+    completed = evaluator.observe(
+        _snapshot(
+            success_step,
+            profile_id=profile_id,
+            count=profile.target_sugar_count,
+            button_pressed=True,
+        )
+    ).to_report_stages()
+    assert completed["stages"]["success"] == {
+        "applicable": True,
+        "passed": True,
+        "first_pass_step": success_step,
+    }
+
+
+def test_public_report_keeps_sugar_history_when_over_add_blocks_success() -> None:
+    evaluator = _evaluator("k2_n3")
+    evaluator.observe(_snapshot(1, profile_id="k2_n3", count=1))
+    evaluator.observe(_snapshot(2, profile_id="k2_n3", count=2))
+
+    report = evaluator.observe(
+        _snapshot(3, profile_id="k2_n3", count=3)
+    ).to_report_stages()
+
+    assert report["stages"]["sugar_1"]["passed"] is True
+    assert report["stages"]["sugar_2"]["passed"] is True
+    assert report["stages"]["success"]["passed"] is False

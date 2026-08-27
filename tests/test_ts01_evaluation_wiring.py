@@ -190,3 +190,8 @@ def test_runtime_initialize_mounts_fresh_evaluator(monkeypatch) -> None:
         "target_sugar_count": 2,
         "total_sugar_count": 4,
     }
+
+
+def test_runtime_registers_public_report_stage_projector() -> None:
+    assert ts01_runtime.TASK_RUNTIME_API.report_stage_profile_id == "TS01/report-v1"
+    assert callable(ts01_runtime.TASK_RUNTIME_API.report_stages)

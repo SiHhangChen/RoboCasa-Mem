@@ -13,6 +13,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
+from bench.evaluation.report_profiles import TS03_REPORT_PROFILE
 from bench.tasks.ts03.domain.contracts import (
     SugarCountProfile,
     profile_for_counts,
@@ -23,6 +24,8 @@ from bench.tasks.ts03.domain.contracts import (
 
 SUGAR_STAGE_NAMES = ("sugar_1", "sugar_2")
 STAGE_ORDER = (*SUGAR_STAGE_NAMES, "button", "success")
+REPORT_STAGE_ORDER = TS03_REPORT_PROFILE.stage_ids
+REPORT_STAGE_PROFILE_ID = TS03_REPORT_PROFILE.profile_id
 TASK_EVALUATOR_METADATA_KEY = "task_evaluator"
 
 
@@ -212,6 +215,37 @@ class TS03EvalResult:
             }
         )
         return payload
+
+    def to_report_stages(self) -> dict[str, Any]:
+        """Project internal TS03 stages onto the public benchmark funnel."""
+
+        stages: dict[str, dict[str, Any]] = {}
+        for index, name in enumerate(SUGAR_STAGE_NAMES, start=1):
+            applicable = index <= self.target_sugar_count
+            internal = self.stages[name]
+            stages[name] = {
+                "applicable": applicable,
+                "passed": bool(internal.qualified) if applicable else None,
+                "first_pass_step": (
+                    internal.qualified_step
+                    if applicable and internal.qualified
+                    else None
+                ),
+            }
+
+        success = self.stages["success"]
+        stages["success"] = {
+            "applicable": True,
+            "passed": bool(self.success),
+            "first_pass_step": success.qualified_step if self.success else None,
+        }
+        return {
+            "schema_version": "membench.report_stages/v1",
+            "task_id": TS03_REPORT_PROFILE.task_id,
+            "profile_id": REPORT_STAGE_PROFILE_ID,
+            "order": list(REPORT_STAGE_ORDER),
+            "stages": stages,
+        }
 
 
 @dataclass
@@ -509,7 +543,13 @@ def diagnostics_for_runtime(runtime: Any) -> Mapping[str, Any]:
     return evaluate_initialized_runtime(runtime).to_diagnostics()
 
 
+def report_stages_for_runtime(runtime: Any) -> Mapping[str, Any]:
+    return evaluate_initialized_runtime(runtime).to_report_stages()
+
+
 __all__ = [
+    "REPORT_STAGE_ORDER",
+    "REPORT_STAGE_PROFILE_ID",
     "SUGAR_STAGE_NAMES",
     "STAGE_ORDER",
     "TASK_EVALUATOR_METADATA_KEY",
@@ -519,5 +559,6 @@ __all__ = [
     "TS03Evaluator",
     "diagnostics_for_runtime",
     "evaluate_initialized_runtime",
+    "report_stages_for_runtime",
     "success_for_runtime",
 ]

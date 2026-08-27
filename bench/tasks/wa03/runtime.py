@@ -16,9 +16,11 @@ from bench.tasks.wa03.config import (
 from bench.tasks.wa03.domain.episode import resolve_episode_plan, resolve_scene_config
 from bench.tasks.wa03.domain.geometry import dining_region_config_summary
 from bench.tasks.wa03.evaluation import (
+    REPORT_STAGE_PROFILE_ID,
     TASK_EVALUATOR_METADATA_KEY,
     WA03Evaluator,
     diagnostics_for_runtime,
+    report_stages_for_runtime,
     success_for_runtime,
 )
 from bench.tasks.wa03.execution.navigation import build_navigation_config
@@ -87,6 +89,8 @@ _ADAPTER = TaskRuntimeAdapter(
         variant=variant,
     ), environment=_environment,
     initialize=_initialize, diagnostics=diagnostics_for_runtime, success=success_for_runtime, close=default_close,
+    report_stage_profile_id=REPORT_STAGE_PROFILE_ID,
+    report_stages=report_stages_for_runtime,
     expert_runtime=build_operation_handlers,
 )
 TASK_RUNTIME_API = _ADAPTER.api()

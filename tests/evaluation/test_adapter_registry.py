@@ -9,6 +9,7 @@ import pytest
 from bench.evaluation.adapter import EpisodeRuntime, get_adapter, preflight_adapter
 from bench.evaluation.canonical_adapter import CanonicalEvaluationAdapter
 from bench.evaluation.observation import build_canonical_observation
+from bench.evaluation.report_profiles import REPORT_STAGE_PROFILES
 from bench.evaluation.suite import (
     ArtifactConfig,
     EvalSuiteConfig,
@@ -24,6 +25,16 @@ from bench.policy.protocol import (
 from bench.policy.protocol.contracts import ACTION_SCHEMA
 from bench.policy.protocol.errors import ProtocolError
 from bench.tasks import BUILTIN_TASK_PLUGINS
+
+
+_BENCHMARK_TASK_IDS = {profile.task_id for profile in REPORT_STAGE_PROFILES}
+
+
+def _suite_path(task_id: str) -> Path:
+    name = task_id.lower().replace("-", "")
+    if task_id in _BENCHMARK_TASK_IDS:
+        return Path("configs/eval/suites") / f"{name}_v1.yaml"
+    return Path("configs/eval/legacy_suites") / f"{name}_smoke_v1.yaml"
 
 
 def _contract(
@@ -83,8 +94,7 @@ def test_all_builtin_tasks_resolve_to_an_evaluation_adapter() -> None:
 def test_all_calibrated_preflights_consume_the_versioned_observation_profile(
     task_id: str,
 ) -> None:
-    suite_name = task_id.lower().replace("-", "") + "_smoke_v1.yaml"
-    suite = load_eval_suite(Path("configs/eval/suites") / suite_name)
+    suite = load_eval_suite(_suite_path(task_id))
     adapter = get_adapter(task_id)
 
     report = preflight_adapter(
@@ -106,7 +116,9 @@ def test_all_calibrated_preflights_consume_the_versioned_observation_profile(
 def test_tm03_production_preflight_rejects_incomplete_calibration() -> None:
     from bench.tasks.tm03.config import TM03CalibrationError
 
-    suite = load_eval_suite(Path("configs/eval/suites/tm03_smoke_v1.yaml"))
+    suite = load_eval_suite(
+        Path("configs/eval/legacy_suites/tm03_smoke_v1.yaml")
+    )
     with pytest.raises(TM03CalibrationError):
         preflight_adapter(
             get_adapter("TM03"),

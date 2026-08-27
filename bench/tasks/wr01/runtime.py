@@ -10,9 +10,11 @@ from bench.tasks.runtime_support import cabinet_initialization, manual_navigatio
 from bench.tasks.wr01.config import load_task_config, resolve_action_config
 from bench.tasks.wr01.domain.episode import resolve_episode_plan, resolve_scene_config
 from bench.tasks.wr01.evaluation import (
+    REPORT_STAGE_PROFILE_ID,
     TASK_EVALUATOR_METADATA_KEY,
     WR01Evaluator,
     diagnostics_for_runtime,
+    report_stages_for_runtime,
     success_for_runtime,
 )
 from bench.tasks.wr01.execution.navigation import build_navigation_config
@@ -80,6 +82,8 @@ _ADAPTER = TaskRuntimeAdapter(
     diagnostics=diagnostics_for_runtime,
     success=success_for_runtime,
     close=default_close,
+    report_stage_profile_id=REPORT_STAGE_PROFILE_ID,
+    report_stages=report_stages_for_runtime,
     expert_runtime=build_operation_handlers,
 )
 TASK_RUNTIME_API = _ADAPTER.api()

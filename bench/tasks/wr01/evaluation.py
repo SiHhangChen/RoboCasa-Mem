@@ -11,6 +11,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
+from bench.evaluation.report_profiles import WR01_REPORT_PROFILE
 from bench.tasks.wr01.domain.contracts import CABINET_LEVELS, ITEM_IDS
 
 
@@ -38,7 +39,17 @@ STAGE_PREREQUISITES: dict[str, str | None] = {
     name: None if index == 0 else STAGE_ORDER[index - 1]
     for index, name in enumerate(STAGE_ORDER)
 }
+REPORT_STAGE_ORDER = WR01_REPORT_PROFILE.stage_ids
+REPORT_STAGE_PROFILE_ID = WR01_REPORT_PROFILE.profile_id
 TASK_EVALUATOR_METADATA_KEY = "task_evaluator"
+
+_REPORT_STAGE_SOURCES = {
+    "one_can_stored": "first_can_store",
+    "two_cans_stored": "second_can_store",
+    "storage_hidden": "close_lower_cabinet",
+    "correct_cabinet_opened": "open_cabinet",
+    "success": "retrieve_item",
+}
 
 
 def _item(value: Any) -> str:
@@ -219,6 +230,28 @@ class WR01EvalResult:
             }
         )
         return payload
+
+    def to_report_stages(self) -> dict[str, Any]:
+        """Project the detailed evaluator state onto the public WR-01 funnel."""
+
+        stages: dict[str, dict[str, Any]] = {}
+        for name in REPORT_STAGE_ORDER:
+            internal = self.stages[_REPORT_STAGE_SOURCES[name]]
+            passed = bool(self.success) if name == "success" else bool(
+                internal.qualified
+            )
+            stages[name] = {
+                "applicable": True,
+                "passed": passed,
+                "first_pass_step": internal.qualified_step if passed else None,
+            }
+        return {
+            "schema_version": "membench.report_stages/v1",
+            "task_id": WR01_REPORT_PROFILE.task_id,
+            "profile_id": REPORT_STAGE_PROFILE_ID,
+            "order": list(REPORT_STAGE_ORDER),
+            "stages": stages,
+        }
 
 
 @dataclass
@@ -456,7 +489,13 @@ def diagnostics_for_runtime(runtime: Any) -> Mapping[str, Any]:
     return evaluate_initialized_runtime(runtime).to_diagnostics()
 
 
+def report_stages_for_runtime(runtime: Any) -> Mapping[str, Any]:
+    return evaluate_initialized_runtime(runtime).to_report_stages()
+
+
 __all__ = [
+    "REPORT_STAGE_ORDER",
+    "REPORT_STAGE_PROFILE_ID",
     "STAGE_LABELS",
     "STAGE_ORDER",
     "STAGE_PREREQUISITES",
@@ -467,5 +506,6 @@ __all__ = [
     "WR01Evaluator",
     "diagnostics_for_runtime",
     "evaluate_initialized_runtime",
+    "report_stages_for_runtime",
     "success_for_runtime",
 ]

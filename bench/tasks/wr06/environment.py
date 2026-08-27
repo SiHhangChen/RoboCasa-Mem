@@ -36,6 +36,7 @@ from bench.tasks.wr06.domain.semantics import (
     record_initial_level,
     record_transport_posture_normalized,
 )
+from bench.tasks.wr06.evaluation import WR06EvaluationSnapshot, WR06Evaluator
 from bench.tasks.wr06.physical_events import PhysicalSample, WR06PhysicalObserver
 
 
@@ -110,6 +111,7 @@ class WR06ReturnSingleBottleToOriginalLevel(Kitchen):
             raise ValueError("WR-06 terminal verification must be positive")
         self._semantic_state = SemanticState()
         self._physical_observer: WR06PhysicalObserver | None = None
+        self._wr06_evaluator: WR06Evaluator | None = None
         self._physical_event_diagnostics: dict[str, Any] = {}
         self._object_center_surface_offset_z = 0.0
         kwargs.setdefault("obj_registries", ("objaverse", "aigen", "lightwheel"))
@@ -238,6 +240,7 @@ class WR06ReturnSingleBottleToOriginalLevel(Kitchen):
         # A reset may reuse the same environment instance.  Do not let the
         # previous episode's observer consume partially reset physics.
         self._physical_observer = None
+        self._wr06_evaluator = None
         super()._setup_scene()
         self._configure_condiment_contact_physics()
         self._semantic_state = SemanticState()
@@ -322,6 +325,8 @@ class WR06ReturnSingleBottleToOriginalLevel(Kitchen):
         )
 
     def latch_original_level_hidden(self) -> bool:
+        if self._item_grasped():
+            return False
         physical = self.physical_state()
         return latch_memory_barrier(
             self._semantic_state,
@@ -539,28 +544,59 @@ class WR06ReturnSingleBottleToOriginalLevel(Kitchen):
         return evaluate_success(self._semantic_state, self.physical_state())
 
     def task_diagnostics(self) -> dict[str, Any]:
+        snapshot = self.evaluation_snapshot()
+        if self._wr06_evaluator is not None:
+            return self._wr06_evaluator.observe(snapshot).to_diagnostics()
+        return {
+            **dict(snapshot.details),
+            "success": bool(snapshot.domain_success),
+            "terminal": bool(
+                snapshot.domain_success or snapshot.protocol_violation
+            ),
+            "failure_code": snapshot.failure_code,
+        }
+
+    def evaluation_snapshot(self) -> WR06EvaluationSnapshot:
+        """Expose stable protocol history and current final-state predicates."""
+
         self._update_task_state()
         report = self._success_report()
         physical = self.physical_state()
         violation_reason = self._physical_event_diagnostics.get("violation_reason")
-        return {
-            "success": report.success,
-            "terminal": bool(report.success or self._semantic_state.protocol_violation),
-            "failure_code": (
-                None
-                if not self._semantic_state.protocol_violation
-                else str(violation_reason or "protocol_violation")
-            ),
+        state = self._semantic_state
+        details = {
             **report.checks(),
             "current_item_position": self._obj_pos(ITEM_ID).astype(float).tolist(),
             "current_item_at_fixed_plate": physical.item_at_fixed_plate,
             "current_item_in_lower": physical.item_in_lower,
             "current_item_in_upper": physical.item_in_upper,
-            "wrong_return_level_attempted": self._semantic_state.wrong_return_level_attempted,
-            "protocol_violation": self._semantic_state.protocol_violation,
-            "stage_regressions": list(self._semantic_state.stage_regressions),
+            "wrong_return_level_attempted": state.wrong_return_level_attempted,
+            "protocol_violation": state.protocol_violation,
+            "stage_regressions": list(state.stage_regressions),
             "physical_events": dict(self._physical_event_diagnostics),
         }
+        return WR06EvaluationSnapshot(
+            step_id=int(getattr(self, "timestep", 0)),
+            initial_level=state.initial_level,
+            initial_level_physically_verified=(
+                state.initial_level_physically_verified
+            ),
+            item_removed_from_home=state.item_removed_from_home,
+            item_staged_at_plate=state.item_staged_at_plate,
+            memory_barrier_latched=state.memory_barrier_latched,
+            first_return_level=state.first_return_level,
+            wrong_return_level_attempted=state.wrong_return_level_attempted,
+            returned_item_id=state.returned_item_id,
+            protocol_violation=state.protocol_violation,
+            stage_regressions=tuple(state.stage_regressions),
+            domain_success=report.success,
+            failure_code=(
+                None
+                if not state.protocol_violation
+                else str(violation_reason or "protocol_violation")
+            ),
+            details=details,
+        )
 
     def _update_task_state(self) -> None:
         observer = self._physical_observer

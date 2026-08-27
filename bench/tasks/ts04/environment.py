@@ -34,6 +34,7 @@ from bench.tasks.ts04.domain.semantics import (
     record_inspection_attempt,
     record_open_attempt,
 )
+from bench.tasks.ts04.evaluation import TS04EvaluationSnapshot
 from bench.tasks.ts04.physical_events import PhysicalSample, TS04PhysicalObserver
 from bench.tasks.ts04.single_drawer import SingleTabletopDrawer
 from bench.tasks.ts04.target_object import (
@@ -215,6 +216,8 @@ class TS04InspectTwoDrawers(Kitchen):
         self.reset_semantic_state()
 
     def _reset_internal(self) -> None:
+        """Arm physical edge detection only after reset has settled."""
+
         self._observer_armed = False
         super()._reset_internal()
         self.close_all_drawers()
@@ -380,6 +383,16 @@ class TS04InspectTwoDrawers(Kitchen):
             }
         )
 
+    def _physical_sample(self) -> PhysicalSample:
+        return PhysicalSample(
+            step_id=int(getattr(self, "timestep", 0)),
+            drawer_open_fraction={
+                fixture_name: self.slot_open_fraction(fixture_name)
+                for fixture_name in self.fixture_names
+            },
+            completion_button_press_depth_m=self.completion_button_press_depth(),
+        )
+
     def all_drawers_closed(self) -> bool:
         return all(
             self.slot_open_fraction(fixture_name) <= self.closed_threshold
@@ -494,6 +507,39 @@ class TS04InspectTwoDrawers(Kitchen):
             closed_threshold=self.closed_threshold,
         ).success
 
+    def evaluation_snapshot(self) -> TS04EvaluationSnapshot:
+        """Expose debounced trajectory facts to the task-local evaluator."""
+
+        state = self.semantic_state
+        observer = self._physical_observer
+        domain_report = evaluate_success(
+            state,
+            self.physical_state(),
+            closed_threshold=self.closed_threshold,
+        )
+        details = self.inspection_diagnostics()
+        details["completed_fixture_steps"] = dict(
+            observer.completed_fixture_steps
+        )
+        details["valid_button_press_steps"] = list(
+            observer.valid_button_press_steps
+        )
+        return TS04EvaluationSnapshot(
+            step_id=int(getattr(self, "timestep", 0)),
+            fixture_names=tuple(self.fixture_names),
+            target_fixture=state.target_fixture,
+            completed_fixture_history=tuple(state.completed_fixture_history),
+            completed_fixture_steps=dict(observer.completed_fixture_steps),
+            target_found=state.target_found,
+            search_after_target_detected=state.search_after_target_detected,
+            valid_button_press_steps=tuple(observer.valid_button_press_steps),
+            actual_button_press_count=state.completion_button_press_count,
+            required_button_press_count=state.required_button_presses,
+            domain_success=domain_report.success,
+            failure_reason=state.failure_reason,
+            details=details,
+        )
+
     def inspection_diagnostics(self) -> dict[str, Any]:
         return diagnostics(
             self.semantic_state,
@@ -503,7 +549,14 @@ class TS04InspectTwoDrawers(Kitchen):
         )
 
     def task_diagnostics(self) -> dict[str, Any]:
-        return self.inspection_diagnostics()
+        values = self.inspection_diagnostics()
+        values["completed_fixture_steps"] = dict(
+            self._physical_observer.completed_fixture_steps
+        )
+        values["valid_button_press_steps"] = list(
+            self._physical_observer.valid_button_press_steps
+        )
+        return values
 
     def _validate_fixture(self, fixture_name: str) -> None:
         if str(fixture_name) not in self.fixture_names:

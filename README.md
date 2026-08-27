@@ -237,7 +237,7 @@ python scripts/record_entrypoint.py \
   --dry-run
 
 python scripts/evaluate.py \
-  --suite configs/eval/suites/wa01_smoke_v1.yaml \
+  --suite configs/eval/suites/wa01_v1.yaml \
   --preflight-only
 ```
 
@@ -368,7 +368,7 @@ conda activate robocasa
 cd /path/to/membench
 PYTHONPATH=. python scripts/eval/run_remote.py \
   --endpoint ws://SERVER_IP:8000 \
-  --suite configs/eval/suites/wa01_smoke_v1.yaml \
+  --suite configs/eval/suites/wa01_v1.yaml \
   --preflight-only
 ```
 
@@ -455,7 +455,7 @@ AC-DiT backend 当前仍是未实现占位，不能用于正式评测。
 ```bash
 PYTHONPATH=. python scripts/eval/run_remote.py \
   --endpoint ws://SERVER_IP:8000 \
-  --suite configs/eval/suites/wx01_smoke_v1.yaml \
+  --suite configs/eval/suites/wx01_v1.yaml \
   --preflight-only
 ```
 
@@ -465,7 +465,7 @@ PYTHONPATH=. python scripts/eval/run_remote.py \
 PYTHONPATH=. MUJOCO_GL=egl PYOPENGL_PLATFORM=egl \
 python scripts/eval/run_remote.py \
   --endpoint ws://SERVER_IP:8000 \
-  --suite configs/eval/suites/wx01_smoke_v1.yaml \
+  --suite configs/eval/suites/wx01_v1.yaml \
   --output-root outputs/eval \
   --run-id wx01-smoke-model-name
 ```
@@ -486,12 +486,17 @@ python scripts/eval/summarize_run.py outputs/eval/wx01-smoke-model-name
 - checkpoint URI/fingerprint；
 - `outputs/eval/<run-id>/` 完整目录。
 
-## 11. ACT 训练入口
+## 11. 训练入口
+
+本项目维护的训练入口统一位于 `scripts/train/<policy>/`，完整索引见
+`scripts/train/README.md`。训练日志统一放在 `outputs/train/<policy>/`。
+
+### ACT
 
 WX-01 的 ACT 配置位于 `configs/policies/act_wx01_v1.yaml`。先修改其中的数据集根目录、repo ID 和输出目录，然后在安装了兼容 LeRobot 源码、PyTorch 和 CUDA 的独立环境中检查配置：
 
 ```bash
-PYTHONPATH=. python scripts/train/train_act_wx01.py \
+PYTHONPATH=. python scripts/train/act/train_act_wx01.py \
   --config configs/policies/act_wx01_v1.yaml \
   --dry-run
 ```
@@ -499,7 +504,7 @@ PYTHONPATH=. python scripts/train/train_act_wx01.py \
 确认生成的 resolved config 正确后开始训练：
 
 ```bash
-PYTHONPATH=. python scripts/train/train_act_wx01.py \
+PYTHONPATH=. python scripts/train/act/train_act_wx01.py \
   --config configs/policies/act_wx01_v1.yaml
 ```
 

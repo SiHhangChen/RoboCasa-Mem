@@ -89,9 +89,13 @@ def discover_model_candidates() -> list[dict[str, Any]]:
             }
         )
     try:
-        import mani_skill
+        configured_panda_dir = os.environ.get("MEMBENCH_MANISKILL_PANDA_DIR", "").strip()
+        if configured_panda_dir:
+            panda_dir = Path(configured_panda_dir).expanduser().resolve()
+        else:
+            import mani_skill
 
-        panda_dir = Path(mani_skill.__file__).resolve().parent / "assets/robots/panda"
+            panda_dir = Path(mani_skill.__file__).resolve().parent / "assets/robots/panda"
         for urdf in sorted(panda_dir.glob("*.urdf"), key=_panda_urdf_preference_key):
             srdf = urdf.with_suffix(".srdf")
             urdf_has_capsule = _urdf_contains_unsupported_capsule(urdf)
@@ -711,7 +715,15 @@ def run_mplib_planner_subprocess(
             str(os.environ.get("CONDA_DEFAULT_ENV", "")).strip(),
             Path(sys.prefix).name,
         }
-        if requested_env in active_env_names:
+        configured_python = os.environ.get("MEMBENCH_MPLIB_PYTHON", "").strip()
+        if configured_python and Path(configured_python).is_file():
+            cmd = [
+                configured_python,
+                str(script_path),
+                "--plan-json",
+                str(request_path),
+            ]
+        elif requested_env in active_env_names:
             cmd = [
                 sys.executable,
                 str(script_path),

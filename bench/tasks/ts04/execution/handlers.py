@@ -207,6 +207,7 @@ def close_fixture(
             drawer_closed=known and fraction <= float(env.closed_threshold),
         )
 
+    completed_before = len(env.semantic_state.completed_fixture_history)
     mode = str(actuation_mode).strip().lower()
     if mode == "semantic":
         env.set_slot_open_fraction(fixture_name, float(closed_fraction))
@@ -232,7 +233,11 @@ def close_fixture(
         actuation.get("pass", False) and fraction <= float(env.closed_threshold)
     )
     history = env.semantic_state.completed_fixture_history
-    if physically_closed and history and history[-1] == fixture_name:
+    if (
+        physically_closed
+        and len(history) == completed_before + 1
+        and history[-1] == fixture_name
+    ):
         result = _observer_committed_result(env, "close_fixture", fixture_name)
     else:
         result = env.record_close_event(

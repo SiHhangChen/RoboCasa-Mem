@@ -34,6 +34,7 @@ from bench.tasks.ts02.domain.semantics import (
     record_inspection_attempt,
     record_open_attempt,
 )
+from bench.tasks.ts02.evaluation import TS02EvaluationSnapshot
 from bench.tasks.ts02.physical_events import PhysicalSample, TS02PhysicalObserver
 from bench.tasks.ts02.single_drawer import SingleTabletopDrawer
 from bench.tasks.ts02.target_object import (
@@ -307,12 +308,18 @@ class TS02InspectThreeCabinets(Kitchen):
         drawer_closed: bool,
         failure_reason: str | None = None,
     ) -> dict[str, Any]:
-        result = record_close_attempt(
+        report = record_close_attempt(
             self.semantic_state,
             fixture_name,
             drawer_closed=drawer_closed,
             failure_reason=failure_reason,
-        ).as_dict()
+        )
+        if report.passed:
+            self._physical_observer.completed_fixture_steps.setdefault(
+                str(fixture_name),
+                int(getattr(self, "timestep", 0)),
+            )
+        result = report.as_dict()
         result["diagnostics"] = self.inspection_diagnostics()
         return result
 
@@ -328,12 +335,17 @@ class TS02InspectThreeCabinets(Kitchen):
             if all_drawers_closed is None
             else bool(all_drawers_closed)
         )
-        result = record_completion_button_attempt(
+        report = record_completion_button_attempt(
             self.semantic_state,
             all_drawers_closed=closed,
             button_physically_pressed=button_physically_pressed,
             failure_reason=failure_reason,
-        ).as_dict()
+        )
+        if report.passed:
+            self._physical_observer.valid_button_press_steps.append(
+                int(getattr(self, "timestep", 0))
+            )
+        result = report.as_dict()
         result["diagnostics"] = self.inspection_diagnostics()
         return result
 
@@ -472,6 +484,39 @@ class TS02InspectThreeCabinets(Kitchen):
             closed_threshold=self.closed_threshold,
         ).success
 
+    def evaluation_snapshot(self) -> TS02EvaluationSnapshot:
+        """Expose debounced trajectory facts to the task-local evaluator."""
+
+        state = self.semantic_state
+        observer = self._physical_observer
+        domain_report = evaluate_success(
+            state,
+            self.physical_state(),
+            closed_threshold=self.closed_threshold,
+        )
+        details = self.inspection_diagnostics()
+        details["completed_fixture_steps"] = dict(
+            observer.completed_fixture_steps
+        )
+        details["valid_button_press_steps"] = list(
+            observer.valid_button_press_steps
+        )
+        return TS02EvaluationSnapshot(
+            step_id=int(getattr(self, "timestep", 0)),
+            fixture_names=tuple(self.fixture_names),
+            target_fixture=state.target_fixture,
+            completed_fixture_history=tuple(state.completed_fixture_history),
+            completed_fixture_steps=dict(observer.completed_fixture_steps),
+            target_found=state.target_found,
+            search_after_target_detected=state.search_after_target_detected,
+            valid_button_press_steps=tuple(observer.valid_button_press_steps),
+            actual_button_press_count=state.completion_button_press_count,
+            required_button_press_count=state.required_button_presses,
+            domain_success=domain_report.success,
+            failure_reason=state.failure_reason,
+            details=details,
+        )
+
     def inspection_diagnostics(self) -> dict[str, Any]:
         return diagnostics(
             self.semantic_state,
@@ -481,7 +526,14 @@ class TS02InspectThreeCabinets(Kitchen):
         )
 
     def task_diagnostics(self) -> dict[str, Any]:
-        return self.inspection_diagnostics()
+        values = self.inspection_diagnostics()
+        values["completed_fixture_steps"] = dict(
+            self._physical_observer.completed_fixture_steps
+        )
+        values["valid_button_press_steps"] = list(
+            self._physical_observer.valid_button_press_steps
+        )
+        return values
 
     def _validate_fixture(self, fixture_name: str) -> None:
         if str(fixture_name) not in self.fixture_names:

@@ -6,22 +6,29 @@ from collections.abc import Mapping
 from dataclasses import replace
 from typing import Any
 
-from bench.runtime import (
-    TaskRuntimeAdapter,
-    default_close,
-    default_diagnostics,
-    default_success,
-)
+from bench.runtime import TaskRuntimeAdapter, default_close
 from bench.tasks.runtime_support import (
     drawer_initialization,
-    station_navigation,
     standard_plan,
     standard_scene,
+    station_navigation,
     variant_prompt,
 )
-from bench.tasks.ts04.config import load_task_config, resolve_action_config, resolve_task_options
-from bench.tasks.ts04.domain.episode import resolve_episode_plan, resolve_scene_config
+from bench.tasks.ts04.config import (
+    load_task_config,
+    resolve_action_config,
+    resolve_task_options,
+)
 from bench.tasks.ts04.domain.contracts import TASK_REVISION
+from bench.tasks.ts04.domain.episode import resolve_episode_plan, resolve_scene_config
+from bench.tasks.ts04.evaluation import (
+    REPORT_STAGE_PROFILE_ID,
+    TASK_EVALUATOR_METADATA_KEY,
+    TS04Evaluator,
+    diagnostics_for_runtime,
+    report_stages_for_runtime,
+    success_for_runtime,
+)
 from bench.tasks.ts04.execution.navigation import build_navigation_config
 from bench.tasks.ts04.expert.operations import build_operation_handlers
 from bench.tasks.ts04.initialization import (
@@ -68,6 +75,32 @@ def _environment(
     }
 
 
+_initialize_drawers = drawer_initialization(
+    apply_initial_drawer_state,
+    apply_robot_base_initial_state,
+)
+
+
+def _initialize(descriptor: Any, env: Any, observation: Mapping[str, Any]):
+    updated, initialization, metadata, targets = _initialize_drawers(
+        descriptor,
+        env,
+        observation,
+    )
+    evaluator = TS04Evaluator(
+        fixture_names=env.fixture_names,
+        target_fixture=env.target_fixture,
+    )
+    evaluator.reset(env.evaluation_snapshot())
+    env._ts04_evaluator = evaluator
+    return (
+        updated,
+        initialization,
+        {**dict(metadata or {}), TASK_EVALUATOR_METADATA_KEY: evaluator},
+        targets,
+    )
+
+
 _ADAPTER = TaskRuntimeAdapter(
     task_id="TS04",
     load_task_config=load_task_config,
@@ -78,12 +111,12 @@ _ADAPTER = TaskRuntimeAdapter(
     navigation=station_navigation(build_navigation_config),
     prompt=variant_prompt(resolve_prompt_spec),
     environment=_environment,
-    initialize=drawer_initialization(
-        apply_initial_drawer_state, apply_robot_base_initial_state
-    ),
-    diagnostics=default_diagnostics,
-    success=default_success,
+    initialize=_initialize,
+    diagnostics=diagnostics_for_runtime,
+    success=success_for_runtime,
     close=default_close,
+    report_stage_profile_id=REPORT_STAGE_PROFILE_ID,
+    report_stages=report_stages_for_runtime,
     release_facts=lambda config, episode, resources, options: {
         "task_revision": TASK_REVISION,
         "task_id": episode.task_id,

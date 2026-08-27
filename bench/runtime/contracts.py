@@ -127,6 +127,8 @@ class TaskRuntimeAPI:
     check_success: Callable[[InitializedTaskRuntime, Mapping[str, Any]], bool]
     diagnostics: Callable[[InitializedTaskRuntime], Mapping[str, Any]]
     close_runtime: Callable[[InitializedTaskRuntime], None]
+    report_stage_profile_id: str | None = None
+    report_stages: Callable[[InitializedTaskRuntime], Mapping[str, Any]] | None = None
     build_expert_runtime: Callable[
         [RuntimeDescriptor, Any, Mapping[str, Any]], Mapping[str, Any]
     ] | None = None

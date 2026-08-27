@@ -11,9 +11,11 @@ from bench.tasks.wr03.config import load_task_config, resolve_action_config, res
 from bench.tasks.wr03.domain.episode import resolve_episode_plan, resolve_scene_config
 from bench.tasks.wr03.domain.contracts import TASK_REVISION
 from bench.tasks.wr03.evaluation import (
+    REPORT_STAGE_PROFILE_ID,
     TASK_EVALUATOR_METADATA_KEY,
     WR03Evaluator,
     diagnostics_for_runtime,
+    report_stages_for_runtime,
     success_for_runtime,
 )
 from bench.tasks.wr03.execution.navigation import build_navigation_config
@@ -74,6 +76,8 @@ _ADAPTER = TaskRuntimeAdapter(
     prompt=variant_prompt(resolve_prompt_spec), environment=_environment,
     initialize=_initialize,
     diagnostics=diagnostics_for_runtime, success=success_for_runtime, close=default_close,
+    report_stage_profile_id=REPORT_STAGE_PROFILE_ID,
+    report_stages=report_stages_for_runtime,
     release_facts=lambda config, episode, resources, options: {
         "task_revision": TASK_REVISION,
         "task_id": episode.task_id,

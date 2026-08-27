@@ -25,6 +25,7 @@ from bench.tasks.tm01.domain.contracts import (
     KNOB_ID,
     KNOB_JOINT,
     ObserverConfig,
+    StageEvent,
 )
 from bench.tasks.tm01.domain.episode import (
     DEFAULT_COMPLETION_BUTTON_WORLD_XYZS,
@@ -40,6 +41,7 @@ from bench.tasks.tm01.domain.semantics import (
     record_inspection_attempt,
     record_open_attempt,
 )
+from bench.tasks.tm01.evaluation import TM01EvaluationSnapshot
 from bench.tasks.tm01.physical_events import PhysicalSample, TM01PhysicalObserver
 from bench.tasks.tm01.single_drawer import SingleTabletopDrawer
 from bench.tasks.tm01.button_asset import TM01_BUTTON_MAX_TRAVEL_M, add_tm01_button_asset
@@ -131,6 +133,7 @@ class TM01BoilWaterAndInspectTwoDrawers(Kitchen):
         self.knob = str(knob_id)
         self.burner = str(burner_id)
         self._tm01_observer = TM01PhysicalObserver(resolved_observer)
+        self._tm01_evaluator: Any | None = None
         self._observer_armed = False
         self._pot_reset_position = np.zeros(3, dtype=float)
         self._pot_reset_quaternion = np.asarray([1.0, 0.0, 0.0, 0.0])
@@ -359,12 +362,18 @@ class TM01BoilWaterAndInspectTwoDrawers(Kitchen):
         drawer_closed: bool,
         failure_reason: str | None = None,
     ) -> dict[str, Any]:
-        result = record_close_attempt(
+        report = record_close_attempt(
             self.semantic_state,
             fixture_name,
             drawer_closed=drawer_closed,
             failure_reason=failure_reason,
-        ).as_dict()
+        )
+        if report.passed:
+            self._tm01_observer.event_steps.setdefault(
+                report.event,
+                int(getattr(self, "timestep", 0)),
+            )
+        result = report.as_dict()
         result["diagnostics"] = diagnostics(self.semantic_state)
         return result
 
@@ -376,7 +385,7 @@ class TM01BoilWaterAndInspectTwoDrawers(Kitchen):
         button_id: str | None = None,
         failure_reason: str | None = None,
     ) -> dict[str, Any]:
-        result = record_completion_button_attempt(
+        report = record_completion_button_attempt(
             self.semantic_state,
             button_id=(button_id or COMPLETION_BUTTON_NAMES[0]),
             all_drawers_closed=(
@@ -386,7 +395,13 @@ class TM01BoilWaterAndInspectTwoDrawers(Kitchen):
             ),
             button_physically_pressed=button_physically_pressed,
             failure_reason=failure_reason,
-        ).as_dict()
+        )
+        if report.passed:
+            self._tm01_observer.event_steps.setdefault(
+                StageEvent.COMPLETION_BUTTON.value,
+                int(getattr(self, "timestep", 0)),
+            )
+        result = report.as_dict()
         result["diagnostics"] = diagnostics(self.semantic_state)
         return result
 
@@ -596,6 +611,37 @@ class TM01BoilWaterAndInspectTwoDrawers(Kitchen):
             ),
         ).success
 
+    def evaluation_snapshot(self) -> TM01EvaluationSnapshot:
+        """Expose observer history and the complete domain-success verdict."""
+
+        state = self.semantic_state
+        invalid_environment_labels = list(
+            self._tm01_observer.invalid_environment_labels
+        )
+        absorbing_failure = bool(
+            state.absorbing_failure or invalid_environment_labels
+        )
+        failure_code = (
+            invalid_environment_labels[0]
+            if invalid_environment_labels
+            else state.failure_reason
+        )
+        if absorbing_failure and failure_code is None:
+            failure_code = "absorbing_failure"
+        return TM01EvaluationSnapshot(
+            step_id=int(getattr(self, "timestep", 0)),
+            burner_on_completed=state.a1_complete,
+            one_drawer_inspected=state.b1_complete,
+            boiling_thread_completed=state.a2_complete,
+            drawer_thread_completed=state.b2_complete,
+            completion_button_pressed=state.completion_button_pressed,
+            absorbing_failure=absorbing_failure,
+            failure_code=failure_code,
+            domain_success=self._check_success(),
+            event_steps=dict(self._tm01_observer.event_steps),
+            details=self.task_diagnostics(),
+        )
+
     def task_diagnostics(self) -> dict[str, Any]:
         state = diagnostics(self.semantic_state)
         physical = self.physical_state()
@@ -618,6 +664,9 @@ class TM01BoilWaterAndInspectTwoDrawers(Kitchen):
                 },
                 "invalid_environment_labels": list(
                     self._tm01_observer.invalid_environment_labels
+                ),
+                "semantic_event_steps": dict(
+                    self._tm01_observer.event_steps
                 ),
                 "success_checks": success_report.checks(),
                 "failure_attribution": (

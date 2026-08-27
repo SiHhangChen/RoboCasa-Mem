@@ -13,7 +13,8 @@ import numpy as np
 from bench.evaluation.action import ActionChunkQueue
 from bench.evaluation.adapter import EpisodeRuntime, EvaluationAdapter, preflight_adapter
 from bench.evaluation.artifacts import ArtifactWriter, EpisodeArtifactSession
-from bench.evaluation.client import RemotePolicyClient
+from bench.evaluation.client import PolicyClient
+from bench.evaluation.report_stages import validate_report_stages
 from bench.evaluation.suite import EvalSuiteConfig
 
 
@@ -32,6 +33,7 @@ class EpisodeResult:
     failure_reason: str | None = None
     error: str | None = None
     diagnostics: Mapping[str, Any] = field(default_factory=dict)
+    report_stages: Mapping[str, Any] | None = None
     inference_latency_ms: list[float] = field(default_factory=list)
     action_mean: list[float] = field(default_factory=list)
     action_std: list[float] = field(default_factory=list)
@@ -47,7 +49,7 @@ class RolloutRunner:
     def __init__(
         self,
         *,
-        client: RemotePolicyClient,
+        client: PolicyClient,
         suite: EvalSuiteConfig,
         artifacts: ArtifactWriter | None = None,
     ) -> None:
@@ -189,7 +191,11 @@ class RolloutRunner:
                 if failure_reason is not None:
                     break
             if not success and failure_reason is None:
-                failure_reason = "max_steps"
+                failure_reason = (
+                    "terminal_state_not_preserved"
+                    if success_step is not None
+                    else "max_steps"
+                )
             result = self._make_result(
                 seed=seed,
                 episode_id=episode_id,
@@ -202,6 +208,11 @@ class RolloutRunner:
                 failure_reason=failure_reason,
                 error=None,
                 diagnostics=adapter.diagnostics(runtime),
+                report_stages=self._report_stages(
+                    adapter,
+                    runtime,
+                    expected_success=success,
+                ),
                 latencies=latencies,
                 actions=actions,
                 policy_actions_returned=policy_actions_returned,
@@ -222,6 +233,11 @@ class RolloutRunner:
                 failure_reason=None,
                 error="KeyboardInterrupt",
                 diagnostics=self._safe_diagnostics(adapter, runtime),
+                report_stages=self._safe_report_stages(
+                    adapter,
+                    runtime,
+                    expected_success=False,
+                ),
                 latencies=latencies,
                 actions=actions,
                 policy_actions_returned=policy_actions_returned,
@@ -245,6 +261,11 @@ class RolloutRunner:
                     traceback.format_exception_only(type(exc), exc)
                 ).strip(),
                 diagnostics=self._safe_diagnostics(adapter, runtime),
+                report_stages=self._safe_report_stages(
+                    adapter,
+                    runtime,
+                    expected_success=False,
+                ),
                 latencies=latencies,
                 actions=actions,
                 policy_actions_returned=policy_actions_returned,
@@ -272,6 +293,7 @@ class RolloutRunner:
                             failure_reason=None,
                             error=close_error,
                             diagnostics={},
+                            report_stages=None,
                             latencies=latencies,
                             actions=actions,
                             policy_actions_returned=policy_actions_returned,
@@ -287,6 +309,7 @@ class RolloutRunner:
                             if result.error is None
                             else f"{result.error}; {close_error}"
                         )
+                        result.report_stages = None
         assert result is not None
         result.duration_s = time.monotonic() - started_at
         if session is not None:
@@ -351,6 +374,7 @@ class RolloutRunner:
         failure_reason: str | None,
         error: str | None,
         diagnostics: Mapping[str, Any],
+        report_stages: Mapping[str, Any] | None,
         latencies: list[float],
         actions: list[np.ndarray],
         policy_actions_returned: int,
@@ -379,6 +403,9 @@ class RolloutRunner:
             failure_reason=failure_reason,
             error=error,
             diagnostics=dict(diagnostics),
+            report_stages=(
+                None if report_stages is None else dict(report_stages)
+            ),
             inference_latency_ms=latencies,
             action_mean=action_mean,
             action_std=action_std,
@@ -400,6 +427,58 @@ class RolloutRunner:
             return dict(adapter.diagnostics(runtime))
         except Exception as exc:
             return {"diagnostics_error": f"{type(exc).__name__}: {exc}"}
+
+    def _report_stages(
+        self,
+        adapter: EvaluationAdapter,
+        runtime: EpisodeRuntime,
+        *,
+        expected_success: bool,
+    ) -> dict[str, Any] | None:
+        profile_id = getattr(adapter, "report_stage_profile_id", None)
+        callback = getattr(adapter, "report_stages", None)
+        if profile_id is None:
+            if callable(callback) and callback(runtime) is not None:
+                raise ValueError(
+                    f"Task {self.suite.task_id} returned report_stages without "
+                    "declaring report_stage_profile_id"
+                )
+            return None
+        if not callable(callback):
+            raise ValueError(
+                f"Task {self.suite.task_id} declares report stage profile "
+                f"{profile_id!r} but has no report_stages callback"
+            )
+        payload = callback(runtime)
+        if payload is None:
+            raise ValueError(
+                f"Task {self.suite.task_id} declares report stage profile "
+                f"{profile_id!r} but returned no report"
+            )
+        return validate_report_stages(
+            payload,
+            expected_task_id=self.suite.task_id,
+            expected_profile_id=str(profile_id),
+            expected_success=expected_success,
+        )
+
+    def _safe_report_stages(
+        self,
+        adapter: EvaluationAdapter,
+        runtime: EpisodeRuntime | None,
+        *,
+        expected_success: bool,
+    ) -> dict[str, Any] | None:
+        if runtime is None:
+            return None
+        try:
+            return self._report_stages(
+                adapter,
+                runtime,
+                expected_success=expected_success,
+            )
+        except Exception:
+            return None
 
 
 def _format_episode_progress(

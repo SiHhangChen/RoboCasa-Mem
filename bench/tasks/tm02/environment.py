@@ -41,6 +41,7 @@ from bench.tasks.tm02.domain.episode import (
 )
 from bench.tasks.tm02.domain.fill import PotFillState, advance_pot_fill
 from bench.tasks.tm02.domain.semantics import diagnostics, evaluate_success
+from bench.tasks.tm02.evaluation import TM02EvaluationSnapshot
 from bench.tasks.tm02.physical_events import PhysicalSample, TM02PhysicalObserver
 from bench.tasks.wa02_button_asset import add_wa02_button_asset
 RED_CAN_XML = f"{assets_root}/objects/objaverse/canned_food/canned_food_15/model.xml"
@@ -257,6 +258,7 @@ class TM02FillPotAndRetrieveCan(Kitchen):
         else:
             resolved_observer = ObserverConfig(**dict(observer_config))
         self._tm02_observer = TM02PhysicalObserver(resolved_observer)
+        self._tm02_evaluator: Any | None = None
         self.final_closed_threshold = float(
             resolved_observer.cabinet_closed_threshold
         )
@@ -983,6 +985,37 @@ class TM02FillPotAndRetrieveCan(Kitchen):
             ),
         ).success
 
+    def evaluation_snapshot(self) -> TM02EvaluationSnapshot:
+        """Expose observer history and the complete domain-success verdict."""
+
+        state = self.semantic_state
+        invalid_environment_labels = list(
+            self._tm02_observer.invalid_environment_labels
+        )
+        absorbing_failure = bool(
+            state.absorbing_failure or invalid_environment_labels
+        )
+        failure_code = (
+            invalid_environment_labels[0]
+            if invalid_environment_labels
+            else (state.failure_labels[0] if state.failure_labels else None)
+        )
+        if absorbing_failure and failure_code is None:
+            failure_code = "absorbing_failure"
+        return TM02EvaluationSnapshot(
+            step_id=int(getattr(self, "timestep", 0)),
+            faucet_on_completed=state.a1_complete,
+            pot_filled_and_can_retrieved=state.b1_complete,
+            fill_pot_thread_completed=state.a2_complete,
+            retrieve_can_thread_completed=state.b2_complete,
+            completion_button_pressed=state.completion_button_pressed,
+            absorbing_failure=absorbing_failure,
+            failure_code=failure_code,
+            domain_success=self._check_success(),
+            event_steps=dict(self._tm02_observer.event_steps),
+            details=self.task_diagnostics(),
+        )
+
     def task_diagnostics(self) -> dict[str, Any]:
         semantic = diagnostics(self.semantic_state)
         physical = self.physical_state()
@@ -997,6 +1030,7 @@ class TM02FillPotAndRetrieveCan(Kitchen):
             "success": report.success,
             "success_checks": report.checks(),
             "semantic": semantic,
+            "semantic_event_steps": dict(self._tm02_observer.event_steps),
             "physical": {
                 **physical.__dict__,
                 "water_button_press_depth_m": self.button_press_depth(

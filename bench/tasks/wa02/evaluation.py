@@ -6,6 +6,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
+from bench.evaluation.report_profiles import WA02_REPORT_PROFILE
 from bench.tasks.wa02.domain.contracts import CUP_IDS, SERVICE_SLOTS, TEMPERATURES
 
 
@@ -32,6 +33,16 @@ STAGE_PREREQUISITES: dict[str, str | None] = {
     for index, name in enumerate(STAGE_ORDER)
 }
 TASK_EVALUATOR_METADATA_KEY = "task_evaluator"
+REPORT_STAGE_ORDER = WA02_REPORT_PROFILE.stage_ids
+REPORT_STAGE_PROFILE_ID = WA02_REPORT_PROFILE.profile_id
+
+_REPORT_STAGE_SOURCES = {
+    "hot_cup_filled": "first_cup_fill",
+    "hot_cup_ready": "first_cup_ready",
+    "cold_cup_filled": "second_cup_fill",
+    "both_cups_ready": "second_cup_ready",
+    "success": "selection_success",
+}
 
 
 def _cup(value: Any) -> str:
@@ -224,6 +235,36 @@ class WA02EvalResult:
             }
         )
         return payload
+
+    def to_report_stages(self) -> dict[str, Any]:
+        """Project the internal seven-stage protocol onto hot-first reporting."""
+
+        bindings = dict((self.details.get("evaluation") or {}).get("stage_bindings") or {})
+        if (
+            bindings.get("first_temperature") != "hot"
+            or bindings.get("second_temperature") != "cold"
+        ):
+            raise ValueError(
+                "WA-02/report-v1 requires the benchmark hot-first profile"
+            )
+        stages = {}
+        for name in REPORT_STAGE_ORDER:
+            internal = self.stages[_REPORT_STAGE_SOURCES[name]]
+            passed = bool(self.success) if name == "success" else bool(
+                internal.qualified
+            )
+            stages[name] = {
+                "applicable": True,
+                "passed": passed,
+                "first_pass_step": internal.qualified_step if passed else None,
+            }
+        return {
+            "schema_version": "membench.report_stages/v1",
+            "task_id": WA02_REPORT_PROFILE.task_id,
+            "profile_id": REPORT_STAGE_PROFILE_ID,
+            "order": list(REPORT_STAGE_ORDER),
+            "stages": stages,
+        }
 
 
 @dataclass
@@ -437,7 +478,13 @@ def diagnostics_for_runtime(runtime: Any) -> Mapping[str, Any]:
     return evaluate_initialized_runtime(runtime).to_diagnostics()
 
 
+def report_stages_for_runtime(runtime: Any) -> Mapping[str, Any]:
+    return evaluate_initialized_runtime(runtime).to_report_stages()
+
+
 __all__ = [
+    "REPORT_STAGE_ORDER",
+    "REPORT_STAGE_PROFILE_ID",
     "STAGE_ORDER",
     "STAGE_LABELS",
     "STAGE_PREREQUISITES",
@@ -448,5 +495,6 @@ __all__ = [
     "WA02Evaluator",
     "diagnostics_for_runtime",
     "evaluate_initialized_runtime",
+    "report_stages_for_runtime",
     "success_for_runtime",
 ]

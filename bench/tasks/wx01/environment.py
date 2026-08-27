@@ -17,6 +17,7 @@ from bench.tasks.wx01.domain.semantics import (
     evaluate_success,
     record_wipe_completion,
 )
+from bench.tasks.wx01.evaluation import WX01EvaluationSnapshot, WX01Evaluator
 from bench.tasks.wx01.prompts import resolve_prompt_spec
 
 
@@ -63,6 +64,7 @@ class WX01ReturnObjectToOriginalPlace(Kitchen):
             blocking_object_rotation,
             "blocking_object_rotation",
         )
+        self._wx01_evaluator: WX01Evaluator | None = None
         super().__init__(**kwargs)
 
     def _setup_kitchen_references(self) -> None:
@@ -86,6 +88,7 @@ class WX01ReturnObjectToOriginalPlace(Kitchen):
 
         super()._setup_scene()
         self._semantic_state = SemanticState()
+        self._wx01_evaluator = None
         self.table_contact_positions: list[np.ndarray] = []
         self.table_contact_timer = 0
         self.wipe_sweep_range = 0.0
@@ -183,12 +186,28 @@ class WX01ReturnObjectToOriginalPlace(Kitchen):
     def task_diagnostics(self) -> dict[str, object]:
         """Return complete evidence for every authoritative success condition."""
 
+        snapshot = self.evaluation_snapshot()
+        if self._wx01_evaluator is not None:
+            return self._wx01_evaluator.observe(snapshot).to_diagnostics()
+        return {
+            **dict(snapshot.details),
+            "success": bool(snapshot.domain_success),
+            "terminal": bool(snapshot.domain_success),
+            "failure_code": None,
+        }
+
+    def evaluation_snapshot(self) -> WX01EvaluationSnapshot:
+        """Expose wipe history and current cleanup and return predicates."""
+
         self.update_state()
         physical = self._physical_state()
         report = evaluate_success(self._semantic_state, physical)
-        return {
-            "success": report.success,
+        details = {
             "success_checks": report.checks(),
+            "release_checks": {
+                "cleaning_tool_released": physical.cleaning_tool_released,
+                "blocking_object_released": physical.blocking_object_released,
+            },
             "original_area_wiped": bool(self.original_area_wiped),
             "table_contact_timer": int(self.table_contact_timer),
             "wipe_sweep_range": float(self.wipe_sweep_range),
@@ -200,6 +219,18 @@ class WX01ReturnObjectToOriginalPlace(Kitchen):
                 physical.cleaning_tool_released and physical.blocking_object_released
             ),
         }
+        return WX01EvaluationSnapshot(
+            step_id=int(getattr(self, "timestep", 0)),
+            remembered_area_wiped=self._semantic_state.remembered_area_wiped,
+            cleaning_tool_released=physical.cleaning_tool_released,
+            blocking_object_at_origin=physical.blocking_object_at_origin,
+            blocking_object_on_dining_table=(
+                physical.blocking_object_on_dining_table
+            ),
+            blocking_object_released=physical.blocking_object_released,
+            domain_success=report.success,
+            details=details,
+        )
 
     def get_object_world_position(self, object_name: str) -> np.ndarray:
         """Read a task object body position in world coordinates."""
