@@ -101,16 +101,34 @@ def record_final_take(state: SemanticState, cup_id: str) -> None:
     state.final_taken_cup_id = _cup(cup_id)
 
 
+def cup_for_temperature(state: SemanticState, temperature: str) -> str | None:
+    """Return the uniquely observed cup for one physically recorded temperature."""
+
+    temp = _temperature(temperature)
+    matches = [
+        cup
+        for cup, recorded in state.filled_temperature_by_cup.items()
+        if recorded == temp
+    ]
+    return matches[0] if len(matches) == 1 else None
+
+
 def evaluate_success(state: SemanticState) -> SuccessReport:
     """Compute WA-02's only authoritative final result."""
 
-    hot_filled = state.filled_temperature_by_cup.get(state.hot_cup_id) == "hot"
-    cold_filled = state.filled_temperature_by_cup.get(state.cold_cup_id) == "cold"
+    hot_cup = cup_for_temperature(state, "hot")
+    cold_cup = cup_for_temperature(state, "cold")
+    hot_filled = hot_cup is not None
+    cold_filled = cold_cup is not None and cold_cup != hot_cup
     staged = bool(
         state.cups_staged_before_final_pick
-        and state.staged_slot_by_cup == state.service_slot_by_cup
+        and set(state.staged_slot_by_cup) == set(CUP_IDS)
+        and set(state.staged_slot_by_cup.values()) == set(SERVICE_SLOTS)
     )
-    requested_taken = state.final_taken_cup_id == state.requested_cup_id
+    requested_cup = cup_for_temperature(state, state.requested_temperature)
+    requested_taken = (
+        requested_cup is not None and state.final_taken_cup_id == requested_cup
+    )
     selected_temp = (
         state.filled_temperature_by_cup.get(state.final_taken_cup_id or "")
         == state.requested_temperature
@@ -141,6 +159,7 @@ def _temperature(value: str) -> str:
 __all__ = [
     "SemanticState",
     "SuccessReport",
+    "cup_for_temperature",
     "evaluate_success",
     "latch_cups_staged",
     "record_final_take",

@@ -38,7 +38,8 @@ def _bare_environment() -> WA02ServeHotColdWaterCups:
     env.cup_fill_progress = {"cup_A": 0.0, "cup_B": 0.0}
     env.cup_temperatures = {"cup_A": None, "cup_B": None}
     env.cup_filled = {"cup_A": False, "cup_B": False}
-    env.are_cups_physically_staged = lambda: False
+    env.service_slot_poses = {"slot_1": [0.0, 0.0, 0.0], "slot_2": [1.0, 0.0, 0.0]}
+    env.cup_is_at_service_slot = lambda cup, slot: False
     env._cup_physically_staged = lambda cup, slot: False
     env.cup_is_under_sensor_faucet = lambda cup, temperature: False
     return env
@@ -78,7 +79,7 @@ def test_wa02_staging_requires_release() -> None:
     held = {"cup_A": True, "cup_B": False}
     env.object_position = lambda cup: positions[cup]
     env._cup_physically_grasped = lambda cup: held[cup]
-    env._cup_physically_staged = lambda cup, slot: cup == "cup_A"
+    env.detected_service_slot = lambda cup: "slot_2" if cup == "cup_A" else None
 
     env._update_task_events_from_physics()
     assert "cup_A" not in env._semantic_state.staged_slot_by_cup
@@ -86,7 +87,15 @@ def test_wa02_staging_requires_release() -> None:
     held["cup_A"] = False
     env.timestep += 1
     env._update_task_events_from_physics()
-    assert env._semantic_state.staged_slot_by_cup == {"cup_A": "slot_1"}
+    assert env._semantic_state.staged_slot_by_cup == {"cup_A": "slot_2"}
+
+
+def test_wa02_physical_staging_accepts_swapped_slot_assignment() -> None:
+    env = _bare_environment()
+    actual = {"cup_A": "slot_2", "cup_B": "slot_1"}
+    env.cup_is_at_service_slot = lambda cup, slot: actual[cup] == slot
+
+    assert env.are_cups_physically_staged()
 
 
 def test_wa02_selection_requires_release_then_sustained_regrasp() -> None:

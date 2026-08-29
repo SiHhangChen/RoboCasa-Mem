@@ -36,15 +36,6 @@ TASK_EVALUATOR_METADATA_KEY = "task_evaluator"
 REPORT_STAGE_ORDER = WA02_REPORT_PROFILE.stage_ids
 REPORT_STAGE_PROFILE_ID = WA02_REPORT_PROFILE.profile_id
 
-_REPORT_STAGE_SOURCES = {
-    "hot_cup_filled": "first_cup_fill",
-    "hot_cup_ready": "first_cup_ready",
-    "cold_cup_filled": "second_cup_fill",
-    "both_cups_ready": "second_cup_ready",
-    "success": "selection_success",
-}
-
-
 def _cup(value: Any) -> str:
     result = str(value)
     if result not in CUP_IDS:
@@ -59,15 +50,6 @@ def _temperature(value: Any) -> str:
     return result
 
 
-def _order(values: Sequence[Any]) -> tuple[str, str]:
-    if isinstance(values, (str, bytes)) or len(values) != 2:
-        raise ValueError("WA-02 fill_cup_order must contain two cups")
-    result = tuple(_cup(value) for value in values)
-    if set(result) != set(CUP_IDS):
-        raise ValueError("WA-02 fill_cup_order must contain each cup exactly once")
-    return result  # type: ignore[return-value]
-
-
 def _temperature_order(values: Sequence[Any]) -> tuple[str, str]:
     if isinstance(values, (str, bytes)) or len(values) != 2:
         raise ValueError("WA-02 fill_temperature_order must contain two temperatures")
@@ -78,24 +60,14 @@ def _temperature_order(values: Sequence[Any]) -> tuple[str, str]:
         )
     return result  # type: ignore[return-value]
 
-
-def _slot_by_cup(values: Mapping[str, Any]) -> dict[str, str]:
-    result = {_cup(cup): str(slot) for cup, slot in values.items()}
-    if set(result) != set(CUP_IDS) or set(result.values()) != set(SERVICE_SLOTS):
-        raise ValueError("WA-02 service_slot_by_cup must map both cups to both slots")
-    return result
-
-
 @dataclass(frozen=True, slots=True)
 class WA02EvaluationSnapshot:
     """Physical and semantic facts sampled at one environment step."""
 
     step_id: int
-    fill_cup_order: tuple[str, str]
+    requested_temperature: str
     fill_temperature_order: tuple[str, str]
-    service_slot_by_cup: Mapping[str, str]
-    requested_cup_id: str
-    pickup_events_by_cup: Mapping[str, bool] = field(default_factory=dict)
+    pickup_step_by_cup: Mapping[str, int] = field(default_factory=dict)
     filled_temperature_by_cup: Mapping[str, str] = field(default_factory=dict)
     staged_slot_by_cup: Mapping[str, str] = field(default_factory=dict)
     final_taken_cup_id: str | None = None
@@ -105,25 +77,23 @@ class WA02EvaluationSnapshot:
         object.__setattr__(self, "step_id", int(self.step_id))
         if self.step_id < 0:
             raise ValueError("WA-02 evaluation step_id must be non-negative")
-        object.__setattr__(self, "fill_cup_order", _order(self.fill_cup_order))
+        object.__setattr__(
+            self, "requested_temperature", _temperature(self.requested_temperature)
+        )
         object.__setattr__(
             self,
             "fill_temperature_order",
             _temperature_order(self.fill_temperature_order),
         )
-        object.__setattr__(
-            self, "service_slot_by_cup", _slot_by_cup(self.service_slot_by_cup)
-        )
-        object.__setattr__(self, "requested_cup_id", _cup(self.requested_cup_id))
         pickup = {
-            _cup(cup): bool(value) for cup, value in self.pickup_events_by_cup.items()
+            _cup(cup): int(value) for cup, value in self.pickup_step_by_cup.items()
         }
-        if set(pickup) - set(CUP_IDS):
-            raise ValueError("unknown cup in pickup_events_by_cup")
+        if any(step < 0 for step in pickup.values()):
+            raise ValueError("WA-02 pickup steps must be non-negative")
         object.__setattr__(
             self,
-            "pickup_events_by_cup",
-            {cup: bool(pickup.get(cup, False)) for cup in CUP_IDS},
+            "pickup_step_by_cup",
+            pickup,
         )
         fills = {
             _cup(cup): _temperature(temp)
@@ -133,6 +103,8 @@ class WA02EvaluationSnapshot:
         staged = {
             _cup(cup): str(slot) for cup, slot in self.staged_slot_by_cup.items()
         }
+        if any(slot not in SERVICE_SLOTS for slot in staged.values()):
+            raise ValueError("invalid WA-02 service slot in staged_slot_by_cup")
         object.__setattr__(self, "staged_slot_by_cup", staged)
         final = (
             None if self.final_taken_cup_id is None else _cup(self.final_taken_cup_id)
@@ -140,47 +112,14 @@ class WA02EvaluationSnapshot:
         object.__setattr__(self, "final_taken_cup_id", final)
         object.__setattr__(self, "details", dict(self.details or {}))
 
-    def cup_for_ordinal(self, ordinal: int) -> str:
-        return self.fill_cup_order[int(ordinal) - 1]
-
-    def temperature_for_ordinal(self, ordinal: int) -> str:
-        return self.fill_temperature_order[int(ordinal) - 1]
-
-    def raw_stage_values(self) -> dict[str, bool]:
-        first, second = self.fill_cup_order
-        first_temp, second_temp = self.fill_temperature_order
-        first_pick = bool(self.pickup_events_by_cup[first])
-        first_fill = first in self.filled_temperature_by_cup
-        first_ready = first in self.staged_slot_by_cup
-        second_pick = bool(self.pickup_events_by_cup[second])
-        second_fill = second in self.filled_temperature_by_cup
-        second_ready = second in self.staged_slot_by_cup
-        del first_temp, second_temp
-        return {
-            "first_cup_pick": first_pick,
-            "first_cup_fill": first_fill,
-            "first_cup_ready": first_ready,
-            "second_cup_pick": second_pick,
-            "second_cup_fill": second_fill,
-            "second_cup_ready": second_ready,
-            "selection_success": self.final_taken_cup_id is not None,
-        }
-
-    def correct_stage_values(self) -> dict[str, bool]:
-        first, second = self.fill_cup_order
-        first_temp, second_temp = self.fill_temperature_order
-        return {
-            "first_cup_pick": bool(self.pickup_events_by_cup[first]),
-            "first_cup_fill": self.filled_temperature_by_cup.get(first) == first_temp,
-            "first_cup_ready": self.staged_slot_by_cup.get(first)
-            == self.service_slot_by_cup[first],
-            "second_cup_pick": bool(self.pickup_events_by_cup[second]),
-            "second_cup_fill": self.filled_temperature_by_cup.get(second)
-            == second_temp,
-            "second_cup_ready": self.staged_slot_by_cup.get(second)
-            == self.service_slot_by_cup[second],
-            "selection_success": self.final_taken_cup_id == self.requested_cup_id,
-        }
+    def cup_for_temperature(self, temperature: str) -> str | None:
+        temp = _temperature(temperature)
+        matches = [
+            cup
+            for cup, recorded in self.filled_temperature_by_cup.items()
+            if recorded == temp
+        ]
+        return matches[0] if len(matches) == 1 else None
 
 
 @dataclass(frozen=True, slots=True)
@@ -237,27 +176,80 @@ class WA02EvalResult:
         return payload
 
     def to_report_stages(self) -> dict[str, Any]:
-        """Project the internal seven-stage protocol onto hot-first reporting."""
+        """Project dynamic temperature bindings onto the stable report-v1 funnel."""
 
         bindings = dict((self.details.get("evaluation") or {}).get("stage_bindings") or {})
-        if (
-            bindings.get("first_temperature") != "hot"
-            or bindings.get("second_temperature") != "cold"
+        sources_by_temperature: dict[str, tuple[str, str]] = {}
+        for temperature, fill_stage, ready_stage in (
+            (bindings.get("first_temperature"), "first_cup_fill", "first_cup_ready"),
+            (bindings.get("second_temperature"), "second_cup_fill", "second_cup_ready"),
         ):
-            raise ValueError(
-                "WA-02/report-v1 requires the benchmark hot-first profile"
-            )
-        stages = {}
-        for name in REPORT_STAGE_ORDER:
-            internal = self.stages[_REPORT_STAGE_SOURCES[name]]
-            passed = bool(self.success) if name == "success" else bool(
-                internal.qualified
-            )
-            stages[name] = {
+            if temperature in TEMPERATURES and temperature not in sources_by_temperature:
+                sources_by_temperature[str(temperature)] = (fill_stage, ready_stage)
+
+        def stage(name: str | None) -> StageEvalResult | None:
+            return None if name is None else self.stages[name]
+
+        def passed(value: StageEvalResult | None) -> bool:
+            return bool(value is not None and value.qualified)
+
+        def gated_step(is_passed: bool, *values: StageEvalResult | None) -> int | None:
+            if not is_passed:
+                return None
+            steps = [
+                value.qualified_step
+                for value in values
+                if value is not None and value.qualified_step is not None
+            ]
+            return max(steps) if steps else None
+
+        hot_sources = sources_by_temperature.get("hot", (None, None))
+        cold_sources = sources_by_temperature.get("cold", (None, None))
+        hot_fill = stage(hot_sources[0])
+        hot_ready = stage(hot_sources[1])
+        cold_fill = stage(cold_sources[0])
+        both_ready = self.stages["second_cup_ready"]
+        selection = self.stages["selection_success"]
+
+        hot_filled = passed(hot_fill)
+        hot_is_ready = bool(hot_filled and passed(hot_ready))
+        # report-v1 is a prefix funnel. For cold-first execution, retain the
+        # physical cold-fill step in diagnostics but expose this milestone only
+        # after the preceding hot-cup milestone is also satisfied.
+        cold_filled = bool(hot_is_ready and passed(cold_fill))
+        both_are_ready = bool(cold_filled and passed(both_ready))
+        succeeded = bool(both_are_ready and self.success)
+        stages = {
+            "hot_cup_filled": {
                 "applicable": True,
-                "passed": passed,
-                "first_pass_step": internal.qualified_step if passed else None,
-            }
+                "passed": hot_filled,
+                "first_pass_step": gated_step(hot_filled, hot_fill),
+            },
+            "hot_cup_ready": {
+                "applicable": True,
+                "passed": hot_is_ready,
+                "first_pass_step": gated_step(hot_is_ready, hot_fill, hot_ready),
+            },
+            "cold_cup_filled": {
+                "applicable": True,
+                "passed": cold_filled,
+                "first_pass_step": gated_step(
+                    cold_filled, hot_fill, hot_ready, cold_fill
+                ),
+            },
+            "both_cups_ready": {
+                "applicable": True,
+                "passed": both_are_ready,
+                "first_pass_step": gated_step(
+                    both_are_ready, hot_fill, hot_ready, cold_fill, both_ready
+                ),
+            },
+            "success": {
+                "applicable": True,
+                "passed": succeeded,
+                "first_pass_step": gated_step(succeeded, selection),
+            },
+        }
         return {
             "schema_version": "membench.report_stages/v1",
             "task_id": WA02_REPORT_PROFILE.task_id,
@@ -281,15 +273,13 @@ class WA02Evaluator:
     def __init__(
         self,
         *,
-        fill_cup_order: Sequence[str],
         fill_temperature_order: Sequence[str],
-        service_slot_by_cup: Mapping[str, str],
-        requested_cup_id: str,
+        requested_temperature: str,
     ) -> None:
-        self.fill_cup_order = _order(fill_cup_order)
         self.fill_temperature_order = _temperature_order(fill_temperature_order)
-        self.service_slot_by_cup = _slot_by_cup(service_slot_by_cup)
-        self.requested_cup_id = _cup(requested_cup_id)
+        self.requested_temperature = _temperature(requested_temperature)
+        self.first_cup_id: str | None = None
+        self.second_cup_id: str | None = None
         self._stages = {name: _MutableStage() for name in STAGE_ORDER}
         self._rejected: dict[str, list[dict[str, Any]]] = {name: [] for name in STAGE_ORDER}
         self._previous_raw = {name: False for name in STAGE_ORDER}
@@ -298,9 +288,12 @@ class WA02Evaluator:
 
     def reset(self, snapshot: WA02EvaluationSnapshot) -> WA02EvalResult:
         self._validate_configuration(snapshot)
+        self.first_cup_id = None
+        self.second_cup_id = None
         self._stages = {name: _MutableStage() for name in STAGE_ORDER}
         self._rejected = {name: [] for name in STAGE_ORDER}
-        raw = snapshot.raw_stage_values()
+        self._bind_cup_order(snapshot)
+        raw, _ = self._stage_values(snapshot)
         for name, value in raw.items():
             if value:
                 self._mark_observed(name, snapshot.step_id)
@@ -322,8 +315,8 @@ class WA02Evaluator:
             raise ValueError(
                 f"WA-02 evaluation step moved backwards: {snapshot.step_id} < {self._last_step_id}"
             )
-        raw = snapshot.raw_stage_values()
-        correct = snapshot.correct_stage_values()
+        self._bind_cup_order(snapshot)
+        raw, correct = self._stage_values(snapshot)
         qualified_before = {name: self._stages[name].qualified for name in STAGE_ORDER}
         newly_qualified: set[str] = set()
         for name, value in raw.items():
@@ -355,18 +348,80 @@ class WA02Evaluator:
 
     def _validate_configuration(self, snapshot: WA02EvaluationSnapshot) -> None:
         if (
-            snapshot.fill_cup_order != self.fill_cup_order
-            or snapshot.fill_temperature_order != self.fill_temperature_order
-            or dict(snapshot.service_slot_by_cup) != self.service_slot_by_cup
-            or snapshot.requested_cup_id != self.requested_cup_id
+            snapshot.fill_temperature_order != self.fill_temperature_order
+            or snapshot.requested_temperature != self.requested_temperature
         ):
             raise ValueError("WA-02 evaluation snapshot configuration changed within an episode")
 
+    def _bind_cup_order(self, snapshot: WA02EvaluationSnapshot) -> None:
+        if self.first_cup_id is not None:
+            return
+        pickup_steps = dict(snapshot.pickup_step_by_cup)
+        if not pickup_steps:
+            return
+        earliest = min(pickup_steps.values())
+        first_candidates = [
+            cup for cup, step in pickup_steps.items() if int(step) == earliest
+        ]
+        if len(first_candidates) != 1:
+            self._mark_observed("first_cup_pick", snapshot.step_id)
+            self._reject("first_cup_pick", snapshot.step_id, "ambiguous_pickup_order")
+            return
+        first = first_candidates[0]
+        self.first_cup_id = first
+        self.second_cup_id = next(cup for cup in CUP_IDS if cup != first)
+
+    def _stage_values(
+        self, snapshot: WA02EvaluationSnapshot
+    ) -> tuple[dict[str, bool], dict[str, bool]]:
+        first = self.first_cup_id
+        second = self.second_cup_id
+        first_temp = snapshot.filled_temperature_by_cup.get(first or "")
+        second_temp = snapshot.filled_temperature_by_cup.get(second or "")
+        staged = dict(snapshot.staged_slot_by_cup)
+        both_slots_used = bool(
+            first is not None
+            and second is not None
+            and first in staged
+            and second in staged
+            and set(staged.values()) == set(SERVICE_SLOTS)
+        )
+        requested_cup = snapshot.cup_for_temperature(self.requested_temperature)
+        raw = {
+            "first_cup_pick": first is not None and first in snapshot.pickup_step_by_cup,
+            "first_cup_fill": first is not None and first in snapshot.filled_temperature_by_cup,
+            "first_cup_ready": first is not None and first in staged,
+            "second_cup_pick": second is not None and second in snapshot.pickup_step_by_cup,
+            "second_cup_fill": second is not None and second in snapshot.filled_temperature_by_cup,
+            "second_cup_ready": second is not None and second in staged,
+            "selection_success": snapshot.final_taken_cup_id is not None,
+        }
+        correct = {
+            "first_cup_pick": raw["first_cup_pick"],
+            "first_cup_fill": raw["first_cup_fill"],
+            "first_cup_ready": bool(first is not None and staged.get(first) in SERVICE_SLOTS),
+            "second_cup_pick": raw["second_cup_pick"],
+            "second_cup_fill": bool(
+                raw["second_cup_fill"]
+                and first_temp is not None
+                and second_temp is not None
+                and first_temp != second_temp
+            ),
+            "second_cup_ready": both_slots_used,
+            "selection_success": bool(
+                requested_cup is not None
+                and snapshot.final_taken_cup_id == requested_cup
+            ),
+        }
+        return raw, correct
+
     def _incorrect_reason(self, name: str) -> str:
-        if name in {"first_cup_fill", "second_cup_fill"}:
-            return "wrong_fill_temperature"
+        if name == "second_cup_fill":
+            return "duplicate_fill_temperature"
+        if name == "first_cup_fill":
+            return "invalid_fill_temperature"
         if name in {"first_cup_ready", "second_cup_ready"}:
-            return "wrong_service_slot"
+            return "invalid_service_staging"
         if name == "selection_success":
             return "wrong_cup_selected"
         return "physical_condition_not_verified"
@@ -427,18 +482,33 @@ class WA02Evaluator:
         evaluation = dict(details.get("evaluation") or {})
         evaluation.update(
             {
-                "profile_id": "wa02-seven-stage-v1",
-                "schema_version": 1,
+                "profile_id": "wa02-seven-stage-v3",
+                "schema_version": 3,
                 "step_id": int(snapshot.step_id),
                 "stage_order": list(STAGE_ORDER),
                 "stage_prerequisites": dict(STAGE_PREREQUISITES),
-                "qualification_policy": "rising_edge_after_prerequisite_and_correctness",
+                "qualification_policy": (
+                    "rising_edge_after_prerequisite_and_dynamic_temperature_binding"
+                ),
                 "stage_bindings": {
-                    "first_cup_id": self.fill_cup_order[0],
-                    "first_temperature": self.fill_temperature_order[0],
-                    "second_cup_id": self.fill_cup_order[1],
-                    "second_temperature": self.fill_temperature_order[1],
+                    "binding_source": "physical_events",
+                    "first_cup_id": self.first_cup_id,
+                    "first_temperature": snapshot.filled_temperature_by_cup.get(
+                        self.first_cup_id or ""
+                    ),
+                    "second_cup_id": self.second_cup_id,
+                    "second_temperature": snapshot.filled_temperature_by_cup.get(
+                        self.second_cup_id or ""
+                    ),
+                    "requested_temperature": self.requested_temperature,
+                    "requested_cup_id": snapshot.cup_for_temperature(
+                        self.requested_temperature
+                    ),
+                    "service_slot_by_cup": dict(snapshot.staged_slot_by_cup),
                 },
+                "demonstration_temperature_order": list(
+                    self.fill_temperature_order
+                ),
                 "rejected_stage_observations": {
                     name: list(values) for name, values in self._rejected.items() if values
                 },

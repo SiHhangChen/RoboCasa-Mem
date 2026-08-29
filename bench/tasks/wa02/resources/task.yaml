@@ -22,8 +22,8 @@ scene:
 episode:
   hot_cup_id: null
   requested_temperature: null
-  # Fill order is fixed while cup identity and final request stay balanced.
-  # Temperature is encoded only by the selected faucet, never by cup appearance.
+  # Expert demonstrations use a fixed order; learned-policy evaluation accepts
+  # either order and binds temperature only from the physically selected faucet.
   fill_order: hot-first
   service_slot_by_cup: null
   max_horizon: 6000

@@ -22,10 +22,12 @@ from bench.tasks.wa02.domain.geometry import (
 
 
 def balanced_axes_for_seed(seed: int) -> dict[str, Any]:
-    """Return the balanced 2 x 2 x 2 label grid entry for one seed.
+    """Return balanced expert-demonstration choices for one seed.
 
-    Across every consecutive block of eight seeds, hot-cup identity, requested
-    temperature, and service-slot permutation are mutually balanced.
+    Across every consecutive block of eight seeds, the expert's first/hot cup,
+    requested temperature, and service-slot permutation are mutually balanced.
+    Only requested temperature is an evaluation target; cup and slot identities
+    are bound from the policy's physical actions at runtime.
     """
 
     index = int(seed) % 8
@@ -105,7 +107,7 @@ def resolve_scene_config(*, seed: int, env_split: str, **values: Any) -> SceneCo
 
 
 def resolve_episode_plan(*, seed: int, **values: Any) -> EpisodePlan:
-    """Freeze every hidden WA-02 decision before environment construction."""
+    """Resolve task inputs and a deterministic expert demonstration trajectory."""
 
     balanced = balanced_axes_for_seed(seed)
     configured_hot = values.get("hot_cup_id")

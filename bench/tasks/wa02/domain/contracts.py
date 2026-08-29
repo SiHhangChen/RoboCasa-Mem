@@ -96,7 +96,12 @@ class SceneConfig:
 
 @dataclass(frozen=True)
 class EpisodePlan:
-    """All hidden task decisions frozen before the environment is created."""
+    """Episode inputs plus deterministic choices used by the expert rollout.
+
+    ``hot_cup_id``, ``cold_cup_id``, ``requested_cup_id``, and
+    ``service_slot_by_cup`` define the demonstration trajectory. Learned-policy
+    evaluation derives those bindings from physical fill and staging events.
+    """
 
     seed: int
     hot_cup_id: str

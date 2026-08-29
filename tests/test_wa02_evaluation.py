@@ -20,23 +20,24 @@ from bench.tasks.wa02.evaluation import (
 def _snapshot(
     step: int,
     *,
-    cup_order: tuple[str, str] = ("cup_A", "cup_B"),
+    requested_temperature: str = "hot",
     temperature_order: tuple[str, str] = ("hot", "cold"),
-    slots: dict[str, str] | None = None,
-    requested: str = "cup_A",
     picked: tuple[str, ...] = (),
+    pick_steps: dict[str, int] | None = None,
     filled: dict[str, str] | None = None,
     staged: dict[str, str] | None = None,
     selected: str | None = None,
 ) -> WA02EvaluationSnapshot:
-    resolved_slots = slots or {"cup_A": "slot_1", "cup_B": "slot_2"}
+    resolved_pick_steps = (
+        dict(pick_steps)
+        if pick_steps is not None
+        else {cup: 1 + 3 * index for index, cup in enumerate(picked)}
+    )
     return WA02EvaluationSnapshot(
         step_id=step,
-        fill_cup_order=cup_order,
+        requested_temperature=requested_temperature,
         fill_temperature_order=temperature_order,
-        service_slot_by_cup=resolved_slots,
-        requested_cup_id=requested,
-        pickup_events_by_cup={cup: cup in picked for cup in ("cup_A", "cup_B")},
+        pickup_step_by_cup=resolved_pick_steps,
         filled_temperature_by_cup=filled or {},
         staged_slot_by_cup=staged or {},
         final_taken_cup_id=selected,
@@ -44,90 +45,113 @@ def _snapshot(
     )
 
 
-def _evaluator(**configuration: object) -> WA02Evaluator:
-    values = {
-        "cup_order": ("cup_A", "cup_B"),
-        "temperature_order": ("hot", "cold"),
-        "slots": {"cup_A": "slot_1", "cup_B": "slot_2"},
-        "requested": "cup_A",
-    }
-    values.update(configuration)
+def _evaluator(
+    *,
+    requested_temperature: str = "hot",
+    temperature_order: tuple[str, str] = ("hot", "cold"),
+) -> WA02Evaluator:
     evaluator = WA02Evaluator(
-        fill_cup_order=values["cup_order"],
-        fill_temperature_order=values["temperature_order"],
-        service_slot_by_cup=values["slots"],
-        requested_cup_id=values["requested"],
+        fill_temperature_order=temperature_order,
+        requested_temperature=requested_temperature,
     )
-    evaluator.reset(_snapshot(0, **values))
+    evaluator.reset(
+        _snapshot(
+            0,
+            requested_temperature=requested_temperature,
+            temperature_order=temperature_order,
+        )
+    )
     return evaluator
 
 
-def test_wa02_evaluator_qualifies_all_seven_stages_in_order() -> None:
-    evaluator = _evaluator()
-
-    evaluator.observe(_snapshot(1, picked=("cup_A",)))
-    evaluator.observe(
-        _snapshot(2, picked=("cup_A",), filled={"cup_A": "hot"})
-    )
-    evaluator.observe(
+def _successful_snapshots(
+    *,
+    first: str = "cup_A",
+    first_temperature: str = "hot",
+    requested_temperature: str = "hot",
+    first_slot: str = "slot_1",
+) -> list[WA02EvaluationSnapshot]:
+    second = "cup_B" if first == "cup_A" else "cup_A"
+    second_temperature = "cold" if first_temperature == "hot" else "hot"
+    second_slot = "slot_2" if first_slot == "slot_1" else "slot_1"
+    common = {
+        "requested_temperature": requested_temperature,
+        "picked": (first, second),
+    }
+    return [
+        _snapshot(1, requested_temperature=requested_temperature, picked=(first,)),
+        _snapshot(
+            2,
+            requested_temperature=requested_temperature,
+            picked=(first,),
+            filled={first: first_temperature},
+        ),
         _snapshot(
             3,
-            picked=("cup_A",),
-            filled={"cup_A": "hot"},
-            staged={"cup_A": "slot_1"},
-        )
-    )
-    evaluator.observe(
+            requested_temperature=requested_temperature,
+            picked=(first,),
+            filled={first: first_temperature},
+            staged={first: first_slot},
+        ),
         _snapshot(
             4,
-            picked=("cup_A", "cup_B"),
-            filled={"cup_A": "hot"},
-            staged={"cup_A": "slot_1"},
-        )
-    )
-    evaluator.observe(
+            **common,
+            filled={first: first_temperature},
+            staged={first: first_slot},
+        ),
         _snapshot(
             5,
-            picked=("cup_A", "cup_B"),
-            filled={"cup_A": "hot", "cup_B": "cold"},
-            staged={"cup_A": "slot_1"},
-        )
-    )
-    evaluator.observe(
+            **common,
+            filled={first: first_temperature, second: second_temperature},
+            staged={first: first_slot},
+        ),
         _snapshot(
             6,
-            picked=("cup_A", "cup_B"),
-            filled={"cup_A": "hot", "cup_B": "cold"},
-            staged={"cup_A": "slot_1", "cup_B": "slot_2"},
-        )
+            **common,
+            filled={first: first_temperature, second: second_temperature},
+            staged={first: first_slot, second: second_slot},
+        ),
+    ]
+
+
+def test_wa02_evaluator_qualifies_actual_hot_cold_binding() -> None:
+    evaluator = _evaluator(requested_temperature="cold")
+    snapshots = _successful_snapshots(
+        first="cup_A", requested_temperature="cold", first_slot="slot_2"
     )
+    for snapshot in snapshots:
+        evaluator.observe(snapshot)
     result = evaluator.observe(
         _snapshot(
             7,
+            requested_temperature="cold",
             picked=("cup_A", "cup_B"),
             filled={"cup_A": "hot", "cup_B": "cold"},
-            staged={"cup_A": "slot_1", "cup_B": "slot_2"},
-            selected="cup_A",
+            staged={"cup_A": "slot_2", "cup_B": "slot_1"},
+            selected="cup_B",
         )
     )
 
     assert result.success
     assert result.terminal
     assert result.failure_code is None
+    assert result.details["evaluation"]["profile_id"] == "wa02-seven-stage-v3"
     assert {stage: result.stages[stage].qualified_step for stage in STAGE_ORDER} == {
         stage: index for index, stage in enumerate(STAGE_ORDER, start=1)
     }
-    diagnostics = result.to_diagnostics()
-    assert diagnostics["evaluation"]["profile_id"] == "wa02-seven-stage-v1"
-    assert all(diagnostics["stage_checks"].values())
+    bindings = result.details["evaluation"]["stage_bindings"]
+    assert bindings == {
+        "binding_source": "physical_events",
+        "first_cup_id": "cup_A",
+        "first_temperature": "hot",
+        "second_cup_id": "cup_B",
+        "second_temperature": "cold",
+        "requested_temperature": "cold",
+        "requested_cup_id": "cup_B",
+        "service_slot_by_cup": {"cup_A": "slot_2", "cup_B": "slot_1"},
+    }
     report = result.to_report_stages()
-    assert report["order"] == [
-        "hot_cup_filled",
-        "hot_cup_ready",
-        "cold_cup_filled",
-        "both_cups_ready",
-        "success",
-    ]
+    assert report["order"] == list(REPORT_STAGE_ORDER)
     assert {
         name: report["stages"][name]["first_pass_step"]
         for name in REPORT_STAGE_ORDER
@@ -146,65 +170,34 @@ def test_wa02_evaluator_qualifies_all_seven_stages_in_order() -> None:
     ) == report
 
 
-def test_wa02_evaluator_binds_first_and_second_to_episode_order() -> None:
-    configuration = {
-        "cup_order": ("cup_B", "cup_A"),
-        "temperature_order": ("cold", "hot"),
-        "slots": {"cup_A": "slot_2", "cup_B": "slot_1"},
-        "requested": "cup_B",
-    }
-    evaluator = _evaluator(**configuration)
+def test_wa02_evaluator_accepts_either_physical_cup_as_first() -> None:
+    evaluator = _evaluator(requested_temperature="hot")
+    for snapshot in _successful_snapshots(
+        first="cup_B", requested_temperature="hot", first_slot="slot_1"
+    ):
+        evaluator.observe(snapshot)
+    result = evaluator.observe(
+        _snapshot(
+            7,
+            requested_temperature="hot",
+            picked=("cup_B", "cup_A"),
+            filled={"cup_B": "hot", "cup_A": "cold"},
+            staged={"cup_B": "slot_1", "cup_A": "slot_2"},
+            selected="cup_B",
+        )
+    )
 
-    states = [
-        {"picked": ("cup_B",)},
-        {"picked": ("cup_B",), "filled": {"cup_B": "cold"}},
-        {
-            "picked": ("cup_B",),
-            "filled": {"cup_B": "cold"},
-            "staged": {"cup_B": "slot_1"},
-        },
-        {
-            "picked": ("cup_B", "cup_A"),
-            "filled": {"cup_B": "cold"},
-            "staged": {"cup_B": "slot_1"},
-        },
-        {
-            "picked": ("cup_B", "cup_A"),
-            "filled": {"cup_B": "cold", "cup_A": "hot"},
-            "staged": {"cup_B": "slot_1"},
-        },
-        {
-            "picked": ("cup_B", "cup_A"),
-            "filled": {"cup_B": "cold", "cup_A": "hot"},
-            "staged": {"cup_B": "slot_1", "cup_A": "slot_2"},
-        },
-        {
-            "picked": ("cup_B", "cup_A"),
-            "filled": {"cup_B": "cold", "cup_A": "hot"},
-            "staged": {"cup_B": "slot_1", "cup_A": "slot_2"},
-            "selected": "cup_B",
-        },
-    ]
-    result = None
-    for step, state in enumerate(states, start=1):
-        result = evaluator.observe(_snapshot(step, **configuration, **state))
-
-    assert result is not None and result.success
+    assert result.success
     bindings = result.details["evaluation"]["stage_bindings"]
-    assert bindings == {
-        "first_cup_id": "cup_B",
-        "first_temperature": "cold",
-        "second_cup_id": "cup_A",
-        "second_temperature": "hot",
-    }
-    with pytest.raises(ValueError, match="hot-first"):
-        result.to_report_stages()
+    assert bindings["first_cup_id"] == "cup_B"
+    assert bindings["second_cup_id"] == "cup_A"
+    assert bindings["requested_cup_id"] == "cup_B"
 
 
 def test_wa02_evaluator_rejects_second_pick_before_first_cup_ready() -> None:
     evaluator = _evaluator()
-
-    result = evaluator.observe(_snapshot(1, picked=("cup_B",)))
+    evaluator.observe(_snapshot(1, picked=("cup_A",)))
+    result = evaluator.observe(_snapshot(2, picked=("cup_A", "cup_B")))
 
     stage = result.stages["second_cup_pick"]
     assert stage.observed
@@ -214,66 +207,127 @@ def test_wa02_evaluator_rejects_second_pick_before_first_cup_ready() -> None:
     assert result.failure_code == stage.reason
 
 
-@pytest.mark.parametrize(
-    ("state", "stage", "reason"),
-    [
-        (
-            {"picked": ("cup_A",), "filled": {"cup_A": "cold"}},
-            "first_cup_fill",
-            "wrong_fill_temperature",
-        ),
-        (
-            {
-                "picked": ("cup_A",),
-                "filled": {"cup_A": "hot"},
-                "staged": {"cup_A": "slot_2"},
-            },
-            "first_cup_ready",
-            "wrong_service_slot",
-        ),
-    ],
-)
-def test_wa02_evaluator_observes_but_rejects_incorrect_events(
-    state: dict[str, object], stage: str, reason: str
-) -> None:
-    evaluator = _evaluator()
-    evaluator.observe(_snapshot(1, picked=("cup_A",)))
-    if stage == "first_cup_ready":
-        evaluator.observe(
-            _snapshot(2, picked=("cup_A",), filled={"cup_A": "hot"})
-        )
-        step = 3
-    else:
-        step = 2
-
-    result = evaluator.observe(_snapshot(step, **state))
-
-    assert result.stages[stage].observed
-    assert not result.stages[stage].qualified
-    assert result.stages[stage].reason == reason
-
-
-def test_wa02_evaluator_rejects_selection_before_both_cups_are_ready() -> None:
+def test_wa02_evaluator_binds_first_temperature_from_actual_fill() -> None:
     evaluator = _evaluator()
     evaluator.observe(_snapshot(1, picked=("cup_A",)))
     result = evaluator.observe(
+        _snapshot(2, picked=("cup_A",), filled={"cup_A": "cold"})
+    )
+
+    assert result.stages["first_cup_fill"].observed
+    assert result.stages["first_cup_fill"].qualified
+    bindings = result.details["evaluation"]["stage_bindings"]
+    assert bindings["first_temperature"] == "cold"
+    assert bindings["second_temperature"] is None
+    assert not any(
+        stage["passed"] for stage in result.to_report_stages()["stages"].values()
+    )
+    validate_report_stages(
+        result.to_report_stages(),
+        expected_task_id="WA-02",
+        expected_profile_id="WA-02/report-v1",
+        expected_success=False,
+    )
+
+
+@pytest.mark.parametrize(
+    ("requested_temperature", "selected"),
+    (("cold", "cup_A"), ("hot", "cup_B")),
+)
+def test_wa02_evaluator_accepts_cold_first_execution(
+    requested_temperature: str,
+    selected: str,
+) -> None:
+    evaluator = _evaluator(requested_temperature=requested_temperature)
+    for snapshot in _successful_snapshots(
+        first="cup_A",
+        first_temperature="cold",
+        requested_temperature=requested_temperature,
+        first_slot="slot_2",
+    ):
+        evaluator.observe(snapshot)
+    result = evaluator.observe(
         _snapshot(
-            2,
-            picked=("cup_A",),
-            filled={"cup_A": "hot"},
-            selected="cup_A",
+            7,
+            requested_temperature=requested_temperature,
+            picked=("cup_A", "cup_B"),
+            filled={"cup_A": "cold", "cup_B": "hot"},
+            staged={"cup_A": "slot_2", "cup_B": "slot_1"},
+            selected=selected,
         )
     )
 
-    selection = result.stages["selection_success"]
-    assert selection.observed
-    assert not selection.qualified
-    assert selection.reason == "prerequisite_not_qualified:second_cup_ready"
+    assert result.success
+    assert all(result.stages[name].qualified for name in STAGE_ORDER)
+    bindings = result.details["evaluation"]["stage_bindings"]
+    assert bindings["binding_source"] == "physical_events"
+    assert bindings["first_cup_id"] == "cup_A"
+    assert bindings["first_temperature"] == "cold"
+    assert bindings["second_cup_id"] == "cup_B"
+    assert bindings["second_temperature"] == "hot"
+    assert bindings["requested_temperature"] == requested_temperature
+    assert bindings["requested_cup_id"] == selected
+    assert bindings["service_slot_by_cup"] == {
+        "cup_A": "slot_2",
+        "cup_B": "slot_1",
+    }
+    report = result.to_report_stages()
+    assert {
+        name: report["stages"][name]["first_pass_step"]
+        for name in REPORT_STAGE_ORDER
+    } == {
+        "hot_cup_filled": 5,
+        "hot_cup_ready": 6,
+        "cold_cup_filled": 6,
+        "both_cups_ready": 6,
+        "success": 7,
+    }
+    assert validate_report_stages(
+        report,
+        expected_task_id="WA-02",
+        expected_profile_id="WA-02/report-v1",
+        expected_success=True,
+    ) == report
 
 
-def test_wa02_evaluator_reports_wrong_final_selection() -> None:
+def test_wa02_evaluator_rejects_same_temperature_for_both_cups() -> None:
     evaluator = _evaluator()
-    snapshots = [
+    states = [
+        _snapshot(1, picked=("cup_A",)),
+        _snapshot(2, picked=("cup_A",), filled={"cup_A": "cold"}),
+        _snapshot(
+            3,
+            picked=("cup_A",),
+            filled={"cup_A": "cold"},
+            staged={"cup_A": "slot_1"},
+        ),
+        _snapshot(
+            4,
+            picked=("cup_A", "cup_B"),
+            filled={"cup_A": "cold"},
+            staged={"cup_A": "slot_1"},
+        ),
+    ]
+    for snapshot in states:
+        evaluator.observe(snapshot)
+    result = evaluator.observe(
+        _snapshot(
+            5,
+            picked=("cup_A", "cup_B"),
+            filled={"cup_A": "cold", "cup_B": "cold"},
+            staged={"cup_A": "slot_1"},
+        )
+    )
+
+    stage = result.stages["second_cup_fill"]
+    assert stage.observed
+    assert not stage.qualified
+    assert stage.reason == "duplicate_fill_temperature"
+
+
+def test_wa02_evaluator_rejects_duplicate_service_slot() -> None:
+    evaluator = _evaluator()
+    states = [
         _snapshot(1, picked=("cup_A",)),
         _snapshot(2, picked=("cup_A",), filled={"cup_A": "hot"}),
         _snapshot(
@@ -294,29 +348,69 @@ def test_wa02_evaluator_reports_wrong_final_selection() -> None:
             filled={"cup_A": "hot", "cup_B": "cold"},
             staged={"cup_A": "slot_1"},
         ),
+    ]
+    for snapshot in states:
+        evaluator.observe(snapshot)
+    result = evaluator.observe(
         _snapshot(
             6,
             picked=("cup_A", "cup_B"),
             filled={"cup_A": "hot", "cup_B": "cold"},
-            staged={"cup_A": "slot_1", "cup_B": "slot_2"},
-        ),
-    ]
-    for snapshot in snapshots:
-        evaluator.observe(snapshot)
+            staged={"cup_A": "slot_1", "cup_B": "slot_1"},
+        )
+    )
 
+    assert result.stages["second_cup_ready"].observed
+    assert result.stages["second_cup_ready"].reason == "invalid_service_staging"
+
+
+def test_wa02_evaluator_rejects_selection_before_both_cups_are_ready() -> None:
+    evaluator = _evaluator()
+    evaluator.observe(_snapshot(1, picked=("cup_A",)))
+    result = evaluator.observe(
+        _snapshot(
+            2,
+            picked=("cup_A",),
+            filled={"cup_A": "hot"},
+            selected="cup_A",
+        )
+    )
+
+    selection = result.stages["selection_success"]
+    assert selection.observed
+    assert not selection.qualified
+    assert selection.reason == "prerequisite_not_qualified:second_cup_ready"
+
+
+def test_wa02_evaluator_compares_selection_with_actual_fill() -> None:
+    evaluator = _evaluator(requested_temperature="cold")
+    for snapshot in _successful_snapshots(
+        first="cup_B", requested_temperature="cold", first_slot="slot_2"
+    ):
+        evaluator.observe(snapshot)
     result = evaluator.observe(
         _snapshot(
             7,
-            picked=("cup_A", "cup_B"),
-            filled={"cup_A": "hot", "cup_B": "cold"},
-            staged={"cup_A": "slot_1", "cup_B": "slot_2"},
+            requested_temperature="cold",
+            picked=("cup_B", "cup_A"),
+            filled={"cup_B": "hot", "cup_A": "cold"},
+            staged={"cup_B": "slot_2", "cup_A": "slot_1"},
             selected="cup_B",
         )
     )
 
     assert not result.success
+    assert result.details["evaluation"]["stage_bindings"]["requested_cup_id"] == "cup_A"
     assert result.stages["selection_success"].reason == "wrong_cup_selected"
-    assert result.failure_code == "wrong_cup_selected"
+
+
+def test_wa02_evaluator_rejects_ambiguous_pickup_order() -> None:
+    evaluator = _evaluator()
+    result = evaluator.observe(
+        _snapshot(1, pick_steps={"cup_A": 1, "cup_B": 1})
+    )
+
+    assert result.stages["first_cup_pick"].reason == "ambiguous_pickup_order"
 
 
 def test_wa02_evaluator_is_idempotent_and_rejects_backward_steps() -> None:
@@ -343,22 +437,18 @@ def test_wa02_runtime_callbacks_share_the_initialized_evaluator() -> None:
     diagnostics = diagnostics_for_runtime(runtime)
     assert diagnostics["stage_checks"]["first_cup_pick"]
     assert not success_for_runtime(runtime, {})
-    assert report_stages_for_runtime(runtime)["order"] == list(
-        REPORT_STAGE_ORDER
-    )
+    assert report_stages_for_runtime(runtime)["order"] == list(REPORT_STAGE_ORDER)
     assert diagnostics_for_runtime(runtime) == diagnostics
 
 
-def test_wa02_runtime_initialization_attaches_evaluator(
+def test_wa02_runtime_initialization_attaches_dynamic_evaluator(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from bench.tasks.wa02 import runtime as runtime_module
 
     plan = SimpleNamespace(
-        fill_cup_order=("cup_A", "cup_B"),
         fill_temperature_order=("hot", "cold"),
-        service_slot_by_cup={"cup_A": "slot_1", "cup_B": "slot_2"},
-        requested_cup_id="cup_A",
+        requested_temperature="cold",
     )
     descriptor = SimpleNamespace(
         episode_plan=plan,
@@ -377,7 +467,7 @@ def test_wa02_runtime_initialization_attaches_evaluator(
             self.canonical_physics_configured = True
 
         def evaluation_snapshot(self) -> WA02EvaluationSnapshot:
-            return _snapshot(0)
+            return _snapshot(0, requested_temperature="cold")
 
     monkeypatch.setattr(
         runtime_module,
@@ -397,6 +487,7 @@ def test_wa02_runtime_initialization_attaches_evaluator(
 
     evaluator = metadata[TASK_EVALUATOR_METADATA_KEY]
     assert isinstance(evaluator, WA02Evaluator)
+    assert evaluator.requested_temperature == "cold"
     assert env._wa02_evaluator is evaluator
     assert updated == {"objects": True, "base": True}
 

@@ -25,6 +25,7 @@ from bench.tasks.wa02.domain.geometry import (
 )
 from bench.tasks.wa02.domain.semantics import (
     SemanticState,
+    cup_for_temperature,
     evaluate_success,
     latch_cups_staged,
     record_final_take,
@@ -603,12 +604,27 @@ class WA02ServeHotColdWaterCups(Kitchen):
             return False
 
     def are_cups_physically_staged(self) -> bool:
-        if self._episode_plan is None or not self.service_slot_poses:
+        if not self.service_slot_poses:
             return False
-        return all(
-            self.cup_is_at_service_slot(cup, self._episode_plan.service_slot_by_cup[cup])
+        detected = {
+            cup: slot
             for cup in CUP_IDS
+            if (slot := self.detected_service_slot(cup)) is not None
+        }
+        return bool(
+            set(detected) == set(CUP_IDS)
+            and set(detected.values()) == set(SERVICE_SLOTS)
         )
+
+    def detected_service_slot(self, cup_id: str) -> str | None:
+        """Return the unique service slot currently occupied by one cup."""
+
+        matches = [
+            slot
+            for slot in SERVICE_SLOTS
+            if self.cup_is_at_service_slot(str(cup_id), slot)
+        ]
+        return matches[0] if len(matches) == 1 else None
 
     def faucet_matches(self, *, mode: str, temperature: str | None = None) -> bool:
         """Report the derived touchless state; no handle state is consulted."""
@@ -701,6 +717,11 @@ class WA02ServeHotColdWaterCups(Kitchen):
             return evaluator.observe(self.evaluation_snapshot()).to_diagnostics()
         self.update_state()
         report = evaluate_success(self._semantic_state)
+        actual_hot_cup = cup_for_temperature(self._semantic_state, "hot")
+        actual_cold_cup = cup_for_temperature(self._semantic_state, "cold")
+        actual_requested_cup = cup_for_temperature(
+            self._semantic_state, self._semantic_state.requested_temperature
+        )
         slots = {
             slot: np.asarray(position, dtype=float).tolist()
             for slot, position in self.service_slot_poses.items()
@@ -710,11 +731,22 @@ class WA02ServeHotColdWaterCups(Kitchen):
             "success_checks": report.checks(),
             "physical_events": dict(self._physical_event_diagnostics),
             "oracle": {
-                "hot_cup_id": self._semantic_state.hot_cup_id,
-                "cold_cup_id": self._semantic_state.cold_cup_id,
+                "binding_source": "physical_events",
+                "hot_cup_id": actual_hot_cup,
+                "cold_cup_id": actual_cold_cup,
                 "requested_temperature": self._semantic_state.requested_temperature,
-                "requested_cup_id": self._semantic_state.requested_cup_id,
-                "service_slot_by_cup": dict(self._semantic_state.service_slot_by_cup),
+                "requested_cup_id": actual_requested_cup,
+                "service_slot_by_cup": dict(
+                    self._semantic_state.staged_slot_by_cup
+                ),
+                "expert_plan": {
+                    "hot_cup_id": self.episode_plan.hot_cup_id,
+                    "cold_cup_id": self.episode_plan.cold_cup_id,
+                    "requested_cup_id": self.episode_plan.requested_cup_id,
+                    "service_slot_by_cup": dict(
+                        self.episode_plan.service_slot_by_cup
+                    ),
+                },
             },
             "fill": {
                 "water_control_mode": "twin_proximity_sensor_faucets",
@@ -748,15 +780,13 @@ class WA02ServeHotColdWaterCups(Kitchen):
         details = self.task_diagnostics_fallback()
         return WA02EvaluationSnapshot(
             step_id=int(getattr(self, "timestep", 0)),
-            fill_cup_order=plan.fill_cup_order,
+            requested_temperature=plan.requested_temperature,
             fill_temperature_order=plan.fill_temperature_order,
-            service_slot_by_cup=plan.service_slot_by_cup,
-            requested_cup_id=plan.requested_cup_id,
-            pickup_events_by_cup={
-                cup: cup in self._physical_event_diagnostics.get(
+            pickup_step_by_cup={
+                cup: int(event["step"])
+                for cup, event in self._physical_event_diagnostics.get(
                     "pickup_detected_by_cup", {}
-                )
-                for cup in CUP_IDS
+                ).items()
             },
             filled_temperature_by_cup=dict(
                 self._semantic_state.filled_temperature_by_cup
@@ -774,17 +804,39 @@ class WA02ServeHotColdWaterCups(Kitchen):
             for slot, position in self.service_slot_poses.items()
         }
         report = evaluate_success(self._semantic_state)
+        actual_hot_cup = cup_for_temperature(self._semantic_state, "hot")
+        actual_cold_cup = cup_for_temperature(self._semantic_state, "cold")
+        actual_requested_cup = cup_for_temperature(
+            self._semantic_state, self._semantic_state.requested_temperature
+        )
+        actual_fills = list(self._semantic_state.filled_temperature_by_cup.items())
         return {
             "success_checks_legacy": report.checks(),
             "physical_events": dict(self._physical_event_diagnostics),
             "oracle": {
-                "hot_cup_id": self._semantic_state.hot_cup_id,
-                "cold_cup_id": self._semantic_state.cold_cup_id,
+                "binding_source": "physical_events",
+                "hot_cup_id": actual_hot_cup,
+                "cold_cup_id": actual_cold_cup,
                 "requested_temperature": self._semantic_state.requested_temperature,
-                "requested_cup_id": self._semantic_state.requested_cup_id,
-                "fill_cup_order": list(self.episode_plan.fill_cup_order),
-                "fill_temperature_order": list(self.episode_plan.fill_temperature_order),
-                "service_slot_by_cup": dict(self._semantic_state.service_slot_by_cup),
+                "requested_cup_id": actual_requested_cup,
+                "fill_cup_order": [cup for cup, _ in actual_fills],
+                "fill_temperature_order": [
+                    temperature for _, temperature in actual_fills
+                ],
+                "service_slot_by_cup": dict(
+                    self._semantic_state.staged_slot_by_cup
+                ),
+                "expert_plan": {
+                    "hot_cup_id": self.episode_plan.hot_cup_id,
+                    "cold_cup_id": self.episode_plan.cold_cup_id,
+                    "requested_cup_id": self.episode_plan.requested_cup_id,
+                    "fill_temperature_order": list(
+                        self.episode_plan.fill_temperature_order
+                    ),
+                    "service_slot_by_cup": dict(
+                        self.episode_plan.service_slot_by_cup
+                    ),
+                },
             },
             "fill": {
                 "water_control_mode": "twin_proximity_sensor_faucets",
@@ -1310,12 +1362,12 @@ class WA02ServeHotColdWaterCups(Kitchen):
                 )[cup] = temperature
             continue
 
-        # Staging: latch the planned slot once the cup physically rests there.
+        # Staging: latch whichever unique service slot the policy actually used.
         for cup in CUP_IDS:
             if cup in self._semantic_state.staged_slot_by_cup:
                 continue
-            slot = str(plan.service_slot_by_cup[cup])
-            if not self._cup_physically_staged(cup, slot):
+            slot = self.detected_service_slot(cup)
+            if slot is None:
                 continue
             # A cup held over the target region is not yet placed. Require a
             # release before latching the historical ready event.
@@ -1343,8 +1395,10 @@ class WA02ServeHotColdWaterCups(Kitchen):
         # hand-off itself; the sustained-frames gate excludes 1-frame transient
         # contacts when the navigation arm passes near a staged cup.
         if self._semantic_state.final_taken_cup_id is None:
-            staged = all(
-                cup in self._semantic_state.staged_slot_by_cup for cup in CUP_IDS
+            staged = bool(
+                set(self._semantic_state.staged_slot_by_cup) == set(CUP_IDS)
+                and set(self._semantic_state.staged_slot_by_cup.values())
+                == set(SERVICE_SLOTS)
             )
             if staged:
                 for cup in CUP_IDS:
