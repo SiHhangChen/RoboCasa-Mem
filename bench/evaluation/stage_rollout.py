@@ -268,7 +268,8 @@ class StageStepLog:
     episode_seed: int
     target_stage: str
     environment_step: int
-    model_inference_index: int
+    model_inference_index: int | None
+    model_inference_performed: bool
     observation_id: int
     observation_timestamp: float | None
     privileged_stage_state: Any
@@ -289,6 +290,7 @@ class StageStepLog:
             "target_stage": self.target_stage,
             "environment_step": self.environment_step,
             "model_inference_index": self.model_inference_index,
+            "model_inference_performed": self.model_inference_performed,
             "observation_id": self.observation_id,
             "observation_timestamp": self.observation_timestamp,
             "privileged_stage_state": _jsonable(self.privileged_stage_state),
@@ -499,8 +501,12 @@ def wilson_interval(
     p = successes / trials
     denominator = 1.0 + z * z / trials
     center = (p + z * z / (2.0 * trials)) / denominator
-    radius = z * np.sqrt(p * (1.0 - p) / trials + z * z / (4.0 * trials * trials)) / denominator
-    return max(0.0, center - radius), min(1.0, center + radius)
+    radius = (
+        z
+        * np.sqrt(p * (1.0 - p) / trials + z * z / (4.0 * trials * trials))
+        / denominator
+    )
+    return float(max(0.0, center - radius)), float(min(1.0, center + radius))
 
 
 def _rate(numerator: int, denominator: int) -> float | None:
@@ -518,6 +524,7 @@ def evaluate_stage(
     *,
     tracker: StageTracker | None = None,
     expert_prefix_budget: int | None = None,
+    replan_steps: int = 1,
     record_logs: bool = True,
     logger: Callable[[Mapping[str, Any]], None] | Any | None = None,
 ) -> StageEvaluationResult:
@@ -529,6 +536,9 @@ def evaluate_stage(
     from the observation produced by the prefix's final transition.
     """
 
+    if isinstance(replan_steps, bool) or int(replan_steps) <= 0:
+        raise ValueError("replan_steps must be a positive integer")
+    replan_steps = int(replan_steps)
     stages = _task_stages(task)
     tracker = tracker or StageTracker(stages)
     target_index = tracker._index(target_stage)
@@ -537,7 +547,6 @@ def evaluate_stage(
         configured_prefix_budget = getattr(task, "expert_prefix_budget", None)
         if configured_prefix_budget is not None:
             expert_prefix_budget = int(configured_prefix_budget)
-    instruction = _task_instruction(task)
     reset_episode = getattr(model, "reset_episode", None)
     predict = getattr(model, "predict", None)
     expert_predict = getattr(expert, "predict", None)
@@ -548,6 +557,7 @@ def evaluate_stage(
 
     try:
         reset_value = _reset_task(task, int(seed))
+        instruction = _task_instruction(task)
         reset_episode(instruction)
         tracker.reset(_privileged_state(task))
         observation = _observe_task(task, reset_value)
@@ -644,20 +654,31 @@ def evaluate_stage(
                 )
 
             privileged = _privileged_state(task)
+            inference_performed = False
             if handed_off and action_buffer:
                 proposed = action_buffer.pop(0)
                 inference_index = model_inference_calls - 1
-            else:
+            elif handed_off:
                 # Prefix chunks are discarded in full.  Handoff always starts
                 # with a fresh prediction from the current observation.
                 proposed = predict(observation)
                 model_inference_calls += 1
-                if handed_off:
-                    rows = _action_rows(proposed)
-                    proposed_action = rows.pop(0)
-                    action_buffer.extend(rows)
-                    proposed = proposed_action
+                inference_performed = True
+                rows = _action_rows(proposed)[:replan_steps]
+                proposed_action = rows.pop(0)
+                action_buffer.extend(rows)
+                proposed = proposed_action
                 inference_index = model_inference_calls - 1
+            elif expert_steps % replan_steps == 0:
+                # Match the main rollout's action-chunk cadence during the
+                # expert prefix. The returned chunk is discarded in full.
+                proposed = predict(observation)
+                model_inference_calls += 1
+                inference_performed = True
+                inference_index = model_inference_calls - 1
+            else:
+                proposed = None
+                inference_index = None
 
             if handed_off:
                 executed = proposed
@@ -697,6 +718,7 @@ def evaluate_stage(
                 target_stage=target_id,
                 environment_step=env_steps,
                 model_inference_index=inference_index,
+                model_inference_performed=inference_performed,
                 observation_id=env_steps - 1,
                 observation_timestamp=_transition_timestamp(transition),
                 privileged_stage_state=next_privileged,

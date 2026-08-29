@@ -5,6 +5,9 @@
 #   PORT=57020 CKPT_STEP=070000 ./scripts/eval/gr00t/eval_gr00t_wa05.sh preflight
 #   PORT=57020 CKPT_STEP=070000 ./scripts/eval/gr00t/eval_gr00t_wa05.sh eval
 #   CKPT_STEP=070000 ./scripts/eval/gr00t/eval_gr00t_wa05.sh summary
+#   ./scripts/eval/gr00t/eval_gr00t_wa05.sh stage-prefix
+#   PORT=57020 CKPT_STEP=070000 ./scripts/eval/gr00t/eval_gr00t_wa05.sh stage-eval
+#   CKPT_STEP=070000 ./scripts/eval/gr00t/eval_gr00t_wa05.sh stage-summary
 #   PORT=57020 ./scripts/eval/gr00t/eval_gr00t_wa05.sh stop
 
 set -euo pipefail
@@ -26,6 +29,11 @@ RENDER_GPU="${RENDER_GPU:-${GPU}}"
 RETRY_ERRORS="${RETRY_ERRORS:-0}"
 
 RUN_ID="${RUN_ID:-wa05-gr00t-${CKPT_STEP}-50seeds-r40}"
+STAGE_SUITE="${STAGE_SUITE:-configs/eval/stages/wa05_gr00t_r40_v1.yaml}"
+PREFIX_ROOT="${PREFIX_ROOT:-outputs/stage_prefixes/wa05_v1}"
+STAGE_OUTPUT_ROOT="${STAGE_OUTPUT_ROOT:-outputs/stage_eval}"
+STAGE_RUN_ID="${STAGE_RUN_ID:-wa05-gr00t-${CKPT_STEP}-stage-r40}"
+MAIN_ROLLOUT_RUN="${MAIN_ROLLOUT_RUN:-${OUTPUT_ROOT}/${RUN_ID}}"
 LOG_DIR="${OUTPUT_ROOT}/logs"
 PID_FILE="${LOG_DIR}/serve_gr00t_wa05_${PORT}.pid"
 LOG_FILE="${LOG_DIR}/serve_gr00t_wa05_${PORT}.log"
@@ -167,6 +175,47 @@ run_summary() {
     "${ROBOCASA_PYTHON}" scripts/eval/summarize_run.py "${OUTPUT_ROOT}/${RUN_ID}"
 }
 
+run_stage_prefix() {
+    validate_common
+    cd "${ROOT}"
+    export PYTHONPATH=.
+    export MUJOCO_GL="${MUJOCO_GL:-egl}"
+    export PYOPENGL_PLATFORM="${PYOPENGL_PLATFORM:-egl}"
+    export MUJOCO_EGL_DEVICE_ID="${RENDER_GPU}"
+    export MEMBENCH_MPLIB_PYTHON="${MEMBENCH_MPLIB_PYTHON:-${MPLIB_PYTHON}}"
+    export MEMBENCH_MANISKILL_PANDA_DIR="${MEMBENCH_MANISKILL_PANDA_DIR:-${MANISKILL_PANDA_DIR}}"
+    "${ROBOCASA_PYTHON}" scripts/eval/build_wa05_expert_prefixes.py \
+        --stage-suite "${STAGE_SUITE}" \
+        --output-root "${PREFIX_ROOT}"
+}
+
+run_stage_eval() {
+    validate_common
+    cd "${ROOT}"
+    export PYTHONPATH=.
+    export MUJOCO_GL="${MUJOCO_GL:-egl}"
+    export PYOPENGL_PLATFORM="${PYOPENGL_PLATFORM:-egl}"
+    export MUJOCO_EGL_DEVICE_ID="${RENDER_GPU}"
+    export MEMBENCH_MPLIB_PYTHON="${MEMBENCH_MPLIB_PYTHON:-${MPLIB_PYTHON}}"
+    export MEMBENCH_MANISKILL_PANDA_DIR="${MEMBENCH_MANISKILL_PANDA_DIR:-${MANISKILL_PANDA_DIR}}"
+    export NO_PROXY="${NO_PROXY:+${NO_PROXY},}127.0.0.1,localhost"
+    export no_proxy="${no_proxy:+${no_proxy},}127.0.0.1,localhost"
+    "${ROBOCASA_PYTHON}" scripts/eval/run_stage_remote.py \
+        --endpoint "ws://${SERVER_HOST}:${PORT}" \
+        --stage-suite "${STAGE_SUITE}" \
+        --prefix-root "${PREFIX_ROOT}" \
+        --main-rollout-run "${MAIN_ROLLOUT_RUN}" \
+        --output-root "${STAGE_OUTPUT_ROOT}" \
+        --run-id "${STAGE_RUN_ID}"
+}
+
+run_stage_summary() {
+    validate_common
+    cd "${ROOT}"
+    "${ROBOCASA_PYTHON}" scripts/eval/summarize_stage_run.py \
+        "${STAGE_OUTPUT_ROOT}/${STAGE_RUN_ID}"
+}
+
 status() {
     if [[ -f "${PID_FILE}" ]] && kill -0 "$(<"${PID_FILE}")" 2>/dev/null; then
         echo "GR00T server ${PORT}: running (pid $(<"${PID_FILE}"), checkpoint ${CKPT_STEP})"
@@ -181,6 +230,9 @@ case "${1:-}" in
     preflight) run_preflight ;;
     eval) run_eval ;;
     summary) run_summary ;;
+    stage-prefix) run_stage_prefix ;;
+    stage-eval) run_stage_eval ;;
+    stage-summary) run_stage_summary ;;
     stop) stop_server ;;
     status) status ;;
     help|-h|--help) usage ;;

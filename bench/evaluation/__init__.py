@@ -7,6 +7,21 @@ from .observation import build_canonical_observation, build_state37
 from .rollout import RolloutRunner
 from .suite import load_eval_suite
 from .campaign import EvaluationCampaign
+from .canonical_stage import (
+    CanonicalStageTransition,
+    CanonicalStageTask,
+    RecordedExpertController,
+    RemotePolicyModelAdapter,
+    resolve_suite_episode,
+)
+from .expert_prefix import (
+    ExpertPrefixArtifact,
+    capture_expert_trajectory,
+    load_expert_prefix,
+    write_expert_prefix,
+)
+from .main_stage import import_main_rollout_stage, main_rollout_stage_result
+from .stage_artifacts import StageArtifactWriter, StageEpisodeArtifactSession
 from .stage_rollout import (
     FAILURE,
     ExpertController,
@@ -30,6 +45,7 @@ from .stage_rollout import (
     stage_sr,
     wilson_interval,
 )
+from .stage_suite import StageEvalSuiteConfig, StageTargetConfig, load_stage_eval_suite
 
 __all__ = [
     "ActionChunkQueue",
@@ -42,6 +58,19 @@ __all__ = [
     "load_eval_suite",
     "preflight_adapter",
     "EvaluationCampaign",
+    "CanonicalStageTask",
+    "CanonicalStageTransition",
+    "RecordedExpertController",
+    "RemotePolicyModelAdapter",
+    "resolve_suite_episode",
+    "ExpertPrefixArtifact",
+    "capture_expert_trajectory",
+    "load_expert_prefix",
+    "write_expert_prefix",
+    "import_main_rollout_stage",
+    "main_rollout_stage_result",
+    "StageArtifactWriter",
+    "StageEpisodeArtifactSession",
     "FAILURE",
     "ExpertController",
     "FunctionalStageTask",
@@ -63,4 +92,7 @@ __all__ = [
     "stage_success_rate",
     "stage_sr",
     "wilson_interval",
+    "StageEvalSuiteConfig",
+    "StageTargetConfig",
+    "load_stage_eval_suite",
 ]

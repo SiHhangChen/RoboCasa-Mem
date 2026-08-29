@@ -142,7 +142,9 @@ def test_stage_statistics_exclude_invalid_prefixes() -> None:
     stats = aggregate_stage_results(results)
     assert stats.stage_sr == 0.5
     assert stats.prefix_validity == 2 / 3
-    assert stats.wilson_interval() is not None
+    interval = stats.wilson_interval()
+    assert interval is not None
+    assert all(isinstance(value, float) for value in interval)
     assert macro_stage_sr(results) == 0.5
 
 
@@ -158,6 +160,43 @@ def test_chunk_proposed_before_handoff_is_discarded() -> None:
     assert result.logs[0].proposed_model_action == [[1], [99]]
     assert result.logs[0].executed_action == [0]
     assert result.logs[1].executed_action == [2]
+
+
+def test_expert_prefix_matches_action_chunk_replan_cadence() -> None:
+    state = {"prefix_steps": 0, "done": False}
+
+    def step(action: list[int]) -> dict[str, object]:
+        if action == [0]:
+            state["prefix_steps"] += 1
+        else:
+            state["done"] = True
+        return {"observation": dict(state)}
+
+    task = FunctionalStageTask(
+        task_id="TEST",
+        instruction="remember the target",
+        stage_specs=(
+            StageSpec("A", lambda value: value["prefix_steps"] >= 3),
+            StageSpec("B", lambda value: value["done"], model_step_budget=1),
+        ),
+        reset_fn=lambda seed: state.update(prefix_steps=0, done=False),
+        observe_fn=lambda: dict(state),
+        privileged_state_fn=lambda: dict(state),
+        step_fn=step,
+    )
+    model = _Model([])
+    result = evaluate_stage(task, "B", 7, model, _Expert(), replan_steps=2)
+
+    assert result.total_model_inference_calls == 3
+    assert [log.model_inference_performed for log in result.logs] == [
+        True,
+        False,
+        True,
+        True,
+    ]
+    assert model.calls[0]["prefix_steps"] == 0
+    assert model.calls[1]["prefix_steps"] == 2
+    assert model.calls[2]["prefix_steps"] == 3
 
 
 def test_expert_cannot_complete_multiple_prefix_stages_in_one_step() -> None:
