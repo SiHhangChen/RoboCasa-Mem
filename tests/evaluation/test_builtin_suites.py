@@ -43,11 +43,7 @@ def test_canonical_suites_share_the_frozen_benchmark_contract(
     assert suite.suite_version == expected_name
     assert suite.task_id == plugin.canonical_id
     assert suite.env_split == "pretrain"
-    if suite.task_id == "TS01":
-        assert len(suite.seeds) == 36
-        assert len(set(suite.seeds)) == 36
-    else:
-        assert suite.seeds == tuple(range(1050, 1100))
+    assert suite.seeds == tuple(range(1050, 1100))
     assert suite.rollout.replan_steps == (20 if suite.task_id == "TS02" else 50)
     assert suite.rollout.action_repeat == 1
     assert suite.rollout.stop_on_success is True
