@@ -30,9 +30,10 @@ RETRY_ERRORS="${RETRY_ERRORS:-0}"
 
 RUN_ID="${RUN_ID:-wa05-gr00t-${CKPT_STEP}-50seeds-r40}"
 STAGE_SUITE="${STAGE_SUITE:-configs/eval/stages/wa05_gr00t_r40_v1.yaml}"
-PREFIX_ROOT="${PREFIX_ROOT:-outputs/stage_prefixes/wa05_v1}"
+PREFIX_ROOT="${PREFIX_ROOT:-}"
 STAGE_OUTPUT_ROOT="${STAGE_OUTPUT_ROOT:-outputs/stage_eval}"
 STAGE_RUN_ID="${STAGE_RUN_ID:-wa05-gr00t-${CKPT_STEP}-stage-r40}"
+STAGE_RECORD_VIDEO="${STAGE_RECORD_VIDEO:-}"
 MAIN_ROLLOUT_RUN="${MAIN_ROLLOUT_RUN:-${OUTPUT_ROOT}/${RUN_ID}}"
 LOG_DIR="${OUTPUT_ROOT}/logs"
 PID_FILE="${LOG_DIR}/serve_gr00t_wa05_${PORT}.pid"
@@ -176,7 +177,12 @@ run_summary() {
 }
 
 run_stage_prefix() {
+    local prefix_args=()
+
     validate_common
+    if [[ -n "${PREFIX_ROOT}" ]]; then
+        prefix_args=(--output-root "${PREFIX_ROOT}")
+    fi
     cd "${ROOT}"
     export PYTHONPATH=.
     export MUJOCO_GL="${MUJOCO_GL:-egl}"
@@ -186,11 +192,25 @@ run_stage_prefix() {
     export MEMBENCH_MANISKILL_PANDA_DIR="${MEMBENCH_MANISKILL_PANDA_DIR:-${MANISKILL_PANDA_DIR}}"
     "${ROBOCASA_PYTHON}" scripts/eval/build_wa05_expert_prefixes.py \
         --stage-suite "${STAGE_SUITE}" \
-        --output-root "${PREFIX_ROOT}"
+        "${prefix_args[@]}"
 }
 
 run_stage_eval() {
+    local prefix_args=()
+    local video_args=()
+
     validate_common
+    if [[ -n "${PREFIX_ROOT}" ]]; then
+        prefix_args=(--prefix-root "${PREFIX_ROOT}")
+    fi
+    if [[ "${STAGE_RECORD_VIDEO}" == "0" ]]; then
+        video_args=(--no-record-video)
+    elif [[ "${STAGE_RECORD_VIDEO}" == "1" ]]; then
+        video_args=(--record-video)
+    elif [[ -n "${STAGE_RECORD_VIDEO}" ]]; then
+        echo "STAGE_RECORD_VIDEO must be 0, 1, or empty" >&2
+        exit 2
+    fi
     cd "${ROOT}"
     export PYTHONPATH=.
     export MUJOCO_GL="${MUJOCO_GL:-egl}"
@@ -203,10 +223,11 @@ run_stage_eval() {
     "${ROBOCASA_PYTHON}" scripts/eval/run_stage_remote.py \
         --endpoint "ws://${SERVER_HOST}:${PORT}" \
         --stage-suite "${STAGE_SUITE}" \
-        --prefix-root "${PREFIX_ROOT}" \
         --main-rollout-run "${MAIN_ROLLOUT_RUN}" \
         --output-root "${STAGE_OUTPUT_ROOT}" \
-        --run-id "${STAGE_RUN_ID}"
+        --run-id "${STAGE_RUN_ID}" \
+        "${prefix_args[@]}" \
+        "${video_args[@]}"
 }
 
 run_stage_summary() {

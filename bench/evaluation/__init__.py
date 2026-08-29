@@ -21,6 +21,7 @@ from .expert_prefix import (
     write_expert_prefix,
 )
 from .main_stage import import_main_rollout_stage, main_rollout_stage_result
+from .prefix_statistics import summarize_expert_prefixes
 from .stage_artifacts import StageArtifactWriter, StageEpisodeArtifactSession
 from .stage_rollout import (
     FAILURE,
@@ -69,6 +70,7 @@ __all__ = [
     "write_expert_prefix",
     "import_main_rollout_stage",
     "main_rollout_stage_result",
+    "summarize_expert_prefixes",
     "StageArtifactWriter",
     "StageEpisodeArtifactSession",
     "FAILURE",
