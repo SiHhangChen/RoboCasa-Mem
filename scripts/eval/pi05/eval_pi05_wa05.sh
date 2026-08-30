@@ -1,28 +1,38 @@
 #!/usr/bin/env bash
-# Evaluate one pi0.5 LoRA checkpoint on the WA-05 smoke suite.
+# Evaluate one pi0.5 LoRA checkpoint on the formal 50-seed WA-05 suite.
 #
-#   GPU=2 PORT=55005 ./scripts/eval/pi05/eval_pi05_wa05.sh serve
+#   GPU=2 PORT=55005 CKPT_STEP=59999 ./scripts/eval/pi05/eval_pi05_wa05.sh serve
 #   PORT=55005 ./scripts/eval/pi05/eval_pi05_wa05.sh preflight
 #   PORT=55005 ./scripts/eval/pi05/eval_pi05_wa05.sh eval
 #   PORT=55005 ./scripts/eval/pi05/eval_pi05_wa05.sh summary
+#   PORT=55005 ./scripts/eval/pi05/eval_pi05_wa05.sh stage-eval
+#   ./scripts/eval/pi05/eval_pi05_wa05.sh stage-summary
 #   PORT=55005 ./scripts/eval/pi05/eval_pi05_wa05.sh stop
-#   GPU=2 PORT=55005 ./scripts/eval/pi05/eval_pi05_wa05.sh full
+#   GPU=2 PORT=55005 CKPT_STEP=59999 ./scripts/eval/pi05/eval_pi05_wa05.sh full-stage
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 
-CKPT_DIR="${CKPT_DIR:-/data/shared_workspace/chensihang/ckpts/membench/gr00t/wa05/55000}"
+CKPT_ROOT="${CKPT_ROOT:-/data/shared_workspace/chensihang/ckpts/membench/gr00t/wa05}"
+CKPT_STEP="${CKPT_STEP:-59999}"
+CKPT_DIR="${CKPT_DIR:-${CKPT_ROOT}/${CKPT_STEP}}"
 CONFIG_NAME="${CONFIG_NAME:-pi05_membench_wa05_lora}"
 PORT="${PORT:-55005}"
 GPU="${GPU:-2}"
-SUITE="${SUITE:-configs/eval/suites/wa05_v1.yaml}"
-CKPT_STEP="$(basename "${CKPT_DIR}")"
-RUN_ID="${RUN_ID:-wa05-pi05-lora-${CKPT_STEP}-smoke}"
+RENDER_GPU="${RENDER_GPU:-${GPU}}"
+SUITE="${SUITE:-configs/eval/legacy_suites/wa05_pi05_r20_v1.yaml}"
+RUN_ID="${RUN_ID:-wa05-pi05-${CKPT_STEP}-50seeds-r20}"
 OUTPUT_ROOT="${OUTPUT_ROOT:-outputs/eval}"
 SERVER_HOST="${SERVER_HOST:-127.0.0.1}"
 SERVER_INFERENCE_TIMEOUT_S="${SERVER_INFERENCE_TIMEOUT_S:-300}"
 RETRY_ERRORS="${RETRY_ERRORS:-0}"
+STAGE_SUITE="${STAGE_SUITE:-configs/eval/stages/wa05_pi05_r20_formal_v1.yaml}"
+PREFIX_ROOT="${PREFIX_ROOT:-outputs/stage_prefixes/wa05_formal_v1}"
+STAGE_OUTPUT_ROOT="${STAGE_OUTPUT_ROOT:-outputs/stage_eval}"
+STAGE_RUN_ID="${STAGE_RUN_ID:-wa05-pi05-${CKPT_STEP}-stage-50seeds-r20-formal-v1}"
+STAGE_RECORD_VIDEO="${STAGE_RECORD_VIDEO:-0}"
+MAIN_ROLLOUT_RUN="${MAIN_ROLLOUT_RUN:-${OUTPUT_ROOT}/${RUN_ID}}"
 LOG_DIR="${OUTPUT_ROOT}/logs"
 
 OPENPI_PYTHON="${ROOT}/policy/openpi/.venv/bin/python"
@@ -103,6 +113,7 @@ run_eval() {
     export PYTHONPATH=.
     export MUJOCO_GL="${MUJOCO_GL:-egl}"
     export PYOPENGL_PLATFORM="${PYOPENGL_PLATFORM:-egl}"
+    export MUJOCO_EGL_DEVICE_ID="${RENDER_GPU}"
     export MEMBENCH_MPLIB_PYTHON="${MEMBENCH_MPLIB_PYTHON:-${MPLIB_PYTHON}}"
     export MEMBENCH_MANISKILL_PANDA_DIR="${MEMBENCH_MANISKILL_PANDA_DIR:-${MANISKILL_PANDA_DIR}}"
     export NO_PROXY="${NO_PROXY:+${NO_PROXY},}127.0.0.1,localhost"
@@ -121,6 +132,56 @@ run_summary() {
     "${ROBOCASA_PYTHON}" scripts/eval/summarize_run.py "${OUTPUT_ROOT}/${RUN_ID}"
 }
 
+run_stage_eval() {
+    local video_args=()
+
+    validate_common
+    [[ -f "${ROOT}/${STAGE_SUITE}" || -f "${STAGE_SUITE}" ]] || {
+        echo "Stage suite is missing: ${STAGE_SUITE}" >&2
+        exit 1
+    }
+    [[ -d "${PREFIX_ROOT}" ]] || {
+        echo "Expert prefix root is missing: ${PREFIX_ROOT}" >&2
+        exit 1
+    }
+    [[ -f "${MAIN_ROLLOUT_RUN}/summary.json" ]] || {
+        echo "Completed main rollout is required: ${MAIN_ROLLOUT_RUN}" >&2
+        exit 1
+    }
+    if [[ "${STAGE_RECORD_VIDEO}" == "1" ]]; then
+        video_args=(--record-video)
+    elif [[ "${STAGE_RECORD_VIDEO}" == "0" ]]; then
+        video_args=(--no-record-video)
+    else
+        echo "STAGE_RECORD_VIDEO must be 0 or 1" >&2
+        exit 2
+    fi
+    cd "${ROOT}"
+    export PYTHONPATH=.
+    export MUJOCO_GL="${MUJOCO_GL:-egl}"
+    export PYOPENGL_PLATFORM="${PYOPENGL_PLATFORM:-egl}"
+    export MUJOCO_EGL_DEVICE_ID="${RENDER_GPU}"
+    export MEMBENCH_MPLIB_PYTHON="${MEMBENCH_MPLIB_PYTHON:-${MPLIB_PYTHON}}"
+    export MEMBENCH_MANISKILL_PANDA_DIR="${MEMBENCH_MANISKILL_PANDA_DIR:-${MANISKILL_PANDA_DIR}}"
+    export NO_PROXY="${NO_PROXY:+${NO_PROXY},}127.0.0.1,localhost"
+    export no_proxy="${no_proxy:+${no_proxy},}127.0.0.1,localhost"
+    "${ROBOCASA_PYTHON}" scripts/eval/run_stage_remote.py \
+        --endpoint "ws://${SERVER_HOST}:${PORT}" \
+        --stage-suite "${STAGE_SUITE}" \
+        --prefix-root "${PREFIX_ROOT}" \
+        --main-rollout-run "${MAIN_ROLLOUT_RUN}" \
+        --output-root "${STAGE_OUTPUT_ROOT}" \
+        --run-id "${STAGE_RUN_ID}" \
+        "${video_args[@]}"
+}
+
+run_stage_summary() {
+    validate_common
+    cd "${ROOT}"
+    "${ROBOCASA_PYTHON}" scripts/eval/summarize_stage_run.py \
+        "${STAGE_OUTPUT_ROOT}/${STAGE_RUN_ID}"
+}
+
 status() {
     if [[ -f "${PID_FILE}" ]] && kill -0 "$(<"${PID_FILE}")" 2>/dev/null; then
         echo "Server ${PORT}: running (pid $(<"${PID_FILE}"), checkpoint ${CKPT_STEP})"
@@ -129,13 +190,10 @@ status() {
     fi
 }
 
-run_full() {
+wait_for_preflight() {
     local attempt
-    start_server
-    trap stop_server EXIT
     for attempt in {1..10}; do
         if run_preflight; then
-            run_eval
             return
         fi
         if [[ ! -f "${PID_FILE}" ]] || ! kill -0 "$(<"${PID_FILE}")" 2>/dev/null; then
@@ -149,14 +207,32 @@ run_full() {
     return 1
 }
 
+run_full() {
+    start_server
+    trap stop_server EXIT
+    wait_for_preflight
+    run_eval
+}
+
+run_full_stage() {
+    start_server
+    trap stop_server EXIT
+    wait_for_preflight
+    run_eval
+    run_stage_eval
+}
+
 case "${1:-}" in
     serve) start_server ;;
     preflight) run_preflight ;;
     eval) run_eval ;;
     summary) run_summary ;;
+    stage-eval) run_stage_eval ;;
+    stage-summary) run_stage_summary ;;
     stop) stop_server ;;
     status) status ;;
     full) run_full ;;
+    full-stage) run_full_stage ;;
     help|-h|--help) usage ;;
     *)
         echo "Unknown command: ${1:-}" >&2
