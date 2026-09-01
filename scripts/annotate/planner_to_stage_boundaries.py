@@ -7,8 +7,9 @@ reconstructs the canonical WA-01 v2 names from episode metadata and emits the
 ``boundaries.jsonl`` contract consumed by ``apply_subtask_labels.py``.
 
 No simulator replay is required.  The bridge is deliberately strict: every
-episode must contain the canonical 28 successful stages and the recovered
-stage counts must sum exactly to ``episode.json.step_count``.
+episode must contain either the legacy 28 successful stages or the canonical
+29 stages with a post-second-delivery arm return. The recovered stage counts
+must sum exactly to ``episode.json.step_count``.
 """
 
 from __future__ import annotations
@@ -24,7 +25,9 @@ from typing import Any
 
 TASK_ID = "WA-01"
 EXPERT_PLAN_VERSION = "membench.expert_plan/v2"
-EXPECTED_STAGE_COUNT = 28
+LEGACY_STAGE_COUNT = 28
+EXPECTED_STAGE_COUNT = 29
+SUPPORTED_STAGE_COUNTS = frozenset({LEGACY_STAGE_COUNT, EXPECTED_STAGE_COUNT})
 STEP_KEYS = frozenset({"steps", "executed_steps", "release_settle_steps"})
 NAVIGATE_STAGE_INDICES = frozenset({0, 3, 11, 15, 21})
 EPISODE_DIR_PATTERN = re.compile(r"^seed_(\d{6})_attempt_00$")
@@ -72,11 +75,17 @@ def count_recorded_steps(value: Any, *, path: str = "details") -> tuple[int, dic
     return total, fields
 
 
-def build_stage_names(first: str, second: str, sugared: str) -> list[str]:
+def build_stage_names(
+    first: str,
+    second: str,
+    sugared: str,
+    *,
+    include_post_second_return: bool = True,
+) -> list[str]:
     """Rebuild the canonical names created by WA-01 expert plan v2."""
     _require(first and second and first != second, "delivery_order must contain two distinct cups")
     _require(sugared in {first, second}, f"sugared coffee {sugared!r} is not in delivery_order")
-    return [
+    names = [
         "navigate_pick_sugar",
         "pick_sugar",
         "return_picked_sugar_to_regular_pose",
@@ -101,11 +110,16 @@ def build_stage_names(first: str, second: str, sugared: str) -> list[str]:
         f"navigate_deliver_second_{second}_dining",
         f"place_second_{second}_dining",
         f"verify_second_{second}_on_dining",
+    ]
+    if include_post_second_return:
+        names.append(f"return_after_place_second_{second}_dining_to_regular_pose")
+    names.extend([
         "verify_cups_ready_for_selection",
         "pick_sugared_coffee_topdown",
         "verify_sugared_coffee_held_after_topdown_pick",
         "select_sugared_coffee",
-    ]
+    ])
+    return names
 
 
 def _episode_seed(episode_dir: Path) -> int:
@@ -132,6 +146,22 @@ def _expert_metadata(episode: Mapping[str, Any], *, seed: int) -> Mapping[str, A
     return value
 
 
+def _expert_stage_count(episode: Mapping[str, Any], *, seed: int) -> int:
+    metadata = episode.get("metadata")
+    _require(isinstance(metadata, Mapping), f"seed {seed}: missing episode metadata")
+    assert isinstance(metadata, Mapping)
+    expert_plan = metadata.get("expert_plan")
+    _require(isinstance(expert_plan, Mapping), f"seed {seed}: missing expert_plan metadata")
+    assert isinstance(expert_plan, Mapping)
+    stage_count = expert_plan.get("stage_count")
+    _require(
+        stage_count in SUPPORTED_STAGE_COUNTS,
+        f"seed {seed}: unsupported expert stage_count {stage_count!r}",
+    )
+    assert isinstance(stage_count, int)
+    return stage_count
+
+
 def _resolve_stage_names(episode: Mapping[str, Any], *, seed: int) -> list[str]:
     expert = _expert_metadata(episode, seed=seed)
     delivery_order = expert.get("delivery_order")
@@ -144,7 +174,13 @@ def _resolve_stage_names(episode: Mapping[str, Any], *, seed: int) -> list[str]:
     sugared = expert.get("sugared_coffee_id")
     _require(isinstance(sugared, str) and sugared, f"seed {seed}: missing sugared_coffee_id")
     assert isinstance(sugared, str)
-    return build_stage_names(first, second, sugared)
+    stage_count = _expert_stage_count(episode, seed=seed)
+    return build_stage_names(
+        first,
+        second,
+        sugared,
+        include_post_second_return=stage_count == EXPECTED_STAGE_COUNT,
+    )
 
 
 def _resolve_sugared_coffee_slot(
@@ -222,12 +258,13 @@ def _validate_episode_contract(
         f"seed {seed}: planner version is {planner.get('expert_plan_version')!r}",
     )
     _require(planner.get("pass") is True, f"seed {seed}: planner pass is false")
+    expected_stage_count = _expert_stage_count(episode, seed=seed)
     episode_result = planner.get("episode_result")
     _require(isinstance(episode_result, Mapping), f"seed {seed}: missing planner episode_result")
     assert isinstance(episode_result, Mapping)
     _require(episode_result.get("success") is True, f"seed {seed}: planner result failed")
     _require(
-        episode_result.get("stage_count") == EXPECTED_STAGE_COUNT,
+        episode_result.get("stage_count") == expected_stage_count,
         f"seed {seed}: planner stage_count is {episode_result.get('stage_count')!r}",
     )
 
@@ -236,8 +273,8 @@ def _validate_episode_contract(
     assert isinstance(rollout, Mapping)
     stages = rollout.get("stages")
     _require(
-        isinstance(stages, list) and len(stages) == EXPECTED_STAGE_COUNT,
-        f"seed {seed}: expected {EXPECTED_STAGE_COUNT} rollout stages",
+        isinstance(stages, list) and len(stages) == expected_stage_count,
+        f"seed {seed}: expected {expected_stage_count} rollout stages",
     )
     assert isinstance(stages, list)
     for index, stage in enumerate(stages):

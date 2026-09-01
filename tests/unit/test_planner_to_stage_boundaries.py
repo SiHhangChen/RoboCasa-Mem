@@ -42,11 +42,12 @@ def test_count_recorded_steps_rejects_invalid_step_values(value: object) -> None
 def test_build_stage_names_matches_wa01_v2_template() -> None:
     names = build_stage_names("coffee_B", "coffee_A", "coffee_B")
 
-    assert len(names) == 28
+    assert len(names) == 29
     assert names[0] == "navigate_pick_sugar"
     assert names[7] == "verify_first_pick_reachability_coffee_B"
     assert names[15] == "navigate_pick_second_delivery_coffee_A"
-    assert names[24] == "verify_cups_ready_for_selection"
+    assert names[24] == "return_after_place_second_coffee_A_dining_to_regular_pose"
+    assert names[25] == "verify_cups_ready_for_selection"
     assert names[-1] == "select_sugared_coffee"
 
 
@@ -60,7 +61,7 @@ def test_reconstructed_names_match_current_subtask_config() -> None:
     assert matched == [
         *(["add_sugar"] * 7),
         *(["place_first"] * 8),
-        *(["place_second"] * 9),
+        *(["place_second"] * 10),
         *(["identify"] * 4),
     ]
 
@@ -86,7 +87,7 @@ def test_final_stage_maps_to_fixed_dining_slot_label(slot: str, expected_index: 
     labeled = label_episode(record, config, recorded_total=len(names))
 
     assert labeled["subtask_indices"][-4:] == [expected_index] * 4
-    assert labeled["keyframes"] == [6, 14, 23, 24]
+    assert labeled["keyframes"] == [6, 14, 24, 25]
 
 
 def _write_episode(
@@ -94,6 +95,7 @@ def _write_episode(
     *,
     seed: int,
     include_release_settle: bool = True,
+    stage_count: int = 29,
 ) -> Path:
     episode_dir = root / f"seed_{seed:06d}_attempt_00"
     episode_dir.mkdir(parents=True)
@@ -107,7 +109,7 @@ def _write_episode(
 
     stages = []
     base_total = 0
-    for index in range(28):
+    for index in range(stage_count):
         details: dict[str, object] = {"execution": {"executed_steps": index + 1}}
         base_total += index + 1
         if include_release_settle and index in {4, 12, 22}:
@@ -132,7 +134,7 @@ def _write_episode(
             "seed": seed,
             "expert_plan": {
                 "version": EXPERT_PLAN_VERSION,
-                "stage_count": 28,
+                "stage_count": stage_count,
                 "metadata": {
                     "delivery_order": [first, second],
                     "sugared_coffee_id": first,
@@ -145,7 +147,11 @@ def _write_episode(
         "task_id": "WA-01",
         "expert_plan_version": EXPERT_PLAN_VERSION,
         "pass": True,
-        "episode_result": {"success": True, "stage_count": 28, "stages": [True] * 28},
+        "episode_result": {
+            "success": True,
+            "stage_count": stage_count,
+            "stages": [True] * stage_count,
+        },
         "rollout": {"stages": stages},
         "final_diagnostics": {
             "sugar": {"sugared_coffee_id": first},
@@ -168,9 +174,9 @@ def test_build_boundary_record_recovers_exact_recorded_total(tmp_path: Path) -> 
     record = build_boundary_record(episode_dir)
 
     assert record["seed"] == 0
-    assert record["total_frames"] == record["recorded_total_frames"] == sum(range(1, 29)) + 25
+    assert record["total_frames"] == record["recorded_total_frames"] == sum(range(1, 30)) + 25
     assert record["step_field_totals"] == {
-        "executed_steps": sum(range(1, 29)),
+        "executed_steps": sum(range(1, 30)),
         "release_settle_steps": 25,
         "steps": 0,
     }
@@ -180,10 +186,21 @@ def test_build_boundary_record_recovers_exact_recorded_total(tmp_path: Path) -> 
     assert record["stages"][-1]["end_frame"] == record["total_frames"]
 
 
+def test_build_boundary_record_accepts_legacy_28_stage_episode(tmp_path: Path) -> None:
+    episode_dir = _write_episode(tmp_path, seed=0, stage_count=28)
+
+    record = build_boundary_record(episode_dir)
+    names = [stage["name"] for stage in record["stages"]]
+
+    assert len(names) == 28
+    assert names[24] == "verify_cups_ready_for_selection"
+    assert not any(name.startswith("return_after_place_second_") for name in names)
+
+
 def test_build_boundary_record_rejects_unaccounted_recorded_frames(tmp_path: Path) -> None:
     episode_dir = _write_episode(tmp_path, seed=0, include_release_settle=False)
 
-    with pytest.raises(ValueError, match="recovered 406 stage frames != recorded 431"):
+    with pytest.raises(ValueError, match="recovered 435 stage frames != recorded 460"):
         build_boundary_record(episode_dir)
 
 

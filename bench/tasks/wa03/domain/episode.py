@@ -35,7 +35,7 @@ MAX_INITIAL_CUP_SAMPLING_ATTEMPTS = 1024
 
 
 def target_sugared_coffee_for_seed(seed: int) -> str:
-    """根据 seed 确定性选择 marked 兼容模式需要加糖的杯子。"""
+    """根据 seed 确定性选择 expert 要加糖的杯子。"""
 
     rng = np.random.default_rng(np.random.SeedSequence([int(seed), 0x57413033]))
     return COFFEE_IDS[int(rng.integers(0, len(COFFEE_IDS)))]

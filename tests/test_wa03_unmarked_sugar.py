@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from bench.execution.contracts import OperateStage
 from bench.tasks import resolve_builtin_task_plugin
 from bench.tasks.contracts import EpisodeRequest, ExpertPlanInputs
 from bench.tasks.wa03.domain.episode import (
@@ -38,15 +39,42 @@ def test_wa03_episode_has_no_preassigned_sugar_target() -> None:
     assert "mark" not in episode.public["prompt"].casefold()
 
 
-def test_wa03_expert_deterministically_sugars_first_delivery() -> None:
-    episode = resolve_episode(EpisodeRequest(task_id="WA-03", seed=17))
+def test_wa03_expert_sugar_choice_is_independent_of_delivery_order() -> None:
+    observed_positions: set[int] = set()
+    for seed in range(24):
+        episode = resolve_episode(EpisodeRequest(task_id="WA-03", seed=seed))
+        api = resolve_builtin_task_plugin("WA-03").load_runtime_api()
+        descriptor = api.build_descriptor(episode, False)
+        expert = build_expert_plan(ExpertPlanInputs.from_descriptor(descriptor))
+        sugared = str(expert.metadata["sugared_coffee_id"])
+        delivery_order = tuple(str(value) for value in episode.facts["delivery_order"])
+
+        assert expert.metadata["sugar_target_mode"] == "unmarked"
+        assert expert.metadata["target_sugared_coffee_id"] is None
+        assert sugared == target_sugared_coffee_for_seed(seed)
+        observed_positions.add(delivery_order.index(sugared))
+
+    assert observed_positions == {0, 1, 2}
+
+
+def test_wa03_returns_arm_after_third_delivery_before_final_pick() -> None:
+    episode = resolve_episode(EpisodeRequest(task_id="WA-03", seed=0))
     api = resolve_builtin_task_plugin("WA-03").load_runtime_api()
     descriptor = api.build_descriptor(episode, False)
     expert = build_expert_plan(ExpertPlanInputs.from_descriptor(descriptor))
+    third = str(episode.facts["delivery_order"][2])
+    return_name = f"return_after_place_third_{third}_dining_to_regular_pose"
+    return_index = next(
+        index for index, stage in enumerate(expert.stages) if stage.name == return_name
+    )
+    return_stage = expert.stages[return_index]
 
-    assert expert.metadata["sugar_target_mode"] == "unmarked"
-    assert expert.metadata["target_sugared_coffee_id"] is None
-    assert expert.metadata["sugared_coffee_id"] == episode.facts["delivery_order"][0]
+    assert isinstance(return_stage, OperateStage)
+    assert return_stage.operation == "return_arm"
+    assert return_stage.target == third
+    assert return_stage.metadata["gripper_action"] == -1.0
+    assert expert.stages[return_index + 1].name == "verify_all_cups_ready_for_selection"
+    assert expert.stages[return_index + 2].name == "pick_sugared_coffee_topdown"
 
 
 def test_wa03_accepts_any_delivery_and_requires_selecting_that_coffee() -> None:

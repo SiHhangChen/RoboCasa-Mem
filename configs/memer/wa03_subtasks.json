@@ -71,6 +71,7 @@
       "navigate_deliver_third_",
       "place_third_",
       "verify_third_",
+      "return_after_place_third_",
       "verify_all_cups_ready_for_selection"
     ],
     "identify": [

@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import pytest
 
+from bench.execution.contracts import OperateStage
 from bench.tasks import resolve_builtin_task_plugin
-from bench.tasks.contracts import EpisodeRequest
+from bench.tasks.contracts import EpisodeRequest, ExpertPlanInputs
 from bench.tasks.wa01.execution.handlers import build_stage_handlers
 from bench.tasks.wa01.domain.episode import (
     resolve_episode_plan,
@@ -17,6 +18,7 @@ from bench.tasks.wa01.domain.semantics import (
     record_sugar_delivery,
 )
 from bench.tasks.wa01.episode import resolve_episode
+from bench.tasks.wa01.expert.spec import build_expert_plan
 from bench.tasks.wa01.prompts import resolve_prompt_spec
 
 
@@ -86,6 +88,46 @@ def test_wa01_episode_has_no_preassigned_sugar_target() -> None:
     assert plan.target_sugared_coffee_id is None
     assert episode.facts["sugar_target_mode"] == "unmarked"
     assert episode.facts["target_sugared_coffee_id"] is None
+
+
+def test_wa01_expert_sugar_choice_is_independent_of_delivery_order() -> None:
+    observed_positions: set[str] = set()
+    for seed in range(16):
+        episode = resolve_episode(EpisodeRequest(task_id="WA-01", seed=seed))
+        descriptor = resolve_builtin_task_plugin("WA-01").load_runtime_api().build_descriptor(
+            episode,
+            False,
+        )
+        expert = build_expert_plan(ExpertPlanInputs.from_descriptor(descriptor))
+        sugared = str(expert.metadata["sugared_coffee_id"])
+        delivery_order = tuple(str(value) for value in episode.facts["delivery_order"])
+
+        assert sugared == target_sugared_coffee_for_seed(seed)
+        observed_positions.add("first" if sugared == delivery_order[0] else "second")
+
+    assert observed_positions == {"first", "second"}
+
+
+def test_wa01_returns_arm_after_second_delivery_before_final_pick() -> None:
+    episode = resolve_episode(EpisodeRequest(task_id="WA-01", seed=0))
+    descriptor = resolve_builtin_task_plugin("WA-01").load_runtime_api().build_descriptor(
+        episode,
+        False,
+    )
+    expert = build_expert_plan(ExpertPlanInputs.from_descriptor(descriptor))
+    second = str(episode.facts["delivery_order"][1])
+    return_name = f"return_after_place_second_{second}_dining_to_regular_pose"
+    return_index = next(
+        index for index, stage in enumerate(expert.stages) if stage.name == return_name
+    )
+    return_stage = expert.stages[return_index]
+
+    assert isinstance(return_stage, OperateStage)
+    assert return_stage.operation == "return_arm"
+    assert return_stage.target == second
+    assert return_stage.metadata["gripper_action"] == -1.0
+    assert expert.stages[return_index + 1].name == "verify_cups_ready_for_selection"
+    assert expert.stages[return_index + 2].name == "pick_sugared_coffee_topdown"
 
 
 def test_wa01_accepts_either_delivery_and_requires_selecting_that_coffee() -> None:

@@ -2,9 +2,10 @@
 """Recover exact WA-03 stage boundaries from recorded planner summaries.
 
 The native recorder persists action counts and the expert-plan metadata, but
-not the original stage names.  This bridge reconstructs the 38 canonical
-stages, verifies the recorded semantic diagnostics, and emits the boundary
-contract consumed by ``apply_subtask_labels.py``.
+not the original stage names. This bridge reconstructs either the legacy 38
+stages or the canonical 39 stages with a post-third-delivery arm return,
+verifies the recorded semantic diagnostics, and emits the boundary contract
+consumed by ``apply_subtask_labels.py``.
 """
 
 from __future__ import annotations
@@ -20,7 +21,9 @@ from typing import Any
 
 TASK_ID = "WA-03"
 EXPERT_PLAN_VERSION = "membench.expert_plan/v2"
-EXPECTED_STAGE_COUNT = 38
+LEGACY_STAGE_COUNT = 38
+EXPECTED_STAGE_COUNT = 39
+SUPPORTED_STAGE_COUNTS = frozenset({LEGACY_STAGE_COUNT, EXPECTED_STAGE_COUNT})
 EPISODE_DIR_PATTERN = re.compile(r"^seed_(\d{6})_attempt_00$")
 STEP_KEYS = frozenset({"steps", "executed_steps", "release_settle_steps"})
 COFFEE_IDS = frozenset({"coffee_A", "coffee_B", "coffee_C"})
@@ -84,14 +87,34 @@ def _expert_metadata(episode: Mapping[str, Any], *, seed: int) -> Mapping[str, A
     _require(isinstance(expert, Mapping), f"seed {seed}: missing expert_plan metadata")
     assert isinstance(expert, Mapping)
     _require(expert.get("version") == EXPERT_PLAN_VERSION, f"seed {seed}: expert version mismatch")
-    _require(expert.get("stage_count") == EXPECTED_STAGE_COUNT, f"seed {seed}: expert stage count mismatch")
+    _require(expert.get("stage_count") in SUPPORTED_STAGE_COUNTS, f"seed {seed}: expert stage count mismatch")
     value = expert.get("metadata")
     _require(isinstance(value, Mapping), f"seed {seed}: missing expert_plan.metadata")
     assert isinstance(value, Mapping)
     return value
 
 
-def build_stage_names(delivery_order: Sequence[str]) -> list[str]:
+def _expert_stage_count(episode: Mapping[str, Any], *, seed: int) -> int:
+    metadata = episode.get("metadata")
+    _require(isinstance(metadata, Mapping), f"seed {seed}: missing episode metadata")
+    assert isinstance(metadata, Mapping)
+    expert = metadata.get("expert_plan")
+    _require(isinstance(expert, Mapping), f"seed {seed}: missing expert_plan metadata")
+    assert isinstance(expert, Mapping)
+    stage_count = expert.get("stage_count")
+    _require(
+        stage_count in SUPPORTED_STAGE_COUNTS,
+        f"seed {seed}: unsupported expert stage count {stage_count!r}",
+    )
+    assert isinstance(stage_count, int)
+    return stage_count
+
+
+def build_stage_names(
+    delivery_order: Sequence[str],
+    *,
+    include_post_third_return: bool = True,
+) -> list[str]:
     order = [str(value) for value in delivery_order]
     _require(len(order) == 3 and set(order) == COFFEE_IDS, "delivery_order must contain coffee_A/B/C exactly once")
     first, second, third = order
@@ -116,7 +139,11 @@ def build_stage_names(delivery_order: Sequence[str]) -> list[str]:
                 f"navigate_deliver_{ordinal}_{coffee}_dining",
                 f"place_{ordinal}_{coffee}_dining",
                 f"verify_{ordinal}_{coffee}_on_dining",
-                *([f"return_after_place_{ordinal}_{coffee}_dining_to_regular_pose"] if ordinal != "third" else []),
+                *(
+                    [f"return_after_place_{ordinal}_{coffee}_dining_to_regular_pose"]
+                    if ordinal != "third" or include_post_third_return
+                    else []
+                ),
             ]
         )
         if ordinal == "third":
@@ -126,7 +153,8 @@ def build_stage_names(delivery_order: Sequence[str]) -> list[str]:
         "verify_sugared_coffee_held_after_topdown_pick",
         "select_sugared_coffee",
     ])
-    _require(len(names) == EXPECTED_STAGE_COUNT, f"reconstructed {len(names)} stages, expected {EXPECTED_STAGE_COUNT}")
+    expected_count = EXPECTED_STAGE_COUNT if include_post_third_return else LEGACY_STAGE_COUNT
+    _require(len(names) == expected_count, f"reconstructed {len(names)} stages, expected {expected_count}")
     return names
 
 
@@ -180,14 +208,20 @@ def build_boundary_record(episode_dir: Path) -> dict[str, Any]:
     assert isinstance(order, list)
     sugared = str(expert.get("sugared_coffee_id", ""))
     _require(str(expert.get("sugar_target_mode", "")) == "unmarked", f"seed {seed}: expected unmarked WA-03 data")
-    _require(sugared == str(order[0]), f"seed {seed}: unmarked expert must sugar delivery_order[0]")
+    _require(sugared in COFFEE_IDS, f"seed {seed}: invalid sugared coffee {sugared!r}")
+    stage_count = _expert_stage_count(episode, seed=seed)
+    if stage_count == LEGACY_STAGE_COUNT:
+        _require(sugared == str(order[0]), f"seed {seed}: legacy unmarked expert must sugar delivery_order[0]")
     stages = planner.get("rollout", {}).get("stages")
-    _require(isinstance(stages, list) and len(stages) == EXPECTED_STAGE_COUNT, f"seed {seed}: expected {EXPECTED_STAGE_COUNT} planner stages")
+    _require(isinstance(stages, list) and len(stages) == stage_count, f"seed {seed}: expected {stage_count} planner stages")
     assert isinstance(stages, list)
     result = planner.get("episode_result")
-    _require(isinstance(result, Mapping) and result.get("success") is True and result.get("stage_count") == EXPECTED_STAGE_COUNT, f"seed {seed}: invalid episode result")
+    _require(isinstance(result, Mapping) and result.get("success") is True and result.get("stage_count") == stage_count, f"seed {seed}: invalid episode result")
     assert isinstance(result, Mapping)
-    names = build_stage_names(order)
+    names = build_stage_names(
+        order,
+        include_post_third_return=stage_count == EXPECTED_STAGE_COUNT,
+    )
     cumulative = 0
     output_stages: list[dict[str, Any]] = []
     fields = {key: 0 for key in sorted(STEP_KEYS)}

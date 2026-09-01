@@ -49,7 +49,8 @@
       "raise_second",
       "return_second",
       "navigate_deliver_second",
-      "place_second"
+      "place_second",
+      "return_after_place_second"
     ],
     "identify": [
       "verify_cups_ready",

@@ -9,6 +9,7 @@ from __future__ import annotations
 from bench.execution.contracts import ExpertPlan
 from bench.execution.plan_builder import finish_plan, navigate, operate
 from bench.tasks.contracts import ExpertPlanInputs
+from bench.tasks.wa01.domain.episode import target_sugared_coffee_for_seed
 from bench.tasks.wa01.domain.geometry import dining_region_config_summary
 
 
@@ -23,9 +24,10 @@ def build_expert_plan(inputs: ExpertPlanInputs) -> ExpertPlan:
     if sugar_target_mode == "marked":
         sugared = str(facts["target_sugared_coffee_id"])
     else:
-        # The unmarked task accepts either cup. The expert deterministically
-        # sugars the first delivery so demonstrations remain reproducible.
-        sugared = first
+        # Select the sugared cup independently from delivery order. The
+        # seed-owned choice keeps demonstrations reproducible while allowing
+        # both sugared-first and sugared-second episodes.
+        sugared = target_sugared_coffee_for_seed(episode.seed)
     slots = dict(facts["final_slot_assignment"])
     sugar = str(getattr(inputs.scene, "sugar_name", "sugar_cube"))
 
@@ -57,9 +59,12 @@ def build_expert_plan(inputs: ExpertPlanInputs) -> ExpertPlan:
             operate("verify_dining_placement", coffee, name=f"verify_{ordinal}_{coffee}_on_dining",
                     metadata={"dining_target_slot": slots[coffee]}),
         ])
-        if ordinal == "first":
-            result.append(return_arm(coffee, f"return_after_place_first_{coffee}_dining_to_regular_pose", -1.0))
-        else:
+        result.append(return_arm(
+            coffee,
+            f"return_after_place_{ordinal}_{coffee}_dining_to_regular_pose",
+            -1.0,
+        ))
+        if ordinal == "second":
             result.append(operate("verify_cups_ready", "coffee_pair", name="verify_cups_ready_for_selection"))
         return result
 
