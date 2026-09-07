@@ -1,22 +1,18 @@
 {
   "task_id": "WR-05",
-  "spatial_reference": "Upper/lower name the two fixed WR05 open-shelf levels. Plate left/right name the two fixed task-local regions beside the serving plate, not left/right in an arbitrary camera image.",
+  "spatial_reference": "Upper/lower name the two fixed WR05 open-shelf levels. Either side beside the serving plate is a valid staging location; the expert's recorded left/right assignment is not part of the task label.",
   "keyframes_from_record": true,
   "subtasks": {
     "pick_ketchup_lower": {"label": "pick up the ketchup bottle from the lower shelf", "keyframe": "last"},
     "pick_ketchup_upper": {"label": "pick up the ketchup bottle from the upper shelf", "keyframe": "last"},
-    "place_ketchup_plate_left": {"label": "place the ketchup bottle upright on the left side of the serving plate", "keyframe": "last"},
-    "place_ketchup_plate_right": {"label": "place the ketchup bottle upright on the right side of the serving plate", "keyframe": "last"},
+    "place_ketchup_plate": {"label": "place the ketchup bottle beside the serving plate", "keyframe": "last"},
     "pick_mustard_lower": {"label": "pick up the mustard bottle from the lower shelf", "keyframe": "last"},
     "pick_mustard_upper": {"label": "pick up the mustard bottle from the upper shelf", "keyframe": "last"},
-    "place_mustard_plate_left": {"label": "place the mustard bottle upright on the left side of the serving plate", "keyframe": "last"},
-    "place_mustard_plate_right": {"label": "place the mustard bottle upright on the right side of the serving plate", "keyframe": "last"},
-    "pick_ketchup_plate_left": {"label": "pick up the ketchup bottle from the left side of the serving plate", "keyframe": "last"},
-    "pick_ketchup_plate_right": {"label": "pick up the ketchup bottle from the right side of the serving plate", "keyframe": "last"},
+    "place_mustard_plate": {"label": "place the mustard bottle beside the serving plate", "keyframe": "last"},
+    "pick_ketchup_plate": {"label": "pick up the ketchup bottle from beside the serving plate", "keyframe": "last"},
     "return_ketchup_lower": {"label": "return the ketchup bottle upright to the lower shelf", "keyframe": "last"},
     "return_ketchup_upper": {"label": "return the ketchup bottle upright to the upper shelf", "keyframe": "last"},
-    "pick_mustard_plate_left": {"label": "pick up the mustard bottle from the left side of the serving plate", "keyframe": "last"},
-    "pick_mustard_plate_right": {"label": "pick up the mustard bottle from the right side of the serving plate", "keyframe": "last"},
+    "pick_mustard_plate": {"label": "pick up the mustard bottle from beside the serving plate", "keyframe": "last"},
     "return_mustard_lower": {"label": "return the mustard bottle upright to the lower shelf", "keyframe": "last"},
     "return_mustard_upper": {"label": "return the mustard bottle upright to the upper shelf", "keyframe": "last"}
   },
@@ -32,12 +28,8 @@
   },
   "dynamic_stage_labels": {
     "pick_ketchup_original": {"field": "ketchup_original_level", "values": {"lower": "pick_ketchup_lower", "upper": "pick_ketchup_upper"}},
-    "place_ketchup_plate": {"field": "ketchup_plate_side", "values": {"left": "place_ketchup_plate_left", "right": "place_ketchup_plate_right"}},
     "pick_mustard_original": {"field": "mustard_original_level", "values": {"lower": "pick_mustard_lower", "upper": "pick_mustard_upper"}},
-    "place_mustard_plate": {"field": "mustard_plate_side", "values": {"left": "place_mustard_plate_left", "right": "place_mustard_plate_right"}},
-    "pick_ketchup_plate": {"field": "ketchup_plate_side", "values": {"left": "pick_ketchup_plate_left", "right": "pick_ketchup_plate_right"}},
     "return_ketchup_original": {"field": "ketchup_original_level", "values": {"lower": "return_ketchup_lower", "upper": "return_ketchup_upper"}},
-    "pick_mustard_plate": {"field": "mustard_plate_side", "values": {"left": "pick_mustard_plate_left", "right": "pick_mustard_plate_right"}},
     "return_mustard_original": {"field": "mustard_original_level", "values": {"lower": "return_mustard_lower", "upper": "return_mustard_upper"}}
   }
 }

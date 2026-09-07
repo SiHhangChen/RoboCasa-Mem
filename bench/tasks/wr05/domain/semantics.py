@@ -8,9 +8,10 @@ follow WR-02.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 
-from bench.tasks.wr05.domain.contracts import CONDIMENT_IDS
+from bench.tasks.wr05.domain.contracts import CONDIMENT_IDS, USE_REGIONS
 
 
 @dataclass
@@ -58,6 +59,12 @@ def record_plate_stage(state: SemanticState, condiment_id: str) -> bool:
     return changed
 
 
+def condiment_staged_at_any_plate_side(side_checks: Mapping[str, bool]) -> bool:
+    """Return whether a bottle is staged at either valid plate-side target."""
+
+    return any(bool(side_checks.get(region, False)) for region in USE_REGIONS)
+
+
 def evaluate_success(state: SemanticState, physical: PhysicalState) -> SuccessReport:
     return SuccessReport(
         ketchup_staged_at_plate=bool(state.staged_at_plate["ketchup"]),
@@ -74,6 +81,7 @@ __all__ = [
     "PhysicalState",
     "SemanticState",
     "SuccessReport",
+    "condiment_staged_at_any_plate_side",
     "evaluate_success",
     "record_plate_stage",
 ]

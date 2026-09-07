@@ -37,9 +37,9 @@ REPORT_STAGE_ORDER = WA02_REPORT_PROFILE.stage_ids
 REPORT_STAGE_PROFILE_ID = WA02_REPORT_PROFILE.profile_id
 
 _REPORT_STAGE_SOURCES = {
-    "hot_cup_filled": "first_cup_fill",
-    "hot_cup_ready": "first_cup_ready",
-    "cold_cup_filled": "second_cup_fill",
+    "first_cup_filled": "first_cup_fill",
+    "first_cup_ready": "first_cup_ready",
+    "second_cup_filled": "second_cup_fill",
     "both_cups_ready": "second_cup_ready",
     "success": "selection_success",
 }
@@ -237,16 +237,8 @@ class WA02EvalResult:
         return payload
 
     def to_report_stages(self) -> dict[str, Any]:
-        """Project the internal seven-stage protocol onto hot-first reporting."""
+        """Project the internal protocol onto order-neutral public reporting."""
 
-        bindings = dict((self.details.get("evaluation") or {}).get("stage_bindings") or {})
-        if (
-            bindings.get("first_temperature") != "hot"
-            or bindings.get("second_temperature") != "cold"
-        ):
-            raise ValueError(
-                "WA-02/report-v1 requires the benchmark hot-first profile"
-            )
         stages = {}
         for name in REPORT_STAGE_ORDER:
             internal = self.stages[_REPORT_STAGE_SOURCES[name]]

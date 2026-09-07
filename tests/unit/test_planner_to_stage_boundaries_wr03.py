@@ -42,21 +42,18 @@ def test_wr03_stage_names_match_subtask_config(level: str) -> None:
 
     assert len(names) == 20
     assert matched == [
-        *(["store_can"] * 7),
-        *(["close_upper"] * 3),
-        *(["close_lower"] * 4),
+        "observe",
+        *(["close_first"] * 3),
+        *(["close_second"] * 3),
+        *(["handoff"] * 3),
         *(["open_remembered"] * 4),
-        *(["retrieve_can"] * 2),
+        *(["retrieve"] * 3),
+        *(["place"] * 3),
     ]
 
 
-@pytest.mark.parametrize(
-    ("level", "open_index"),
-    [("upper", 3), ("lower", 4)],
-)
-def test_wr03_only_retrieval_door_label_depends_on_memory(
-    level: str, open_index: int
-) -> None:
+@pytest.mark.parametrize("level", ["lower", "upper"])
+def test_wr03_labels_do_not_expose_the_remembered_level(level: str) -> None:
     root = Path(__file__).resolve().parents[2]
     config = load_config(root / "configs" / "memer" / "wr03_subtasks.json")
     names = build_stage_names(level)
@@ -73,10 +70,12 @@ def test_wr03_only_retrieval_door_label_depends_on_memory(
     labeled = label_episode(record, config, recorded_total=len(names))
 
     assert labeled["subtask_indices"] == [
-        *([0] * 7),
+        0,
         *([1] * 3),
-        *([2] * 4),
-        *([open_index] * 4),
-        *([5] * 2),
+        *([2] * 3),
+        *([3] * 3),
+        *([4] * 4),
+        *([5] * 3),
+        *([6] * 3),
     ]
-    assert labeled["keyframes"] == [6, 9, 13, 14, 19]
+    assert labeled["keyframes"] == [0, 3, 6, 9, 10, 16, 19]

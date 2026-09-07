@@ -1,16 +1,17 @@
 """Authoritative WR-06 history state and final success predicate.
 
 The use target is a fixed serving plate on the dining island: the bottle is
-staged when it physically rests beside the plate on its episode-decided side
-(within the plate staging threshold of that side's target). Return semantics
-follow WR-04's strict single-object memory protocol.
+staged when it physically rests at either valid side of the plate. The
+seed-decided expert side is demonstration metadata, not a success condition.
+Return semantics follow WR-04's strict single-object memory protocol.
 """
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 
-from bench.tasks.wr06.domain.contracts import HOME_LEVELS, ITEM_ID
+from bench.tasks.wr06.domain.contracts import HOME_LEVELS, ITEM_ID, PLATE_SIDES
 from bench.tasks.wr06.domain.episode import validate_level
 
 
@@ -50,6 +51,12 @@ class PhysicalState:
     @property
     def item_outside_shelves(self) -> bool:
         return not self.item_in_lower and not self.item_in_upper
+
+
+def item_staged_at_any_plate_side(side_checks: Mapping[str, bool]) -> bool:
+    """Return whether the bottle is staged at either valid plate-side target."""
+
+    return any(bool(side_checks.get(side, False)) for side in PLATE_SIDES)
 
 
 @dataclass(frozen=True)
@@ -266,6 +273,7 @@ __all__ = [
     "SemanticState",
     "SuccessReport",
     "evaluate_success",
+    "item_staged_at_any_plate_side",
     "latch_memory_barrier",
     "record_initial_level",
     "record_item_removed",

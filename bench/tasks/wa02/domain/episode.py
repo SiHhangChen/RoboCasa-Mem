@@ -22,17 +22,22 @@ from bench.tasks.wa02.domain.geometry import (
 
 
 def balanced_axes_for_seed(seed: int) -> dict[str, Any]:
-    """Return the balanced 2 x 2 x 2 label grid entry for one seed.
+    """Return the balanced 2 x 2 x 2 x 2 label grid entry for one seed.
 
-    Across every consecutive block of eight seeds, hot-cup identity, requested
-    temperature, and service-slot permutation are mutually balanced.
+    Across every consecutive block of sixteen seeds, hot-cup identity, requested
+    temperature, service-slot permutation, and execution sequence are balanced.
     """
 
-    index = int(seed) % 8
+    index = int(seed) % 16
     return {
         "hot_cup_id": CUP_IDS[(index >> 2) & 0x1],
         "requested_temperature": TEMPERATURES[(index >> 1) & 0x1],
         "service_slot_swap": bool(index & 0x1),
+        "fill_temperature_order": (
+            ("hot", "cold")
+            if ((index >> 3) & 0x1) == 0
+            else ("cold", "hot")
+        ),
     }
 
 
@@ -48,19 +53,6 @@ def validate_temperature(value: Any) -> str:
     if temperature not in TEMPERATURES:
         raise ValueError(f"invalid WA-02 temperature: {value!r}")
     return temperature
-
-
-def resolve_fill_order(value: Any, *, seed: int) -> tuple[str, str]:
-    """Resolve the fill sequence without coupling it to service slots."""
-
-    raw = "hot-first" if value is None else str(value).strip().lower().replace("_", "-")
-    if raw in {"hot", "hot-first", "hotfirst"}:
-        return ("hot", "cold")
-    if raw in {"cold", "cold-first", "coldfirst"}:
-        return ("cold", "hot")
-    if raw in {"balanced", "seed-balanced"}:
-        return ("hot", "cold") if ((int(seed) >> 3) & 0x1) == 0 else ("cold", "hot")
-    raise ValueError("WA-02 fill_order must be hot-first, cold-first, or balanced")
 
 
 def resolve_task_definition(**values: Any) -> TaskDefinition:
@@ -107,6 +99,11 @@ def resolve_scene_config(*, seed: int, env_split: str, **values: Any) -> SceneCo
 def resolve_episode_plan(*, seed: int, **values: Any) -> EpisodePlan:
     """Freeze every hidden WA-02 decision before environment construction."""
 
+    if "fill_order" in values:
+        raise ValueError(
+            "WA-02 no longer supports fill_order overrides; "
+            "the execution sequence is seed-balanced"
+        )
     balanced = balanced_axes_for_seed(seed)
     configured_hot = values.get("hot_cup_id")
     hot_cup = (
@@ -138,7 +135,7 @@ def resolve_episode_plan(*, seed: int, **values: Any) -> EpisodePlan:
         cold_cup_id=cold_cup,
         requested_temperature=requested_temperature,
         requested_cup_id=requested_cup,
-        fill_temperature_order=resolve_fill_order(values.get("fill_order", "hot-first"), seed=seed),
+        fill_temperature_order=tuple(balanced["fill_temperature_order"]),
         service_slot_by_cup=assignment,
         max_horizon=int(values.get("max_horizon", 6000)),
     )
@@ -159,7 +156,6 @@ def _is_unspecified(value: Any) -> bool:
 __all__ = [
     "balanced_axes_for_seed",
     "resolve_episode_plan",
-    "resolve_fill_order",
     "resolve_scene_config",
     "resolve_task_definition",
     "validate_cup_id",

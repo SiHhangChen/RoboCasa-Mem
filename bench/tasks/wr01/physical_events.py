@@ -17,6 +17,7 @@ from bench.tasks.wr01.domain.semantics import (
     SemanticState,
     evaluate_success,
     latch_storage_hidden,
+    mark_canonical_reset,
     record_retrieval_door_open,
     record_retrieval_pick,
     record_storage,
@@ -34,6 +35,7 @@ class PhysicalSample:
     upper_door_closed: bool
     lower_door_open: bool
     upper_door_open: bool
+    canonical_reset: bool | None = None
 
     def item_in_level(self, item_id: str, level: str) -> bool:
         if item_id == "red_can":
@@ -128,6 +130,12 @@ class WR01PhysicalObserver:
                 self._transition(self.CLOSE, sample.step_id)
 
         elif self._phase == self.CLOSE:
+            if (
+                sample.canonical_reset is not None
+                and sample.canonical_reset
+                and sample.both_doors_closed
+            ):
+                mark_canonical_reset(self.state, valid=True)
             for level in CABINET_LEVELS:
                 if self._stable(f"closed:{level}", sample.door_closed(level)):
                     events.append(f"closed:{level}")
@@ -144,6 +152,9 @@ class WR01PhysicalObserver:
                     for item in ITEM_IDS
                 ),
                 cabinets_closed=True,
+                canonical_reset_complete=(
+                    True if sample.canonical_reset is None else sample.canonical_reset
+                ),
             ):
                 events.append("memory_barrier")
                 self._mark("hidden", sample.step_id)

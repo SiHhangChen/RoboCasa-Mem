@@ -1,0 +1,39 @@
+{
+  "metadata": {
+    "task_id": "WX-02",
+    "layout_id": 38,
+    "style_id": 38,
+    "seed": 0,
+    "description": "WX-02 short two-point route between the yellow sponge region and the two cups."
+  },
+  "default_start_index": 0,
+  "route_mode": "directed_loop",
+  "station_targets": {
+    "navigation_start": 0,
+    "cleaning_tool_station": 0,
+    "tool_origin": 0,
+    "cleaning_tool": 0,
+    "dining_table_station": 1,
+    "dining_table": 1,
+    "dining_table:holding:cleaning_tool": 1,
+    "cleaning_tool_region": 0,
+    "primary_cup": 1,
+    "secondary_cup": 1,
+    "object_origin": 1,
+    "original_area": 1
+  },
+  "samples": [
+    {
+      "index": 0,
+      "name": "cleaning_tool_region_front",
+      "xy": [2.17, -4.58],
+      "yaw": -0.04
+    },
+    {
+      "index": 1,
+      "name": "dining_table_front",
+      "xy": [2.171, -3.833],
+      "yaw": -0.042
+    }
+  ]
+}

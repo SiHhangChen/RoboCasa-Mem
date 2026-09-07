@@ -1,10 +1,8 @@
 #!/usr/bin/env python
-"""Make a TS02 LeRobot copy self-contained with per-order task instructions.
+"""Restore the original generic TS02 task instruction in a LeRobot copy.
 
-The hidden red-cube location remains absent from every instruction.  Only the
-independently sampled drawer search order is exposed, so a high-level policy
-can emit executable left/center/right drawer subtasks instead of attempting to
-guess an unobservable random expert choice.
+Concrete left/center/right labels remain in ``subtask_index``. The sampled
+expert search order is not exposed through the policy-visible task prompt.
 """
 
 from __future__ import annotations
@@ -60,8 +58,8 @@ def rewrite_tasks(root: Path, boundaries: Path) -> None:
         raise ValueError(f"missing task instructions for episode indices {missing[:10]}")
 
     instructions = sorted(set(instruction_by_episode.values()))
-    if len(instructions) != 6:
-        raise ValueError(f"TS02 must expose six search-order instructions, found {len(instructions)}")
+    if len(instructions) != 1:
+        raise ValueError(f"TS02 must expose one generic instruction, found {len(instructions)}")
     task_index_by_instruction = {
         instruction: index for index, instruction in enumerate(instructions)
     }
@@ -133,7 +131,7 @@ def rewrite_tasks(root: Path, boundaries: Path) -> None:
 
     print(
         f"rewrote {len(instruction_by_episode)} TS02 episodes with "
-        f"{len(instructions)} search-order task instructions"
+        "one generic task instruction"
     )
 
 

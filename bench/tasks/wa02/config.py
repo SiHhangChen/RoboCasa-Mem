@@ -22,7 +22,6 @@ from bench.tasks.wa02.domain.contracts import (
     TaskConfig,
 )
 from bench.tasks.wa02.domain.episode import (
-    resolve_fill_order,
     validate_cup_id,
     validate_temperature,
 )
@@ -255,7 +254,7 @@ def resolve_task_options(task_options: Mapping[str, Any] | None) -> dict[str, An
     """Accept only typed label overrides used by calibration and debugging."""
 
     values = dict(task_options or {})
-    allowed = {"hot_cup_id", "requested_temperature", "fill_order"}
+    allowed = {"hot_cup_id", "requested_temperature"}
     _reject_unknown(values, allowed, "task options")
     resolved: dict[str, Any] = {}
     if "hot_cup_id" in values:
@@ -263,16 +262,6 @@ def resolve_task_options(task_options: Mapping[str, Any] | None) -> dict[str, An
     if "requested_temperature" in values:
         resolved["requested_temperature"] = validate_temperature(
             values["requested_temperature"]
-        )
-    if "fill_order" in values:
-        # Validate without allowing this invocation metadata to change seed use.
-        order = resolve_fill_order(values["fill_order"], seed=0)
-        raw = "" if values["fill_order"] is None else str(values["fill_order"])
-        normalized = raw.strip().lower().replace("_", "-")
-        resolved["fill_order"] = (
-            "balanced"
-            if normalized in {"balanced", "seed-balanced"}
-            else "hot-first" if order[0] == "hot" else "cold-first"
         )
     return resolved
 

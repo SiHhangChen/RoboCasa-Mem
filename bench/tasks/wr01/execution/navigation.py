@@ -27,6 +27,7 @@ from bench.execution.navigation.station_poses import (
 from bench.execution.planning import NavigationConfig
 from bench.execution.sampling.rng import SeedStream
 from bench.execution.sampling.station_sampler import SimpleStationSampler
+from bench.execution.sampling.circle_sampling import sample_uniform_disk
 
 
 STATION_ALIASES: dict[Any, str] = {
@@ -40,6 +41,8 @@ STATION_ALIASES: dict[Any, str] = {
     "door_station": "upper_door_station",
     "lower_door": "lower_door_station",
     "upper_door": "upper_door_station",
+    "memory_handoff_station": "cabinet_front_station",
+    "memory_handoff": "cabinet_front_station",
 }
 
 CALIBRATED_STATION_IDS = (
@@ -48,6 +51,7 @@ CALIBRATED_STATION_IDS = (
     "upper_storage_station",
     "upper_door_station",
     "lower_door_station",
+    "cabinet_front_station",
 )
 
 
@@ -170,7 +174,7 @@ def build_navigation_assembly(
         aliases={key: value for key, value in aliases.items() if isinstance(key, str)},
     )
     station_path = Path(stations_file)
-    calibrated_specs = _calibrated_station_specs(station_path)
+    calibrated_specs = _calibrated_station_specs(station_path, seed=int(seed))
     generated_specs.update(calibrated_specs)
     sampler: Any = SimpleStationSampler(
         stations=generated_specs,
@@ -202,13 +206,15 @@ def build_navigation_assembly(
     )
 
 
-def _calibrated_station_specs(path: Path) -> dict[str, StationSpec]:
+def _calibrated_station_specs(path: Path, *, seed: int = 0) -> dict[str, StationSpec]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     stations = payload.get("stations") or {}
     resolved: dict[str, StationSpec] = {}
     for station_id in CALIBRATED_STATION_IDS:
         values = dict(stations.get(station_id) or {})
-        candidates, samples = _station_candidates(values)
+        candidates, samples = _station_candidates(
+            values, station_id=station_id, seed=int(seed)
+        )
         if not candidates:
             raise ValueError(
                 f"invalid WR-01 station {station_id!r} in {path}: "
@@ -232,6 +238,9 @@ def _calibrated_station_specs(path: Path) -> dict[str, StationSpec]:
                 "base_xy": list(first["base_xy"]),
                 "base_yaw": float(first["base_yaw"]),
                 "samples": samples,
+                "circle": dict(values.get("circle") or {})
+                if isinstance(values.get("circle"), Mapping)
+                else None,
             },
         )
     return resolved
@@ -239,7 +248,39 @@ def _calibrated_station_specs(path: Path) -> dict[str, StationSpec]:
 
 def _station_candidates(
     values: dict[str, Any],
+    *,
+    station_id: str = "",
+    seed: int = 0,
 ) -> tuple[list[Pose], list[dict[str, Any]]]:
+    circle = values.get("circle")
+    if isinstance(circle, Mapping):
+        center = np.asarray(circle.get("center_xy", ()), dtype=float).reshape(-1)
+        radius = float(circle.get("radius_m", -1.0))
+        yaw = float(circle.get("base_yaw", 0.0))
+        torso_height = float(circle.get("torso_height", 0.20))
+        if center.size < 2 or not np.all(np.isfinite(center[:2])):
+            raise ValueError(f"invalid {station_id!r} circle center")
+        if not np.isfinite(radius) or radius < 0.0:
+            raise ValueError(f"invalid {station_id!r} circle radius")
+        sampled = sample_uniform_disk(
+            center[:2], radius, seed=int(seed),
+            salt=0x57524353 + sum(ord(ch) for ch in str(station_id)),
+        )
+        sample = {
+            "sample_index": 0,
+            "base_xy": sampled.astype(float).tolist(),
+            "base_yaw": yaw,
+            "torso_height": torso_height,
+            "record_source": str(circle.get("record_source", "circle_region")),
+            "circle": {"center_xy": center[:2].astype(float).tolist(), "radius_m": radius},
+        }
+        pose = Pose(
+            position=(float(sampled[0]), float(sampled[1]), 0.0),
+            quaternion=tuple(float(v) for v in yaw_to_quat_xyzw(yaw)),
+            torso_height=torso_height,
+        )
+        return [pose], [sample]
+
     raw_samples = values.get("samples")
     if isinstance(raw_samples, list):
         source_samples = list(raw_samples)

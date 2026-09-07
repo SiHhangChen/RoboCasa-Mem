@@ -1,0 +1,38 @@
+{
+  "task_id": "WX-02",
+  "spatial_reference": "Each stain center and cup return pose is the episode-specific world position initially covered by that cup. Temporary cup targets are independently sampled world positions. The sponge starts and ends in the yellow tool region.",
+  "high_level_instruction": "Fetch the sponge, clean the stains under both cups one at a time, return each cup to its own original position, then return the sponge to the yellow region.",
+  "keyframes_from_record": true,
+  "subtasks": {
+    "observe_cups": {"label": "stand in front of both cups and observe their original positions", "keyframe": "last"},
+    "fetch_sponge": {"label": "navigate to the yellow region and pick up the sponge", "keyframe": "last"},
+    "stage_sponge": {"label": "return to the cups and put down the sponge", "keyframe": "last"},
+    "move_primary_cup": {"label": "move the first cup aside to reveal its stain", "keyframe": "last"},
+    "wipe_primary_stain": {"label": "pick up the sponge and wipe the first stain", "keyframe": "last"},
+    "place_sponge_primary": {"label": "put down the sponge after the first wipe", "keyframe": "last"},
+    "pick_primary_cup": {"label": "pick up the displaced first cup", "keyframe": "last"},
+    "return_primary_cup": {"label": "return the first cup to its original position", "keyframe": "last"},
+    "move_secondary_cup": {"label": "move the second cup aside to reveal its stain", "keyframe": "last"},
+    "wipe_secondary_stain": {"label": "pick up the sponge and wipe the second stain", "keyframe": "last"},
+    "place_sponge_secondary": {"label": "put down the sponge after the second wipe", "keyframe": "last"},
+    "pick_secondary_cup": {"label": "pick up the displaced second cup", "keyframe": "last"},
+    "return_secondary_cup": {"label": "return the second cup to its original position", "keyframe": "last"},
+    "return_sponge": {"label": "pick up the sponge and return it to the yellow tool region", "keyframe": "last"}
+  },
+  "stage_prefixes": {
+    "observe_cups": ["stand_in_front_of_two_cups"],
+    "fetch_sponge": ["navigate_to_and_pick_cleaning_tool"],
+    "stage_sponge": ["return_to_cups_and_stage_cleaning_tool"],
+    "move_primary_cup": ["move_primary_cup_to_reveal_stain"],
+    "wipe_primary_stain": ["pick_tool_and_wipe_primary_stain"],
+    "place_sponge_primary": ["place_cleaning_tool_after_primary_wipe"],
+    "pick_primary_cup": ["pick_displaced_primary_cup"],
+    "return_primary_cup": ["return_primary_cup_to_remembered_origin"],
+    "move_secondary_cup": ["move_secondary_cup_to_reveal_stain"],
+    "wipe_secondary_stain": ["pick_tool_and_wipe_secondary_stain"],
+    "place_sponge_secondary": ["place_cleaning_tool_after_secondary_wipe"],
+    "pick_secondary_cup": ["pick_displaced_secondary_cup"],
+    "return_secondary_cup": ["return_secondary_cup_to_remembered_origin"],
+    "return_sponge": ["return_cleaning_tool_to_yellow_region"]
+  }
+}

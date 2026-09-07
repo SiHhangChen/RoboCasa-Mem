@@ -14,6 +14,8 @@ class SemanticState:
     stored_level: str | None = None
     closed_levels_after_storage: set[str] = field(default_factory=set)
     storage_hidden: bool = False
+    canonical_reset_complete: bool = False
+    canonical_reset_required: bool = False
     retrieval_level_opened: str | None = None
     wrong_retrieval_level_opened: bool = False
     retrieved_item_id: str | None = None
@@ -104,6 +106,7 @@ def latch_storage_hidden(
     *,
     can_still_stored: bool,
     cabinets_closed: bool,
+    canonical_reset_complete: bool = False,
 ) -> bool:
     """Latch the memory barrier only after both post-storage close events."""
 
@@ -112,11 +115,18 @@ def latch_storage_hidden(
         and state.closed_levels_after_storage == set(CABINET_LEVELS)
         and can_still_stored
         and cabinets_closed
+        and (not state.canonical_reset_required or canonical_reset_complete)
         and not state.protocol_violation
     )
     if ready:
         state.storage_hidden = True
     return state.storage_hidden
+
+
+def mark_canonical_reset(state: SemanticState, *, valid: bool) -> bool:
+    if valid:
+        state.canonical_reset_complete = True
+    return state.canonical_reset_complete
 
 
 def record_retrieval_door_open(state: SemanticState, level: str) -> bool:
@@ -206,6 +216,7 @@ __all__ = [
     "SuccessReport",
     "evaluate_success",
     "latch_storage_hidden",
+    "mark_canonical_reset",
     "record_retrieval_door_open",
     "record_retrieval_pick",
     "record_storage",

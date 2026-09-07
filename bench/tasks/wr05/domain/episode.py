@@ -92,10 +92,21 @@ def resolve_episode_plan(*, seed: int, **values: Any) -> EpisodePlan:
     )
 
 
-def public_return_prompt() -> str:
-    """Return instruction that never reveals the private lower/upper binding."""
+def public_task_prompt() -> str:
+    """Complete public instruction without private shelf or plate assignments."""
 
-    return "Return the ketchup and mustard bottles to their original open-shelf levels."
+    return (
+        "Remember whether the ketchup and mustard bottles start on the lower or "
+        "upper shelf. First move the ketchup beside the serving plate, then move "
+        "the mustard beside it. After both bottles are staged, return the ketchup "
+        "and then the mustard to their original shelf levels."
+    )
+
+
+def public_return_prompt() -> str:
+    """Backward-compatible alias for the complete public task prompt."""
+
+    return public_task_prompt()
 
 
 def _optional_int(value: Any) -> int | None:

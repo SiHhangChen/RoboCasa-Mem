@@ -1,6 +1,6 @@
 {
   "source_dataset": "lerobot_data/memer/wa02_200seeds_v061_subtasks_v4",
-  "output_dir": "outputs/memer/wa02_sft_50_stride10_v4",
+  "output_dir": "outputs/memer/qwen-sft/wa02_sft_50_stride10_v4",
   "annotation_dir": "outputs/memer/wa02_annotations_v4",
   "camera_layout_config": "configs/memer/wa02_rgb_camera_layout.json",
   "keyframe_rule_file": "configs/memer/wa02_keyframe_rules.json",

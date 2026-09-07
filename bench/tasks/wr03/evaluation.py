@@ -17,41 +17,38 @@ from bench.tasks.wr03.domain.contracts import CAN_ID, CABINET_LEVELS
 
 
 STAGE_ORDER = (
-    "can_pick",
-    "can_store",
-    "close_upper_cabinet",
-    "close_lower_cabinet",
-    "storage_hidden",
+    "close_first_door",
+    "close_second_door",
+    "canonical_reset",
     "open_remembered_cabinet",
     "retrieve_can",
+    "place_on_table",
 )
 STAGE_LABELS = {
-    "can_pick": "罐头取",
-    "can_store": "罐头存",
-    "close_upper_cabinet": "关上柜",
-    "close_lower_cabinet": "关下柜",
-    "storage_hidden": "存储位置隐藏",
+    "close_first_door": "关第一扇柜门",
+    "close_second_door": "关第二扇柜门",
+    "canonical_reset": "回到中性位",
     "open_remembered_cabinet": "打开记忆柜",
     "retrieve_can": "取回罐头",
+    "place_on_table": "放回桌面",
 }
 STAGE_PREREQUISITES: dict[str, str | tuple[str, ...] | None] = {
-    "can_pick": None,
-    "can_store": "can_pick",
-    "close_upper_cabinet": "can_store",
-    "close_lower_cabinet": "can_store",
-    "storage_hidden": ("close_upper_cabinet", "close_lower_cabinet"),
-    "open_remembered_cabinet": "storage_hidden",
+    "close_first_door": None,
+    "close_second_door": "close_first_door",
+    "canonical_reset": "close_second_door",
+    "open_remembered_cabinet": "canonical_reset",
     "retrieve_can": "open_remembered_cabinet",
+    "place_on_table": "retrieve_can",
 }
 REPORT_STAGE_ORDER = WR03_REPORT_PROFILE.stage_ids
 REPORT_STAGE_PROFILE_ID = WR03_REPORT_PROFILE.profile_id
 TASK_EVALUATOR_METADATA_KEY = "task_evaluator"
 
 _REPORT_STAGE_SOURCES = {
-    "can_stored": "can_store",
-    "storage_hidden": "storage_hidden",
+    "can_stored": "close_first_door",
+    "storage_hidden": "canonical_reset",
     "correct_cabinet_opened": "open_remembered_cabinet",
-    "success": "retrieve_can",
+    "success": "place_on_table",
 }
 
 
@@ -67,6 +64,7 @@ class WR03EvaluationSnapshot:
     """One read-only physical/semantic observation for the evaluator."""
 
     step_id: int
+    close_order: tuple[str, str] = ("upper", "lower")
     can_grasped: bool = False
     stored_level: str | None = None
     closed_levels_after_storage: frozenset[str] = frozenset()
@@ -79,6 +77,8 @@ class WR03EvaluationSnapshot:
     can_outside_both: bool = False
     other_door_closed: bool = False
     protocol_violation: bool = False
+    canonical_reset: bool = False
+    final_placement_verified: bool = False
     details: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -86,6 +86,9 @@ class WR03EvaluationSnapshot:
         if step < 0:
             raise ValueError("WR-03 evaluation step_id must be non-negative")
         stored = None if self.stored_level is None else _level(self.stored_level)
+        close_order = tuple(_level(value) for value in self.close_order)
+        if len(close_order) != 2 or set(close_order) != set(CABINET_LEVELS):
+            raise ValueError("WR-03 close_order must contain lower and upper")
         closed_levels = frozenset(
             _level(level) for level in (self.closed_levels_after_storage or ())
         )
@@ -105,6 +108,7 @@ class WR03EvaluationSnapshot:
                 "post-storage door-close events"
             )
         object.__setattr__(self, "step_id", step)
+        object.__setattr__(self, "close_order", close_order)
         object.__setattr__(self, "stored_level", stored)
         object.__setattr__(self, "closed_levels_after_storage", closed_levels)
         object.__setattr__(self, "opened_level", opened)
@@ -118,6 +122,8 @@ class WR03EvaluationSnapshot:
             "can_outside_both",
             "other_door_closed",
             "protocol_violation",
+            "canonical_reset",
+            "final_placement_verified",
         ):
             object.__setattr__(self, name, bool(getattr(self, name)))
         object.__setattr__(self, "details", dict(self.details or {}))
@@ -148,19 +154,12 @@ class WR03EvaluationSnapshot:
 
     def raw_stage_values(self) -> dict[str, bool]:
         return {
-            "can_pick": self.can_grasped,
-            "can_store": self.stored_level is not None,
-            "close_upper_cabinet": bool(
-                self.stored_level is not None
-                and "upper" in self.closed_levels_after_storage
-            ),
-            "close_lower_cabinet": bool(
-                self.stored_level is not None
-                and "lower" in self.closed_levels_after_storage
-            ),
-            "storage_hidden": self.storage_hidden,
+            "close_first_door": bool(self.close_order[0] in self.closed_levels_after_storage),
+            "close_second_door": bool(self.close_order[1] in self.closed_levels_after_storage),
+            "canonical_reset": self.canonical_reset,
             "open_remembered_cabinet": self.opened_level is not None,
             "retrieve_can": self.retrieved_item_id is not None,
+            "place_on_table": self.final_placement_verified,
         }
 
 
@@ -277,7 +276,10 @@ class _MutableStage:
 class WR03Evaluator:
     """Strict ordered evaluator backed by read-only WR-03 observations."""
 
-    def __init__(self) -> None:
+    def __init__(self, close_order: tuple[str, str] = ("upper", "lower")) -> None:
+        self.close_order = tuple(_level(value) for value in close_order)
+        if len(self.close_order) != 2 or set(self.close_order) != set(CABINET_LEVELS):
+            raise ValueError("WR-03 close_order must contain lower and upper")
         self._stages = {name: _MutableStage() for name in STAGE_ORDER}
         self._rejected: dict[str, list[dict[str, Any]]] = {
             name: [] for name in STAGE_ORDER
@@ -288,6 +290,8 @@ class WR03Evaluator:
         self._cached_result: WR03EvalResult | None = None
 
     def reset(self, snapshot: WR03EvaluationSnapshot) -> WR03EvalResult:
+        if snapshot.close_order != self.close_order:
+            raise ValueError("WR-03 evaluation snapshot close_order changed")
         self._stages = {name: _MutableStage() for name in STAGE_ORDER}
         self._rejected = {name: [] for name in STAGE_ORDER}
         self._terminal_failure_code = None
@@ -302,6 +306,8 @@ class WR03Evaluator:
         return self._cached_result
 
     def observe(self, snapshot: WR03EvaluationSnapshot) -> WR03EvalResult:
+        if snapshot.close_order != self.close_order:
+            raise ValueError("WR-03 evaluation snapshot close_order changed")
         if self._last_step_id is None:
             return self.reset(snapshot)
         if snapshot.step_id == self._last_step_id:
@@ -395,6 +401,9 @@ class WR03Evaluator:
                 return "wrong_retrieval_cabinet"
             if not snapshot.correct_cabinet_opened:
                 return "wrong_retrieval_cabinet"
+        elif name == "canonical_reset":
+            if not snapshot.canonical_reset:
+                return "canonical_reset_not_reached"
         elif name == "retrieve_can":
             if snapshot.retrieved_item_id != CAN_ID:
                 return "wrong_item_retrieved"
@@ -404,6 +413,9 @@ class WR03Evaluator:
                 return "other_door_not_closed"
             if not snapshot.correct_cabinet_opened:
                 return "wrong_retrieval_cabinet"
+        elif name == "place_on_table":
+            if not snapshot.final_placement_verified:
+                return "final_placement_not_verified"
         return None
 
     def _mark_observed(self, name: str, step_id: int) -> None:

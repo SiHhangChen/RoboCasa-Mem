@@ -24,6 +24,8 @@ def test_wa03_prompt_allows_any_unmarked_coffee() -> None:
 
     assert "any one coffee" in prompt.initial_prompt
     assert "any one coffee" in prompt.policy_prompt
+    assert "identify the coffee you sugared" in prompt.initial_prompt
+    assert "identify the coffee you sugared" in prompt.policy_prompt
     assert "mark" not in prompt.initial_prompt.casefold()
     assert "mark" not in prompt.policy_prompt.casefold()
 
@@ -119,6 +121,7 @@ def test_wa03_marked_compatibility_restores_old_prompt_and_target() -> None:
     assert episode.facts["sugar_target_mode"] == "marked"
     assert episode.facts["target_sugared_coffee_id"] == target
     assert "temporarily marked" in episode.public["prompt"]
+    assert "identify the sugared coffee" in descriptor.prompt.policy_prompt
     assert descriptor.environment.env_kwargs == {
         "sugar_target_mode": "marked",
         "target_sugared_coffee_id": target,

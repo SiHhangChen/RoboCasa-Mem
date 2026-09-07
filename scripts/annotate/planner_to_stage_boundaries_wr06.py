@@ -1,10 +1,9 @@
 #!/usr/bin/env python
-"""Recover exact WR06 boundaries and per-episode plate-side plans.
+"""Recover exact WR06 boundaries and demonstration metadata.
 
 WR06 requires remembering the ketchup bottle's visible initial shelf level.
-The seed-selected plate side is not visually inferable, so this bridge exposes
-only that side in an executable episode instruction.  The original shelf level
-remains hidden and must be recovered from observation and memory.
+The seed-selected plate side remains recorded for trajectory verification but
+is not exposed in the task instruction or semantic subtask labels.
 """
 
 from __future__ import annotations
@@ -26,6 +25,10 @@ STEP_KEYS = frozenset({"steps", "executed_steps", "release_settle_steps"})
 NAVIGATE_STAGE_INDICES = frozenset({0, 1, 5, 9, 12})
 LEVEL_DISPLAY = {"shelf_lower": "lower", "shelf_upper": "upper"}
 PLATE_DISPLAY = {"plate_left": "left", "plate_right": "right"}
+TASK_INSTRUCTION = (
+    "Remember whether the ketchup bottle starts on the lower or upper shelf. "
+    "Move it beside the serving plate, then return it to its original shelf level."
+)
 
 
 def _require(condition: bool, message: str) -> None:
@@ -203,14 +206,8 @@ def build_stage_names(original_level: str, plate_region: str) -> list[str]:
     ]
 
 
-def build_task_instruction(plate_region: str) -> str:
-    side = PLATE_DISPLAY[plate_region]
-    return (
-        "Inspect the open shelf and remember whether the ketchup bottle starts "
-        f"on the lower or upper level. Move it upright to the {side} side of "
-        f"the fixed serving plate, pick it up again from the {side} side, and "
-        "return it upright to its original shelf level."
-    )
+def build_task_instruction() -> str:
+    return TASK_INSTRUCTION
 
 
 def _episode_seed(episode_dir: Path) -> int:
@@ -355,7 +352,7 @@ def build_boundary_record(episode_dir: Path) -> dict[str, Any]:
         "original_level_id": original_level,
         "plate_side": PLATE_DISPLAY[plate_region],
         "plate_region": plate_region,
-        "high_level_instruction": build_task_instruction(plate_region),
+        "high_level_instruction": build_task_instruction(),
         "total_frames": cumulative,
         "recorded_total_frames": recorded_total,
         "step_field_totals": field_totals,

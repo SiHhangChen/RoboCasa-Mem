@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import socket
 import sys
 import time
@@ -74,6 +73,28 @@ def wait_for_policy_server(host: str, port: int, timeout_sec: float) -> None:
 
 
 def load_prompt(dataset_root: Path, task_index: int) -> str:
+    subtasks_path = dataset_root / "meta" / "subtasks.tsv"
+    if subtasks_path.is_file():
+        tasks: dict[int, str] = {}
+        for line_number, raw_line in enumerate(
+            subtasks_path.read_text(encoding="utf-8").splitlines(), start=1
+        ):
+            try:
+                raw_index, label = raw_line.split("\t", 1)
+                index = int(raw_index)
+            except ValueError as exc:
+                raise ValueError(
+                    f"invalid subtask row in {subtasks_path} at line {line_number}"
+                ) from exc
+            if index != len(tasks) or not label or label != label.strip():
+                raise ValueError(
+                    f"invalid subtask row in {subtasks_path} at line {line_number}: {raw_line!r}"
+                )
+            tasks[index] = label
+        if int(task_index) not in tasks:
+            raise KeyError(f"subtask_index={task_index} not found in {subtasks_path}")
+        return tasks[int(task_index)]
+
     tasks = pd.read_parquet(dataset_root / "meta" / "tasks.parquet")
     matches = tasks[tasks["task_index"].astype(int) == int(task_index)]
     if matches.empty:
@@ -104,7 +125,13 @@ def episode_value(episode_row: pd.Series, key: str, default: Any = None) -> Any:
 def load_dataset_frame(dataset_root: Path, episode_index: int, frame_offset: int, horizon: int) -> dict[str, Any]:
     info = json.loads((dataset_root / "meta" / "info.json").read_text())
     fps = int(info["fps"])
-    episodes = pd.read_parquet(dataset_root / "meta" / "episodes" / "chunk-000" / "file-000.parquet")
+    episode_files = sorted((dataset_root / "meta" / "episodes").glob("chunk-*/*.parquet"))
+    if not episode_files:
+        raise FileNotFoundError(f"no episode metadata under {dataset_root / 'meta' / 'episodes'}")
+    episodes = pd.concat(
+        [pd.read_parquet(path) for path in episode_files],
+        ignore_index=True,
+    )
     episode = episodes[episodes["episode_index"].astype(int) == int(episode_index)]
     if episode.empty:
         raise KeyError(f"episode_index={episode_index} not found")
@@ -120,6 +147,29 @@ def load_dataset_frame(dataset_root: Path, episode_index: int, frame_offset: int
         raise ValueError(f"frame_offset must be in [0, {length}), got {frame_offset}")
     global_index = start + int(frame_offset)
     row = frame_data[frame_data["index"].astype(int) == global_index].iloc[0]
+
+    task_index = int(row["task_index"])
+    subtasks_path = dataset_root / "meta" / "subtasks.tsv"
+    if subtasks_path.is_file():
+        sidecar_file = dataset_root / "subtask_indices" / (
+            data_file.relative_to(dataset_root / "data")
+        )
+        if not sidecar_file.is_file():
+            raise FileNotFoundError(sidecar_file)
+        sidecar = pd.read_parquet(sidecar_file)
+        sidecar_match = sidecar[sidecar["index"].astype(int) == global_index]
+        if len(sidecar_match) != 1:
+            raise ValueError(
+                f"expected one sidecar row for index={global_index}, got {len(sidecar_match)}"
+            )
+        sidecar_row = sidecar_match.iloc[0]
+        for column in ("episode_index", "frame_index", "index"):
+            if int(sidecar_row[column]) != int(row[column]):
+                raise ValueError(
+                    f"sidecar {column} mismatch for index={global_index}: "
+                    f"{sidecar_row[column]} != {row[column]}"
+                )
+        task_index = int(sidecar_row["subtask_index"])
 
     actions = []
     for offset in range(horizon):
@@ -147,7 +197,7 @@ def load_dataset_frame(dataset_root: Path, episode_index: int, frame_offset: int
         "state": np.asarray(row["observation.state"], dtype=np.float32),
         "gt_actions": gt_actions,
         "images": images,
-        "task_index": int(row["task_index"]),
+        "task_index": task_index,
         "timestamp": float(row["timestamp"]),
         "global_index": int(global_index),
         "frame_number": int(frame_numbers["agentview_left"]),

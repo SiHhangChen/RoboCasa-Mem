@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Rewrite a WR05 LeRobot dataset with per-episode plate-side plans."""
+"""Rewrite a WR05 LeRobot dataset with one complete generic instruction."""
 
 from __future__ import annotations
 
@@ -13,6 +13,9 @@ from typing import Any
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
+
+
+TASK_STATISTICS = ("min", "max", "mean", "std", "q01", "q10", "q50", "q90", "q99")
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -67,9 +70,9 @@ def rewrite_tasks(root: Path, boundaries: Path) -> None:
         raise ValueError("per-episode task instruction coverage is incomplete")
 
     instructions = sorted(set(instruction_by_episode.values()))
-    if len(instructions) != 2:
+    if len(instructions) != 1:
         raise ValueError(
-            f"WR05 must expose two complementary plate plans, found {len(instructions)}"
+            f"WR05 must expose one generic instruction, found {len(instructions)}"
         )
     task_index_by_instruction = {
         instruction: index for index, instruction in enumerate(instructions)
@@ -121,6 +124,16 @@ def rewrite_tasks(root: Path, boundaries: Path) -> None:
             field,
             pa.array(rewritten, type=field.type),
         )
+        for statistic in TASK_STATISTICS:
+            name = f"stats/task_index/{statistic}"
+            if name not in table.column_names:
+                continue
+            field = table.schema.field(name)
+            table = table.set_column(
+                table.schema.get_field_index(name),
+                field,
+                pa.array([[0.0] for _ in range(table.num_rows)], type=field.type),
+            )
         _atomic_write_table(table, path)
     if seen_episode_metadata != set(instruction_by_episode):
         raise ValueError("meta/episodes coverage differs from task mapping")
@@ -141,9 +154,19 @@ def rewrite_tasks(root: Path, boundaries: Path) -> None:
     info_path.write_text(
         json.dumps(info, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
+
+    stats_path = root / "meta" / "stats.json"
+    stats = json.loads(stats_path.read_text(encoding="utf-8"))
+    task_stats = dict(stats.get("task_index", {}))
+    for statistic in TASK_STATISTICS:
+        task_stats[statistic] = [0.0]
+    stats["task_index"] = task_stats
+    stats_path.write_text(
+        json.dumps(stats, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
     print(
         f"rewrote {len(instruction_by_episode)} WR05 episodes with "
-        f"{len(instructions)} plate-side task plans"
+        "one generic task instruction"
     )
 
 

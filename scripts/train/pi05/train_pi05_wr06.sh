@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Train pi05 (LoRA) on the wr06_200seeds_v061 dataset.
+# Train pi05 (LoRA) on the WR06 per-frame subtask-prompt dataset.
 #
 # Usage:
 #   scripts/train/pi05/train_pi05_wr06.sh              # fresh run
@@ -24,7 +24,7 @@ cd "${ROOT}"
 # ---- defaults (override via env) ----
 CONFIG_NAME="${CONFIG_NAME:-pi05_membench_wr06_lora}"
 EXP_NAME="${EXP_NAME:-pi05_lora_membench_wr06}"
-DATASET_REPO_ID="${DATASET_REPO_ID:-wr06_200seeds_v061}"
+DATASET_REPO_ID="${DATASET_REPO_ID:-pi05/wr06_200seeds_v061_subtasks_v2}"
 LEROBOT_HOME_DIR="${LEROBOT_HOME_DIR:-/home/chensihang/membench/data}"
 OPENPI_PRETRAIN_MODEL_DIR="${OPENPI_PRETRAIN_MODEL_DIR:-/home/chensihang/membench/pretrain_model}"
 CAMERA_KEYS="${CAMERA_KEYS:-observation.images.robot0_agentview_right,observation.images.robot0_eye_in_hand}"

@@ -1,6 +1,6 @@
 {
   "task_id": "WR-06",
-  "spatial_reference": "Upper/lower name the two fixed WR06 open-shelf levels. Plate left/right name the two fixed task-local regions beside the serving plate, not left/right in an arbitrary camera image.",
+  "spatial_reference": "Upper/lower name the two fixed WR06 open-shelf levels. Either side beside the serving plate is a valid staging location; the expert's recorded left/right side is not part of the task label.",
   "subtasks": {
     "inspect_shelf": {
       "label": "inspect the shelf levels to locate the ketchup bottle",
@@ -14,20 +14,12 @@
       "label": "pick up the ketchup bottle from the upper shelf",
       "keyframe": "last"
     },
-    "place_plate_left": {
-      "label": "place the ketchup bottle upright on the left side of the serving plate",
+    "place_plate": {
+      "label": "place the ketchup bottle beside the serving plate",
       "keyframe": "last"
     },
-    "place_plate_right": {
-      "label": "place the ketchup bottle upright on the right side of the serving plate",
-      "keyframe": "last"
-    },
-    "pick_plate_left": {
-      "label": "pick up the ketchup bottle from the left side of the serving plate",
-      "keyframe": "last"
-    },
-    "pick_plate_right": {
-      "label": "pick up the ketchup bottle from the right side of the serving plate",
+    "pick_plate": {
+      "label": "pick up the ketchup bottle from beside the serving plate",
       "keyframe": "last"
     },
     "return_lower": {
@@ -72,20 +64,6 @@
       "values": {
         "lower": "pick_lower",
         "upper": "pick_upper"
-      }
-    },
-    "place_plate": {
-      "field": "plate_side",
-      "values": {
-        "left": "place_plate_left",
-        "right": "place_plate_right"
-      }
-    },
-    "pick_plate": {
-      "field": "plate_side",
-      "values": {
-        "left": "pick_plate_left",
-        "right": "pick_plate_right"
       }
     },
     "return_original": {

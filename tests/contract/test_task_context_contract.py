@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[2]
     [
         "TM01", "TM02", "TM03", "TM04", "TS01", "TS02", "TS03", "TS04",
         "WA-01", "WA-02", "WA-03", "WA-04", "WA-05", "WR-01", "WR-02", "WR-03", "WR-04",
-        "WR-05", "WR-06", "WX-01",
+        "WR-05", "WR-06", "WR-07", "WR-08", "WX-01", "WX-02",
     ],
 )
 def test_all_plugins_expose_canonical_runtime_and_expert_apis(task_id: str) -> None:
@@ -53,7 +53,10 @@ def test_all_plugins_expose_canonical_runtime_and_expert_apis(task_id: str) -> N
         ("wr03_v1.yaml", 8000),
         ("wr05_v1.yaml", 5000),
         ("wr06_v1.yaml", 3200),
+        ("wr07_v1.yaml", 3600),
+        ("wr08_v1.yaml", 5200),
         ("wx01_v1.yaml", 3200),
+        ("wx02_v1.yaml", 5200),
     ],
 )
 def test_all_suites_inherit_task_horizon(

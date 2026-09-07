@@ -1,13 +1,10 @@
 """Pure deterministic episode decisions for WR-06.
 
-The bottle's original shelf level and its staged plate side are seed-decided:
-even seeds place it on the lower shelf and odd seeds on the upper shelf, while
-the plate staging side alternates with the placement-pair seed (even pair ->
-plate_left, odd pair -> plate_right).  Together the four (level, side) cases
-are balanced and cover every WR-05 pairing once the mustard is removed.  The
-scene is fixed to layout/style/scene-seed 32/32/0, and placement randomness is
-owned by ``placement_pair_seed`` so the lower/upper cases draw identical
-placements.
+The bottle's original shelf level and the expert demonstration's plate side
+are seed-decided. The plate side only balances recorded trajectories; either
+side is valid task behavior. The scene is fixed to layout/style/scene-seed
+32/32/0, and placement randomness is owned by ``placement_pair_seed`` so the
+lower/upper cases draw identical placements.
 """
 
 from __future__ import annotations
@@ -124,16 +121,20 @@ def resolve_episode_plan(*, seed: int, **values: Any) -> EpisodePlan:
     )
 
 
-def public_initial_prompt() -> str:
+def public_task_prompt() -> str:
     return (
         "Remember whether the ketchup bottle starts on the lower or upper shelf. "
-        "Move it to the plate staging spot beside the serving plate, then return "
-        "it to its original shelf level."
+        "Move it beside the serving plate, then return it to its original shelf "
+        "level."
     )
 
 
+def public_initial_prompt() -> str:
+    return public_task_prompt()
+
+
 def public_return_prompt() -> str:
-    return "Return the ketchup bottle to its original shelf level."
+    return public_task_prompt()
 
 
 __all__ = [
@@ -141,6 +142,7 @@ __all__ = [
     "plate_stage_region_for_seed",
     "public_initial_prompt",
     "public_return_prompt",
+    "public_task_prompt",
     "resolve_episode_plan",
     "resolve_scene_config",
     "resolve_task_definition",

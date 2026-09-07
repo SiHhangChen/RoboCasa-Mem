@@ -109,6 +109,8 @@ def test_native_hdf5_uses_one_action_vector_and_v2_contract(tmp_path: Path, monk
     recorder.record_initial_observation(recorder.env._obs)
     recorder.env.step(np.zeros(13, dtype=np.float32))
     recorder.env.step(np.zeros(13, dtype=np.float32))
+    assert all("images" not in record["frame"] for record in recorder.records)
+    assert all("depth" in record["frame"] for record in recorder.records)
     recorder.finalize_terminal(terminated=True, truncated=False, success=True, reason="task_success")
     recorder.close()
     episode = recorder.write_episode(metadata={"task_id": "FAKE"}, planner_summary={"pass": True}, accepted=True)
@@ -122,6 +124,25 @@ def test_native_hdf5_uses_one_action_vector_and_v2_contract(tmp_path: Path, monk
         assert np.asarray(demo["dones"]).tolist() == [False, True]
         assert json.loads(handle["data"].attrs["action_schema_json"])["schema"] == ACTION_SCHEMA
         assert "oracle" in demo and "diagnostics" in demo
+
+
+def test_native_writer_releases_disabled_rgbd_frame_data(tmp_path: Path, monkeypatch):
+    _patch_camera_utils(monkeypatch)
+    recorder = EpisodeRecorder(
+        _Env(),
+        output_dir=tmp_path,
+        cameras=CAMERAS,
+        camera_width=2,
+        camera_height=2,
+        record_depth=False,
+    )
+    recorder.install()
+    recorder.record_initial_observation(recorder.env._obs)
+    recorder.env.step(np.zeros(13, dtype=np.float32))
+    recorder.close()
+
+    assert "images" not in recorder.records[0]["frame"]
+    assert "depth" not in recorder.records[0]["frame"]
 
 
 def test_native_writer_rejects_non_three_camera_contract(tmp_path: Path):

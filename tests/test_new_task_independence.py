@@ -28,7 +28,10 @@ TASK_NAMES = (
     "WR04",
     "WR05",
     "WR06",
+    "WR07",
+    "WR08",
     "WX01",
+    "WX02",
 )
 EXPECTED_TASK_IDS = {
     "TM01",
@@ -50,7 +53,10 @@ EXPECTED_TASK_IDS = {
     "WR-04",
     "WR-05",
     "WR-06",
+    "WR-07",
+    "WR-08",
     "WX-01",
+    "WX-02",
 }
 
 
@@ -113,11 +119,8 @@ def test_composite_tasks_own_local_copied_resources() -> None:
 
     wr03 = importlib.import_module("bench.tasks.wr03.config").load_task_config()
     for name in (
-        "item_grasp_pose",
         "lower_door_grasp_pose",
-        "lower_preinsert_pose",
         "lower_retrieval_prepose",
-        "lower_release_pose",
         "upper_door_grasp_pose",
     ):
         assert wr03.path(wr03.resources[name]).is_relative_to(ROOT / "bench/tasks/wr03")

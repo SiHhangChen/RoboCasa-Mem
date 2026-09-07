@@ -69,17 +69,19 @@ def test_wr06_labels_five_memory_aligned_subtasks() -> None:
     assert [labels[index] for index in labeled["subtask_indices"]] == [
         *(["inspect the shelf levels to locate the ketchup bottle"] * 2),
         *(["pick up the ketchup bottle from the upper shelf"] * 3),
-        *(["place the ketchup bottle upright on the right side of the serving plate"] * 4),
-        *(["pick up the ketchup bottle from the right side of the serving plate"] * 3),
+        *(["place the ketchup bottle beside the serving plate"] * 4),
+        *(["pick up the ketchup bottle from beside the serving plate"] * 3),
         *(["return the ketchup bottle upright to the upper shelf"] * 3),
     ]
     assert labeled["keyframes"] == [1, 4, 8, 11, 14]
 
 
-def test_wr06_instruction_exposes_plate_side_but_not_original_level() -> None:
-    instruction = build_task_instruction("plate_right")
+def test_wr06_instruction_hides_demo_side_and_original_level() -> None:
+    instruction = build_task_instruction()
 
-    assert "right side of the fixed serving plate" in instruction
-    assert "whether the ketchup bottle starts on the lower or upper level" in instruction
+    assert "beside the serving plate" in instruction
+    assert "whether the ketchup bottle starts on the lower or upper shelf" in instruction
     assert "original shelf level" in instruction
     assert "shelf_upper" not in instruction
+    assert "left side" not in instruction
+    assert "right side" not in instruction

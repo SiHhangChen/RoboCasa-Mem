@@ -1,10 +1,10 @@
 {
   "source_dataset": "lerobot_data/memer/wa05_200seeds_v061_subtasks_v2",
-  "output_dir": "outputs/memer/wa05_sft_50_stride10_v2",
+  "output_dir": "outputs/memer/qwen-sft/wa05_sft_50_stride10_v2",
   "annotation_dir": "outputs/memer/wa05_annotations_v2",
   "camera_layout_config": "configs/memer/wa05_rgb_camera_layout.json",
   "keyframe_rule_file": "configs/memer/wa05_keyframe_rules.json",
-  "instruction_source": "meta/tasks.parquet (generic WA05 instruction; hot/cold answer is represented by the current subtask label)",
+  "instruction_source": "meta/tasks.parquet (original generic WA05 task with the red/hot and blue/cold mapping; the fill choice remains open until the observed action determines the matching final button)",
   "selection_seed": 20260825,
   "episode_indices": [
     0, 5, 9, 12, 16, 18, 22, 24, 25, 26,

@@ -1,9 +1,9 @@
 {
   "source_dataset": "lerobot_data/memer/wr06_200seeds_v061_subtasks_v2",
-  "output_dir": "outputs/memer/wr06_sft_50_stride10_v2",
+  "output_dir": "outputs/memer/qwen-sft/wr06_sft_50_stride10_v2",
   "camera_layout_config": "configs/memer/wr06_rgb_camera_layout.json",
   "keyframe_rule_file": "configs/memer/wr06_keyframe_rules.json",
-  "instruction_source": "meta/tasks.parquet (preserve each episode's plate-side plan while keeping the original shelf level hidden)",
+  "instruction_source": "meta/tasks.parquet (one complete generic WR06 instruction; expert plate side remains hidden demonstration metadata)",
   "selection_seed": 20260822,
   "episode_indices": [
     1,

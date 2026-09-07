@@ -62,6 +62,12 @@ def build_expert_plan(inputs: ExpertPlanInputs) -> ExpertPlan:
     requested = str(facts["requested_cup_id"])
     stages.extend([
         operate("verify_cups_staged", "cup_pair", name="verify_both_cups_staged_before_final_pick"),
+        navigate("service_area_center_station", purpose="neutral_selection_pose",
+                 name="navigate_final_selection_center"),
+        operate("return_arm", "cup_pair", name="return_arm_at_final_selection_center",
+                metadata={**dict(actions.return_arm_metadata),
+                          "stage": "return_arm_at_final_selection_center",
+                          "gripper_action": -1.0}),
         navigate("service_area", purpose=str(slot_by_cup[requested]), name=f"navigate_final_pick_{requested}"),
         operate("pick_upright_cup", requested, name=f"physical_final_pick_{requested}", metadata=actions.final_pick_metadata),
         operate("record_final_take", requested, name=f"record_final_take_{requested}"),

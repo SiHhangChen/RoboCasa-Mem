@@ -1,10 +1,10 @@
 #!/usr/bin/env python
-"""Recover exact WR05 stage boundaries and executable episode plans.
+"""Recover exact WR05 stage boundaries and demonstration metadata.
 
 WR05 requires remembering which fixed open-shelf level initially holds each
-condiment.  That home assignment stays hidden from the instruction.  The
-seed-selected serving-plate sides are not visually inferable, so the bridge
-does expose those sides in each episode's instruction for the downstream VLA.
+condiment. Both the home assignment and the seed-selected expert plate sides
+stay out of the instruction. The plate assignment remains in boundary records
+for trajectory auditing only.
 """
 
 from __future__ import annotations
@@ -26,6 +26,12 @@ STEP_KEYS = frozenset({"steps", "executed_steps", "release_settle_steps"})
 LEVEL_DISPLAY = {"shelf_lower": "lower", "shelf_upper": "upper"}
 PLATE_DISPLAY = {"plate_left": "left", "plate_right": "right"}
 CONDIMENTS = ("ketchup", "mustard")
+TASK_INSTRUCTION = (
+    "Remember whether the ketchup and mustard bottles start on the lower or "
+    "upper shelf. First move the ketchup beside the serving plate, then move "
+    "the mustard beside it. After both bottles are staged, return the ketchup "
+    "and then the mustard to their original shelf levels."
+)
 
 
 def _require(condition: bool, message: str) -> None:
@@ -231,19 +237,8 @@ def build_stage_names(
     return names
 
 
-def build_task_instruction(use_assignment: Mapping[str, str]) -> str:
-    use = _validate_assignment(use_assignment, PLATE_DISPLAY, name="plate assignment")
-    ketchup_side = PLATE_DISPLAY[use["ketchup"]]
-    mustard_side = PLATE_DISPLAY[use["mustard"]]
-    return (
-        "Observe and remember which open-shelf level initially holds the ketchup "
-        "and mustard bottles. First stage the ketchup upright on the "
-        f"{ketchup_side} side of the fixed serving plate, then stage the mustard "
-        f"upright on the {mustard_side} side. Pick up the ketchup from the "
-        f"{ketchup_side} side and return it upright to its original shelf level, "
-        f"then pick up the mustard from the {mustard_side} side and return it "
-        "upright to its original shelf level."
-    )
+def build_task_instruction() -> str:
+    return TASK_INSTRUCTION
 
 
 def _episode_seed(episode_dir: Path) -> int:
@@ -458,7 +453,7 @@ def build_boundary_record(episode_dir: Path) -> dict[str, Any]:
         "mustard_original_level": LEVEL_DISPLAY[home["mustard"]],
         "ketchup_plate_side": PLATE_DISPLAY[use["ketchup"]],
         "mustard_plate_side": PLATE_DISPLAY[use["mustard"]],
-        "high_level_instruction": build_task_instruction(use),
+        "high_level_instruction": build_task_instruction(),
         "total_frames": cumulative,
         "recorded_total_frames": recorded_total,
         "step_field_totals": field_totals,

@@ -6,5 +6,5 @@
   ],
   "view_width": 224,
   "view_height": 224,
-  "notes": "MobileManipulator WR06 stacked RGB layout: agentview_left, agentview_right, eye_in_hand. Spatial labels use fixed task-local shelf and plate regions."
+  "notes": "MobileManipulator WR06 stacked RGB layout: agentview_left, agentview_right, eye_in_hand. Spatial labels use the fixed task-local shelf levels; either plate side is valid."
 }

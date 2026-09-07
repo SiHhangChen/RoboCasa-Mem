@@ -831,10 +831,10 @@
     {
       "action_schema": "membench.pandaomron_hybrid13.v2",
       "allow_partial_calibration": false,
-      "config_hash": "sha256:a020162c144ee7a4fa0cfb56db644312f062b8ab075b9c11ea83f1175a0ee3a9",
+      "config_hash": "sha256:812ff558a782c9faca076e899e6d2299b8e9cc2a764d975e65b304192ba3f883",
       "control_frequency_hz": 20,
       "env_split": "pretrain",
-      "episode_identity": "sha256:7b19f33386c442ba13029856ffb1489fa6076a3d1806decbf8e95422c8ddd17e",
+      "episode_identity": "sha256:f6e010ccf6de24798929d695a497c9c506d7e4a18290703472de777187938ec9",
       "facts": {
         "delivery_order": [
           "coffee_B",
@@ -850,11 +850,11 @@
         "target_sugared_coffee_id": null
       },
       "initialization": {
-        "config_hash": "sha256:a020162c144ee7a4fa0cfb56db644312f062b8ab075b9c11ea83f1175a0ee3a9",
+        "config_hash": "sha256:812ff558a782c9faca076e899e6d2299b8e9cc2a764d975e65b304192ba3f883",
         "controller": {
           "max_joint_step": 0.025
         },
-        "resource_hash": "sha256:fe93bff4559f1e3e51b72aa4b37ded1c7b9eb66f476176f88879092d8c3c8893",
+        "resource_hash": "sha256:2245767394039647bfff74d91b3ed9e6b506679634af2cfddc07ca6457dcb018",
         "task_id": "WA-01"
       },
       "max_horizon": 5000,
@@ -892,14 +892,14 @@
         "style_id": 29
       },
       "release_facts": {
-        "config_hash": "sha256:a020162c144ee7a4fa0cfb56db644312f062b8ab075b9c11ea83f1175a0ee3a9",
+        "config_hash": "sha256:812ff558a782c9faca076e899e6d2299b8e9cc2a764d975e65b304192ba3f883",
         "controller": {
           "max_joint_step": 0.025
         },
-        "resource_hash": "sha256:fe93bff4559f1e3e51b72aa4b37ded1c7b9eb66f476176f88879092d8c3c8893",
+        "resource_hash": "sha256:2245767394039647bfff74d91b3ed9e6b506679634af2cfddc07ca6457dcb018",
         "task_id": "WA-01"
       },
-      "resource_hash": "sha256:fe93bff4559f1e3e51b72aa4b37ded1c7b9eb66f476176f88879092d8c3c8893",
+      "resource_hash": "sha256:2245767394039647bfff74d91b3ed9e6b506679634af2cfddc07ca6457dcb018",
       "resources": {
         "cup_place_poses": "bench/tasks/wa01/resources/poses/cup_place.json",
         "manual_base_path": "bench/tasks/wa01/resources/navigation/manual_base_path_layout29_style29_seed0.json",
@@ -1022,10 +1022,10 @@
     {
       "action_schema": "membench.pandaomron_hybrid13.v2",
       "allow_partial_calibration": false,
-      "config_hash": "sha256:1198faac47cc855dae2c27b064bacaa85fbc7d5340a2f61f369c68e69e5e4067",
+      "config_hash": "sha256:cb3c2353bdf5e098ea049f5980e5b0be83369232e2971c28e3ad4fe1874fd737",
       "control_frequency_hz": 20,
       "env_split": "pretrain",
-      "episode_identity": "sha256:e020c28067317c5781b1f6583ff06612dc70d0f61a3977379563af08e9a4c821",
+      "episode_identity": "sha256:08558b127cf22693d6dfc7638b03003100b183912e373e26a6de35607bc350f4",
       "facts": {
         "delivery_order": [
           "coffee_B",
@@ -1039,14 +1039,15 @@
         },
         "max_horizon": 6500,
         "seed": 0,
-        "target_sugared_coffee_id": "coffee_B"
+        "sugar_target_mode": "unmarked",
+        "target_sugared_coffee_id": null
       },
       "initialization": {
-        "config_hash": "sha256:1198faac47cc855dae2c27b064bacaa85fbc7d5340a2f61f369c68e69e5e4067",
+        "config_hash": "sha256:cb3c2353bdf5e098ea049f5980e5b0be83369232e2971c28e3ad4fe1874fd737",
         "controller": {
           "max_joint_step": 0.025
         },
-        "resource_hash": "sha256:d91b73c4c84643ea71d193249da53514d799e435a6e055a12684130440e80cbd",
+        "resource_hash": "sha256:9f652a6fe0743bb05599b20b46f4411b2cdd09a8f0350afccb40276ac7132dca",
         "task_id": "WA-03"
       },
       "max_horizon": 6500,
@@ -1073,25 +1074,25 @@
       "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
       "options": {},
       "prompt": {
-        "initial": "Three identical coffees are already prepared. Sugar the temporarily marked cup only, place all three cups on the dining counter, then identify it.",
-        "policy": "Start at the coffee machine with three identical prepared coffees. Add one sugar cube to the temporarily marked coffee, carry all three coffees to the dining counter, and identify the sugared coffee."
+        "initial": "Three identical coffees are already prepared. Add one sugar cube to any one coffee, place all three cups on the dining counter, then identify the coffee you sugared.",
+        "policy": "Start at the coffee machine with three identical prepared coffees. Add one sugar cube to any one coffee, carry all three coffees to the dining counter, and identify the coffee you sugared."
       },
       "public": {
         "env_name": "WA03SortSugaredAndUnsugaredCoffee",
         "layout_id": 29,
-        "prompt": "Start at the coffee machine with three identical prepared coffees. Add one sugar cube to the temporarily marked coffee, carry all three coffees to the dining counter, and identify the sugared coffee.",
+        "prompt": "Start at the coffee machine with three identical prepared coffees. Add one sugar cube to any one coffee, carry all three coffees to the dining counter, and identify the coffee you sugared.",
         "scene_seed": 0,
         "style_id": 29
       },
       "release_facts": {
-        "config_hash": "sha256:1198faac47cc855dae2c27b064bacaa85fbc7d5340a2f61f369c68e69e5e4067",
+        "config_hash": "sha256:cb3c2353bdf5e098ea049f5980e5b0be83369232e2971c28e3ad4fe1874fd737",
         "controller": {
           "max_joint_step": 0.025
         },
-        "resource_hash": "sha256:d91b73c4c84643ea71d193249da53514d799e435a6e055a12684130440e80cbd",
+        "resource_hash": "sha256:9f652a6fe0743bb05599b20b46f4411b2cdd09a8f0350afccb40276ac7132dca",
         "task_id": "WA-03"
       },
-      "resource_hash": "sha256:d91b73c4c84643ea71d193249da53514d799e435a6e055a12684130440e80cbd",
+      "resource_hash": "sha256:9f652a6fe0743bb05599b20b46f4411b2cdd09a8f0350afccb40276ac7132dca",
       "resources": {
         "cup_place_poses": "bench/tasks/wa03/resources/poses/cup_place.json",
         "manual_base_path": "bench/tasks/wa03/resources/navigation/manual_base_path_layout29_style29_seed0.json",
@@ -1623,10 +1624,10 @@
     {
       "action_schema": "membench.pandaomron_hybrid13.v2",
       "allow_partial_calibration": false,
-      "config_hash": "sha256:5d049825f3b045e9dd46a040728277f279413dc8655a7918287cb18cbe316304",
+      "config_hash": "sha256:39b21ab6371c3af2b110340fc2489523e6379d34dfcc897be8d03dc1924346cc",
       "control_frequency_hz": 20,
       "env_split": "pretrain",
-      "episode_identity": "sha256:c431510743c9232a53506240eee5eec7701855ab7eb16ea3da5a546191a909b8",
+      "episode_identity": "sha256:ae3ab0859311979ce0a04702ee835f04a097db1e3761c8881014137a4f928286",
       "facts": {
         "case_id": 0,
         "home_assignment": {
@@ -1670,13 +1671,13 @@
         }
       },
       "initialization": {
-        "config_hash": "sha256:5d049825f3b045e9dd46a040728277f279413dc8655a7918287cb18cbe316304",
+        "config_hash": "sha256:39b21ab6371c3af2b110340fc2489523e6379d34dfcc897be8d03dc1924346cc",
         "controller": {
           "max_joint_step": 0.03
         },
-        "resource_hash": "sha256:3149a7d3a58770ebd4d8e06f01cda0ce1d59ac3f81cf14a5ed90848511d9ac85",
+        "resource_hash": "sha256:80653fcc65844607b07c8a960c87b4109f1cdbdf90e8f164b6c827b9810050f0",
         "task_id": "WR-05",
-        "task_revision": "WR05-v1"
+        "task_revision": "WR05-v2"
       },
       "max_horizon": 5000,
       "observation": {
@@ -1702,26 +1703,26 @@
       "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
       "options": {},
       "prompt": {
-        "initial": "Observe the open shelf and remember the ketchup-to-mustard level binding. The return phase will not reveal their original levels.",
-        "policy": "Return the ketchup and mustard bottles to their original open-shelf levels."
+        "initial": "Remember whether the ketchup and mustard bottles start on the lower or upper shelf. First move the ketchup beside the serving plate, then move the mustard beside it. After both bottles are staged, return the ketchup and then the mustard to their original shelf levels.",
+        "policy": "Remember whether the ketchup and mustard bottles start on the lower or upper shelf. First move the ketchup beside the serving plate, then move the mustard beside it. After both bottles are staged, return the ketchup and then the mustard to their original shelf levels."
       },
       "public": {
         "env_name": "WR05ReturnCondimentPair",
         "layout_id": 32,
-        "prompt": "Return the ketchup and mustard bottles to their original open-shelf levels.",
+        "prompt": "Remember whether the ketchup and mustard bottles start on the lower or upper shelf. First move the ketchup beside the serving plate, then move the mustard beside it. After both bottles are staged, return the ketchup and then the mustard to their original shelf levels.",
         "scene_seed": 0,
         "style_id": 32
       },
       "release_facts": {
-        "config_hash": "sha256:5d049825f3b045e9dd46a040728277f279413dc8655a7918287cb18cbe316304",
+        "config_hash": "sha256:39b21ab6371c3af2b110340fc2489523e6379d34dfcc897be8d03dc1924346cc",
         "controller": {
           "max_joint_step": 0.03
         },
-        "resource_hash": "sha256:3149a7d3a58770ebd4d8e06f01cda0ce1d59ac3f81cf14a5ed90848511d9ac85",
+        "resource_hash": "sha256:80653fcc65844607b07c8a960c87b4109f1cdbdf90e8f164b6c827b9810050f0",
         "task_id": "WR-05",
-        "task_revision": "WR05-v1"
+        "task_revision": "WR05-v2"
       },
-      "resource_hash": "sha256:3149a7d3a58770ebd4d8e06f01cda0ce1d59ac3f81cf14a5ed90848511d9ac85",
+      "resource_hash": "sha256:80653fcc65844607b07c8a960c87b4109f1cdbdf90e8f164b6c827b9810050f0",
       "resources": {
         "ketchup_shelf_grasp": "bench/tasks/wr05/resources/calibration/shelf_ketchup_grasp.json",
         "mustard_shelf_grasp": "bench/tasks/wr05/resources/calibration/shelf_mustard_grasp.json",
@@ -1748,24 +1749,25 @@
     {
       "action_schema": "membench.pandaomron_hybrid13.v2",
       "allow_partial_calibration": false,
-      "config_hash": "sha256:aaca5256a857bbc533c9a74414c4cdcf0e1730f5cdc7ae835c9b148ef5ca2690",
+      "config_hash": "sha256:de3b34852a02467cfa281c276b18e1d418f8a99aeaccee1e66d4db1630dd0429",
       "control_frequency_hz": 20,
       "env_split": "pretrain",
-      "episode_identity": "sha256:006db21f24cc29c36b26b6f8b3ace942491f11fa1db72786d3e5e55c7bd1c6ee",
+      "episode_identity": "sha256:ed18713ec51bd7e8cefaac180df49e8196efd148b6914ccf3b6be037b55b552c",
       "facts": {
         "demo_original_level": "shelf_lower",
         "max_horizon": 3200,
         "placement_pair_seed": 0,
+        "plate_stage_region": "plate_left",
         "seed": 0
       },
       "initialization": {
-        "config_hash": "sha256:aaca5256a857bbc533c9a74414c4cdcf0e1730f5cdc7ae835c9b148ef5ca2690",
+        "config_hash": "sha256:de3b34852a02467cfa281c276b18e1d418f8a99aeaccee1e66d4db1630dd0429",
         "controller": {
           "max_joint_step": 0.03
         },
-        "resource_hash": "sha256:79cc18ab6b93d3107fe45f7d946b6e2d45cba9d9ab6ed46c37df4162d6ca9622",
+        "resource_hash": "sha256:3f9125fd21310e5685e356ce0edf991f4aefef4619c01d69c136c949e3fc9fbb",
         "task_id": "WR-06",
-        "task_revision": "WR06-v1"
+        "task_revision": "WR06-v3"
       },
       "max_horizon": 3200,
       "observation": {
@@ -1791,26 +1793,26 @@
       "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
       "options": {},
       "prompt": {
-        "initial": "Remember whether the ketchup bottle starts on the lower or upper shelf. Move it to the fixed plate staging spot, then return it to its original shelf level.",
-        "policy": "Return the ketchup bottle to its original shelf level."
+        "initial": "Remember whether the ketchup bottle starts on the lower or upper shelf. Move it beside the serving plate, then return it to its original shelf level.",
+        "policy": "Remember whether the ketchup bottle starts on the lower or upper shelf. Move it beside the serving plate, then return it to its original shelf level."
       },
       "public": {
         "env_name": "WR06ReturnSingleBottleToOriginalLevel",
         "layout_id": 32,
-        "prompt": "Return the ketchup bottle to its original shelf level.",
+        "prompt": "Remember whether the ketchup bottle starts on the lower or upper shelf. Move it beside the serving plate, then return it to its original shelf level.",
         "scene_seed": 0,
         "style_id": 32
       },
       "release_facts": {
-        "config_hash": "sha256:aaca5256a857bbc533c9a74414c4cdcf0e1730f5cdc7ae835c9b148ef5ca2690",
+        "config_hash": "sha256:de3b34852a02467cfa281c276b18e1d418f8a99aeaccee1e66d4db1630dd0429",
         "controller": {
           "max_joint_step": 0.03
         },
-        "resource_hash": "sha256:79cc18ab6b93d3107fe45f7d946b6e2d45cba9d9ab6ed46c37df4162d6ca9622",
+        "resource_hash": "sha256:3f9125fd21310e5685e356ce0edf991f4aefef4619c01d69c136c949e3fc9fbb",
         "task_id": "WR-06",
-        "task_revision": "WR06-v1"
+        "task_revision": "WR06-v3"
       },
-      "resource_hash": "sha256:79cc18ab6b93d3107fe45f7d946b6e2d45cba9d9ab6ed46c37df4162d6ca9622",
+      "resource_hash": "sha256:3f9125fd21310e5685e356ce0edf991f4aefef4619c01d69c136c949e3fc9fbb",
       "resources": {
         "item_shelf_grasp": "bench/tasks/wr06/resources/calibration/shelf_ketchup_grasp.json",
         "planner_script": "bench/execution/planning/mplib_planner.py",
@@ -2026,7 +2028,7 @@
       "variant": "memory"
     }
   ],
-  "lock_hash": "sha256:fe9675c2e770e12eba2e88204d17436ec8ad605e9668ca668ac059b9dda742a7",
+  "lock_hash": "sha256:07b50d0b98c45032983c2a2bcd9368e4a2ae9411ccdfc8c3e103c4f13245c162",
   "release_id": "all_tasks_v1",
   "schema_version": "membench.release_lock/v2"
 }

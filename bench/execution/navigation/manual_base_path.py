@@ -210,6 +210,8 @@ class ManualBasePathExecutor:
         force_terminal_settle: bool = False,
         terminal_xy_tolerance: float | None = None,
         terminal_yaw_tolerance: float | None = None,
+        terminal_target_xy: Any | None = None,
+        terminal_target_yaw: float | None = None,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         resolved_terminal_xy_tolerance = (
             self.xy_tolerance
@@ -244,6 +246,28 @@ class ManualBasePathExecutor:
                 "reason": target_resolution.get("reason", "manual_base_path_target_unavailable"),
             }
 
+        fixed_terminal_sample = self.samples[int(target_index)]
+        terminal_sample = fixed_terminal_sample
+        if terminal_target_xy is not None:
+            resolved_terminal_xy = np.asarray(terminal_target_xy, dtype=float).reshape(-1)
+            if resolved_terminal_xy.size < 2 or not np.all(
+                np.isfinite(resolved_terminal_xy[:2])
+            ):
+                raise ValueError("manual path terminal target xy must be finite")
+            resolved_terminal_yaw = (
+                fixed_terminal_sample.yaw
+                if terminal_target_yaw is None
+                else float(terminal_target_yaw)
+            )
+            if not np.isfinite(resolved_terminal_yaw):
+                raise ValueError("manual path terminal target yaw must be finite")
+            terminal_sample = ManualBasePathSample(
+                index=fixed_terminal_sample.index,
+                xy=resolved_terminal_xy[:2].copy(),
+                yaw=resolved_terminal_yaw,
+                name=fixed_terminal_sample.name,
+            )
+
         start_index = self.current_index
         nearest_summary = None
         if start_index is None:
@@ -271,8 +295,12 @@ class ManualBasePathExecutor:
         current_obs = obs
         for source_index, target_index_item in zip(route, route[1:]):
             source = self.samples[int(source_index)]
-            target = self.samples[int(target_index_item)]
             is_terminal = int(target_index_item) == int(target_index)
+            target = (
+                terminal_sample
+                if is_terminal
+                else self.samples[int(target_index_item)]
+            )
             current_obs, segment = self._move_segment(
                 current_obs,
                 source=source,
@@ -303,7 +331,7 @@ class ManualBasePathExecutor:
             if failed_final_dist <= max(self.xy_tolerance, 0.12):
                 current_obs, terminal_settle = self._settle_at_sample_with_tolerances(
                     current_obs,
-                    target=self.samples[int(target_index)],
+                    target=terminal_sample,
                     arm_qpos=arm_qpos,
                     gripper_action=resolved_gripper_action,
                     xy_tolerance=resolved_terminal_xy_tolerance,
@@ -318,7 +346,7 @@ class ManualBasePathExecutor:
         if not segments or all(bool(item.get("pass", False)) for item in segments):
             current_obs, settle = self._settle_at_sample_with_tolerances(
                 current_obs,
-                target=self.samples[int(target_index)],
+                target=terminal_sample,
                 arm_qpos=arm_qpos,
                 gripper_action=resolved_gripper_action,
                 xy_tolerance=resolved_terminal_xy_tolerance,
@@ -326,7 +354,7 @@ class ManualBasePathExecutor:
             )
             segments.append(settle)
 
-        final_sample = self.samples[int(target_index)]
+        final_sample = terminal_sample
         final_xy = np.array(current_obs["robot0_base_pos"][:2], dtype=float)
         final_yaw = float(base_yaw(current_obs))
         final_dist = float(np.linalg.norm(final_sample.xy - final_xy))
@@ -365,6 +393,8 @@ class ManualBasePathExecutor:
             "final_yaw": final_yaw,
             "target_xy": final_sample.xy.astype(float).tolist(),
             "target_yaw": float(final_sample.yaw),
+            "fixed_path_target_xy": fixed_terminal_sample.xy.astype(float).tolist(),
+            "sampled_terminal_pose": terminal_target_xy is not None,
             "final_dist": final_dist,
             "final_yaw_error": final_yaw_error,
             "path_xy_tolerance": float(self.xy_tolerance),

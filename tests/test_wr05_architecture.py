@@ -13,7 +13,12 @@ from bench.tasks.wr05.config import (
     resolve_action_config,
 )
 from bench.tasks.wr05.domain.episode import EPISODE_CASES, resolve_episode_plan
-from bench.tasks.wr05.domain.semantics import SemanticState, evaluate_success, record_plate_stage
+from bench.tasks.wr05.domain.semantics import (
+    SemanticState,
+    condiment_staged_at_any_plate_side,
+    evaluate_success,
+    record_plate_stage,
+)
 from bench.tasks.wr05.episode import resolve_episode
 from bench.tasks.wr05.expert.spec import build_expert_plan
 from bench.tasks.wr05.runtime import _ADAPTER
@@ -74,6 +79,18 @@ def test_wr05_success_semantics_require_both_staged_and_returned() -> None:
         })(),
     )
     assert report.success
+
+
+def test_wr05_plate_staging_accepts_either_side() -> None:
+    assert condiment_staged_at_any_plate_side(
+        {"plate_left": True, "plate_right": False}
+    )
+    assert condiment_staged_at_any_plate_side(
+        {"plate_left": False, "plate_right": True}
+    )
+    assert not condiment_staged_at_any_plate_side(
+        {"plate_left": False, "plate_right": False}
+    )
 
 
 def test_guarded_place_config_is_enabled() -> None:
@@ -219,6 +236,10 @@ def test_public_prompt_does_not_leak_private_binding() -> None:
         assert "shelf_lower" not in text
         assert "plate_left" not in text
         assert "plate_right" not in text
+        assert prompt.initial_prompt == prompt.policy_prompt
+        assert "First move the ketchup beside the serving plate" in text
+        assert "then move the mustard beside it" in text
+        assert "return the ketchup and then the mustard" in text
         del seed
 
 

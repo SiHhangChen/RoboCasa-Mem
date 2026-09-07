@@ -28,6 +28,7 @@ from bench.tasks.wr01.domain.semantics import (
     SemanticState,
     evaluate_success,
     latch_storage_hidden,
+    mark_canonical_reset,
     record_retrieval_door_open,
     record_retrieval_pick,
     record_storage,
@@ -191,6 +192,9 @@ class WR01RetrieveRememberedCan(Kitchen):
         self._wr01_evaluator: WR01Evaluator | None = None
         self._physical_event_diagnostics: dict[str, Any] = {}
         self._evaluation_initial_item_positions: dict[str, np.ndarray] = {}
+        self._table_target_positions: dict[str, np.ndarray] = {}
+        self._canonical_reset_reference: dict[str, Any] | None = None
+        self._close_order: tuple[str, str] = ("upper", "lower")
         self.item_by_level = {"lower": "red_can", "upper": "blue_can"}
         self.level_by_item = {
             item: level for level, item in self.item_by_level.items()
@@ -306,11 +310,21 @@ class WR01RetrieveRememberedCan(Kitchen):
         self._wr01_evaluator = None
         self._physical_event_diagnostics = {}
         self._evaluation_initial_item_positions = {}
-        self._semantic_state = SemanticState("red_can", "lower")
+        self._table_target_positions = {}
+        self._canonical_reset_reference = None
+        self._close_order = ("upper", "lower")
         self.item_by_level = {"lower": "red_can", "upper": "blue_can"}
         self.level_by_item = {
             item: level for level, item in self.item_by_level.items()
         }
+        self._semantic_state = SemanticState(
+            "red_can",
+            "lower",
+            # The episode assignment is private configuration; the semantic
+            # history is populated only after the physical observer confirms
+            # containment at reset.
+            stored_levels_by_item={},
+        )
 
     # Episode and semantic events ---------------------------------------
 
@@ -331,6 +345,7 @@ class WR01RetrieveRememberedCan(Kitchen):
         *,
         item_by_level: Mapping[str, str],
         target_item_id: str,
+        close_order: tuple[str, str] = ("upper", "lower"),
     ) -> None:
         """Install frozen private episode facts after the environment is reset."""
 
@@ -340,12 +355,127 @@ class WR01RetrieveRememberedCan(Kitchen):
             raise ValueError(f"invalid WR-01 target item: {target!r}")
         self.item_by_level = assignment
         self.level_by_item = {item: level for level, item in assignment.items()}
-        self._semantic_state = SemanticState(target, self.level_by_item[target])
+        self._close_order = tuple(str(value) for value in close_order)
+        self._semantic_state = SemanticState(
+            target,
+            self.level_by_item[target],
+            stored_levels_by_item={},
+            canonical_reset_required=True,
+        )
         self._physical_observer = None
         self._wr01_evaluator = None
         self._physical_event_diagnostics = {}
         self._evaluation_initial_item_positions = {}
         self._ep_meta.setdefault("refs", {})["requested_item_id"] = target
+
+    def configure_canonical_reset_reference(self, obs: Mapping[str, Any]) -> None:
+        """Capture the fixed neutral robot state used by the memory handoff."""
+        base = np.asarray(obs.get("robot0_base_pos", ()), dtype=float).reshape(-1)
+        quat = np.asarray(obs.get("robot0_base_quat", ()), dtype=float).reshape(-1)
+        if base.size < 2 or quat.size < 4:
+            raise ValueError("WR-01 canonical reset requires base pose observations")
+        torso_qpos: list[float] = []
+        try:
+            torso = self.robots[0].composite_controller.part_controllers.get("torso")
+            indices = np.asarray(torso.qpos_index, dtype=int).reshape(-1)
+            torso_qpos = [float(self.sim.data.qpos[int(i)]) for i in indices]
+        except Exception:
+            torso_qpos = []
+        self._canonical_reset_reference = {
+            "base_xy": base[:2].astype(float).tolist(),
+            "base_quat_xyzw": quat[:4].astype(float).tolist(),
+            "base_yaw": _yaw_from_quat_xyzw(quat[:4]),
+            "torso_qpos": torso_qpos,
+        }
+
+    def configure_canonical_reset_region(
+        self,
+        *,
+        center_xy: Any,
+        radius_m: float,
+        base_yaw: float,
+        torso_height_m: float,
+    ) -> None:
+        """Use a fixed, answer-independent disk as the canonical reset region."""
+        center = np.asarray(center_xy, dtype=float).reshape(-1)
+        radius = float(radius_m)
+        if center.size < 2 or not np.all(np.isfinite(center[:2])):
+            raise ValueError("WR-01 canonical reset center must be finite")
+        if not np.isfinite(radius) or radius < 0.0:
+            raise ValueError("WR-01 canonical reset radius must be non-negative")
+        if not np.isfinite(float(base_yaw)) or not np.isfinite(float(torso_height_m)):
+            raise ValueError("WR-01 canonical reset yaw/torso must be finite")
+        self._canonical_reset_reference = {
+            "base_xy": center[:2].astype(float).tolist(),
+            "base_region_radius_m": radius,
+            "base_yaw": float(base_yaw),
+            "torso_qpos": [float(torso_height_m)],
+            "region": {
+                "shape": "disk",
+                "center_xy": center[:2].astype(float).tolist(),
+                "radius_m": radius,
+            },
+        }
+
+    def is_canonical_reset(
+        self,
+        *,
+        base_tolerance: float = 0.08,
+        yaw_tolerance: float = 0.08,
+        torso_tolerance: float = 0.03,
+    ) -> bool:
+        reference = self._canonical_reset_reference
+        if reference is None:
+            return False
+        try:
+            obs = self._get_observations(force_update=True)
+            base = np.asarray(obs["robot0_base_pos"], dtype=float).reshape(-1)
+            base_error = float(
+                np.linalg.norm(base[:2] - np.asarray(reference["base_xy"]))
+            )
+            region_radius = reference.get("base_region_radius_m")
+            if region_radius is None:
+                if base_error > base_tolerance:
+                    return False
+            elif base_error > float(region_radius) + base_tolerance:
+                return False
+            current_quat = np.asarray(obs["robot0_base_quat"], dtype=float).reshape(-1)
+            if current_quat.size < 4:
+                return False
+            if abs(_angle_delta(_yaw_from_quat_xyzw(current_quat[:4]), float(reference["base_yaw"]))) > yaw_tolerance:
+                return False
+            torso = self.robots[0].composite_controller.part_controllers.get("torso")
+            if torso is not None and reference["torso_qpos"]:
+                current = np.asarray([self.sim.data.qpos[int(i)] for i in np.asarray(torso.qpos_index, dtype=int).reshape(-1)])
+                if float(np.max(np.abs(current - np.asarray(reference["torso_qpos"])))) > torso_tolerance:
+                    return False
+            return True
+        except Exception:
+            return False
+
+    def mark_canonical_reset(self) -> bool:
+        physically_stored = all(
+            self.is_item_in_level(item, self.level_by_item[item]) for item in ITEM_IDS
+        )
+        valid = bool(
+            self.is_canonical_reset()
+            and self.are_cabinets_closed()
+            and physically_stored
+        )
+        return mark_canonical_reset(self._semantic_state, valid=valid)
+
+    def table_target_position(self, item_id: str) -> np.ndarray:
+        target = self._table_target_positions.get(str(item_id))
+        if target is None:
+            raise KeyError(f"no WR-01 table target for {item_id!r}")
+        return np.asarray(target, dtype=float).copy()
+
+    def is_item_on_table(self, item_id: str, *, tolerance: float = 0.12) -> bool:
+        try:
+            current = self.get_object_world_position(str(item_id))
+            return bool(float(np.linalg.norm(current - self.table_target_position(str(item_id)))) <= tolerance)
+        except Exception:
+            return False
 
     def configure_canonical_physics(self) -> None:
         """Apply collision-enabled contact physics to every execution mode."""
@@ -399,6 +529,7 @@ class WR01RetrieveRememberedCan(Kitchen):
                 for item in ITEM_IDS
             ),
             cabinets_closed=self.are_cabinets_closed(),
+            canonical_reset_complete=self._semantic_state.canonical_reset_complete,
         )
 
     def record_retrieval_door_open(self, level: str) -> bool:
@@ -442,6 +573,7 @@ class WR01RetrieveRememberedCan(Kitchen):
             upper_door_closed=self.is_door_closed("upper"),
             lower_door_open=self.is_door_open("lower"),
             upper_door_open=self.is_door_open("upper"),
+            canonical_reset=self.is_canonical_reset(),
         )
 
     # Physical observation boundary -------------------------------------
@@ -541,6 +673,14 @@ class WR01RetrieveRememberedCan(Kitchen):
             quat = quat / norm
             updated[3:7] = quat[[3, 0, 1, 2]]
         self.sim.data.set_joint_qpos(obj.joints[0], updated)
+        # Reset-time placement must not inherit a transient velocity from the
+        # counter sampler; otherwise gravity can move the can before the
+        # observer has had its containment dwell window.
+        try:
+            qvel = np.asarray(self.sim.data.get_joint_qvel(obj.joints[0]), dtype=float)
+            self.sim.data.set_joint_qvel(obj.joints[0], np.zeros_like(qvel))
+        except (AttributeError, KeyError, TypeError, ValueError):
+            pass
         self.sim.forward()
 
     # Action-only stepping ----------------------------------------------
@@ -623,6 +763,7 @@ class WR01RetrieveRememberedCan(Kitchen):
                     self._semantic_state.stored_levels_by_item
                 ),
                 "storage_hidden": bool(self._semantic_state.storage_hidden),
+                "canonical_reset_complete": bool(self._semantic_state.canonical_reset_complete),
                 "doors": {level: self.door_open_fraction(level) for level in CABINET_LEVELS},
                 "closed": self.are_cabinets_closed(),
             },
@@ -661,8 +802,10 @@ class WR01RetrieveRememberedCan(Kitchen):
             ),
             target_item_id=self.target_item_id,
             target_level=self.target_level,
+            close_order=self._close_order,
             item_grasped=grasped,
             stored_levels_by_item=self._semantic_state.stored_levels_by_item,
+            storage_hidden=bool(self._semantic_state.storage_hidden),
             upper_door_closed=self.is_door_closed("upper"),
             lower_door_closed=self.is_door_closed("lower"),
             opened_level=self._semantic_state.retrieval_level_opened,
@@ -671,6 +814,11 @@ class WR01RetrieveRememberedCan(Kitchen):
             ),
             retrieved_item_id=self._semantic_state.retrieved_item_id,
             distractor_still_stored=report.distractor_still_stored,
+            canonical_reset=bool(self._semantic_state.canonical_reset_complete),
+            final_placement_verified=bool(
+                self._semantic_state.retrieved_item_id == self.target_item_id
+                and self.is_item_on_table(self.target_item_id)
+            ),
             details=details,
         )
 
@@ -754,3 +902,12 @@ class WR01RetrieveRememberedCan(Kitchen):
 
 
 __all__ = ["WR01RetrieveRememberedCan"]
+
+
+def _yaw_from_quat_xyzw(quat: Any) -> float:
+    x, y, z, w = np.asarray(quat, dtype=float).reshape(-1)[:4]
+    return float(np.arctan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z)))
+
+
+def _angle_delta(value: float, reference: float) -> float:
+    return float((value - reference + np.pi) % (2.0 * np.pi) - np.pi)

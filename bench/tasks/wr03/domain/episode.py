@@ -13,6 +13,9 @@ from bench.tasks.wr03.domain.contracts import (
     TASK_ID,
 )
 
+_CLOSE_ORDER_SALT = 0x57523343
+_CLOSE_ORDER_PERIOD = 200
+
 
 def validate_level(value: Any) -> str:
     level = str(value)
@@ -28,6 +31,16 @@ def demo_storage_level_for_seed(seed: int) -> str:
     return "lower" if episode_seed % 2 == 0 else "upper"
 
 
+def close_order_for_seed(seed: int) -> tuple[str, str]:
+    # Stored level is intentionally parity-based for this one-can task.  The
+    # close order must come from an independent stream; using the same parity
+    # would reveal the answer as soon as the first door is closed.  This
+    # affine permutation is deterministic, looks seed-random, and is exactly
+    # balanced over every contiguous 200-seed release window.
+    bucket = (int(seed) * 73 + _CLOSE_ORDER_SALT) % _CLOSE_ORDER_PERIOD
+    return ("lower", "upper") if bucket < _CLOSE_ORDER_PERIOD // 2 else ("upper", "lower")
+
+
 def resolve_task_definition(**values: Any) -> TaskDefinition:
     if str(values.get("id", TASK_ID)) != TASK_ID:
         raise ValueError(f"WR-03 config must use task.id={TASK_ID!r}")
@@ -40,8 +53,8 @@ def resolve_task_definition(**values: Any) -> TaskDefinition:
         description=str(
             values.get(
                 "description",
-                "Store one can in either cabinet, close both doors, then retrieve "
-                "the can from memory.",
+                "Observe a pre-filled open cabinet, close both doors, reset to "
+                "neutral, then retrieve the can from memory.",
             )
         ),
         success_conditions=conditions,
@@ -73,19 +86,28 @@ def resolve_episode_plan(*, seed: int, **values: Any) -> EpisodePlan:
     episode_seed = int(seed)
     if episode_seed < 0:
         raise ValueError("WR-03 seed must be non-negative")
-    configured = values.get("demo_storage_level")
+    configured = values.get("stored_level", values.get("demo_storage_level"))
     level = (
         demo_storage_level_for_seed(episode_seed)
         if configured is None
         else validate_level(configured)
     )
-    horizon = int(values.get("max_horizon", 15000))
+    configured_order = values.get("close_order")
+    if configured_order is None:
+        close_order = close_order_for_seed(episode_seed)
+    else:
+        if isinstance(configured_order, (str, bytes)) or len(configured_order) != 2:
+            raise ValueError("episode.close_order must contain lower and upper")
+        close_order = tuple(validate_level(v) for v in configured_order)
+        if set(close_order) != set(CABINET_LEVELS):
+            raise ValueError("episode.close_order must contain each level exactly once")
+    horizon = int(values.get("max_horizon", 8000))
     if horizon <= 0:
         raise ValueError("WR-03 max_horizon must be positive")
     return EpisodePlan(
         seed=episode_seed,
-        demo_storage_level=level,
-        placement_pair_seed=episode_seed // 2,
+        stored_level=level,
+        close_order=close_order,
         max_horizon=horizon,
     )
 
@@ -94,12 +116,14 @@ def public_memory_prompt() -> str:
     """Describe the delayed request without exposing the stored level."""
 
     return (
-        "Place the can into one of the two cabinets. Close both cabinet doors, "
-        "remember where the can was stored, then retrieve it."
+        "Retrieve the can. Observe which open cabinet contains it, close both cabinet "
+        "doors in any order, return to the neutral position, then open the remembered "
+        "cabinet and bring the can back to the table."
     )
 
 
 __all__ = [
+    "close_order_for_seed",
     "demo_storage_level_for_seed",
     "public_memory_prompt",
     "resolve_episode_plan",

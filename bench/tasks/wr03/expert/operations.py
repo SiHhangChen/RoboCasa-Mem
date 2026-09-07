@@ -9,8 +9,7 @@ from bench.tasks.wr03.execution.navigation import build_navigation_assembly
 
 
 _CALIBRATION_RESOURCES = (
-    "item_grasp_pose", "lower_door_grasp_pose", "lower_preinsert_pose",
-    "lower_retrieval_prepose", "lower_release_pose", "upper_door_grasp_pose",
+    "lower_door_grasp_pose", "lower_retrieval_prepose", "upper_door_grasp_pose",
 )
 
 

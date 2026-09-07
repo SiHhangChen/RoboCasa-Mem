@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "release_id": "wr01-wr03-v3",
+  "description": "WR01/WR03 reset-time cabinet-memory tasks with canonical handoff.",
+  "tasks": [
+    {
+      "task_id": "WR-01",
+      "task_revision": "WR01-v3",
+      "task_config_file": "bench/tasks/wr01/resources/task.yaml",
+      "dataset_dir": "lerobot_data/wr01_200seeds_v062"
+    },
+    {
+      "task_id": "WR-03",
+      "task_revision": "WR03-v3",
+      "task_config_file": "bench/tasks/wr03/resources/task.yaml",
+      "dataset_dir": "lerobot_data/wr03_200seeds_v062"
+    }
+  ]
+}

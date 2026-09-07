@@ -1,7 +1,7 @@
 {
   "task_id": "WA-01",
   "spatial_reference": "left/right refer to the fixed world-coordinate WA-01 dining placement zones, not camera-image directions or initial cup positions.",
-  "high_level_instruction": "Start at the coffee machine with two identical prepared coffees. Add one sugar cube to either coffee, carry both coffees to the dining counter, and pick up the coffee cup you sugared.",
+  "high_level_instruction": "Start at the coffee machine with two identical prepared coffees. Add one sugar cube to either coffee, carry both coffees to the dining counter, and identify the coffee you sugared.",
   "subtasks": {
     "add_sugar": {
       "label": "add one sugar cube to a coffee cup",

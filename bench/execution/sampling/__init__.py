@@ -5,6 +5,7 @@ self-contained in this package — no dependency on task implementations.
 """
 
 from bench.execution.sampling.candidate import Candidate, CandidateSelection, CandidateValidation
+from bench.execution.sampling.circle_sampling import sample_uniform_disk, sample_uniform_yaw
 from bench.execution.sampling.rng import SeedStream, stable_seed
 from bench.execution.sampling.selector import SelectionMode, select_candidate, valid_candidates
 from bench.execution.sampling.station_sampler import SimpleStationSampler
@@ -20,6 +21,8 @@ __all__ = [
     "Candidate",
     "CandidateSelection",
     "CandidateValidation",
+    "sample_uniform_disk",
+    "sample_uniform_yaw",
     "AnchoredWorldTarget",
     "SeedStream",
     "SelectionMode",

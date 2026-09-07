@@ -20,6 +20,8 @@ from bench.tasks.wr01.domain.contracts import (
 
 _PLACEMENT_SALT = 0x57523150
 _TARGET_SALT = 0x57523154
+_CLOSE_ORDER_SALT = 0x57523143
+_CLOSE_ORDER_PERIOD = 200
 
 
 def validate_item_id(value: Any) -> str:
@@ -51,6 +53,15 @@ def target_item_for_seed(seed: int) -> str:
     return ITEM_IDS[int(rng.integers(0, len(ITEM_IDS)))]
 
 
+def close_order_for_seed(seed: int) -> tuple[str, str]:
+    """Sample door-close order independently from item assignment and target."""
+    # Use a dedicated seed stream rather than the item/target streams.  The
+    # affine permutation makes the first 200 release seeds exactly balanced
+    # while avoiding the direct seed-parity correlation used by older drafts.
+    bucket = (int(seed) * 73 + _CLOSE_ORDER_SALT) % _CLOSE_ORDER_PERIOD
+    return ("lower", "upper") if bucket < _CLOSE_ORDER_PERIOD // 2 else ("upper", "lower")
+
+
 def resolve_task_definition(**values: Any) -> TaskDefinition:
     task_id = str(values.get("id", TASK_ID))
     if task_id != TASK_ID:
@@ -64,8 +75,8 @@ def resolve_task_definition(**values: Any) -> TaskDefinition:
         description=str(
             values.get(
                 "description",
-                "Store red and blue cans in separate cabinets, then retrieve the "
-                "requested can by memory.",
+                "Observe two pre-filled open cabinets, close both doors, reset to "
+                "neutral, then retrieve the requested can by memory.",
             )
         ),
         success_conditions=conditions,
@@ -105,7 +116,16 @@ def resolve_episode_plan(*, seed: int, **values: Any) -> EpisodePlan:
         if configured_target is None
         else validate_item_id(configured_target)
     )
-    horizon = int(values.get("max_horizon", 5000))
+    configured_order = values.get("close_order")
+    if configured_order is None:
+        close_order = close_order_for_seed(seed)
+    else:
+        if isinstance(configured_order, (str, bytes)) or len(configured_order) != 2:
+            raise ValueError("episode.close_order must contain lower and upper")
+        close_order = tuple(validate_level(v) for v in configured_order)
+        if set(close_order) != set(CABINET_LEVELS):
+            raise ValueError("episode.close_order must contain each level exactly once")
+    horizon = int(values.get("max_horizon", 15000))
     if horizon <= 0:
         raise ValueError("episode.max_horizon must be positive")
     return EpisodePlan(
@@ -114,7 +134,7 @@ def resolve_episode_plan(*, seed: int, **values: Any) -> EpisodePlan:
         level_by_item=level_by_item,
         target_item_id=target,
         target_level=level_by_item[target],
-        storage_order=tuple(assignment[level] for level in CABINET_LEVELS),
+        close_order=close_order,
         max_horizon=horizon,
     )
 
@@ -132,6 +152,7 @@ def _optional_int(value: Any) -> int | None:
 
 
 __all__ = [
+    "close_order_for_seed",
     "public_retrieval_prompt",
     "resolve_episode_plan",
     "resolve_scene_config",

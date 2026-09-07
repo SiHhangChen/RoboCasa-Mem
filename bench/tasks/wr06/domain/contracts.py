@@ -84,7 +84,7 @@ class RunContext:
 
 
 TASK_ID = "WR-06"
-TASK_REVISION = "WR06-v2"
+TASK_REVISION = "WR06-v3"
 ENV_NAME = "WR06ReturnSingleBottleToOriginalLevel"
 DISPLAY_NAME = "Return the ketchup bottle to its original shelf level"
 ITEM_ID = "ketchup"
@@ -93,9 +93,9 @@ HOME_LEVELS = ("shelf_lower", "shelf_upper")
 HOME_REGIONS = HOME_LEVELS
 PLATE_SIDES = ("plate_left", "plate_right")
 USE_REGIONS = PLATE_SIDES
-# World offsets of the plate-left / plate-right staging targets relative to
-# the fixed serving plate center (legacy HS-WR-02 plate geometry: +/- 0.25 m
-# in X).  The serving plate itself is fixed; the staged side is seed-decided.
+# World offsets of the two valid staging targets relative to the fixed serving
+# plate center (legacy HS-WR-02 plate geometry: +/- 0.25 m in X). The expert
+# side is seed-decided, while task success accepts either target.
 PLATE_SIDE_WORLD_OFFSETS_M = {
     "plate_left": (-0.25, 0.0, 0.0),
     "plate_right": (0.25, 0.0, 0.0),

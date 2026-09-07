@@ -42,14 +42,16 @@
       "index": 10,
       "routes": {
         "13": [13, 15, 16, 10],
-        "14": [14, 10]
+        "14": [14, 10],
+        "17": [17, 10]
       }
     },
     "service_area:slot_1": {
       "index": 10,
       "routes": {
         "13": [13, 15, 16, 10],
-        "14": [14, 10]
+        "14": [14, 10],
+        "17": [17, 10]
       }
     },
     "service_area:slot_2": {
@@ -57,11 +59,19 @@
       "routes": {
         "8": [8, 9, 14],
         "10": [10, 14],
-        "13": [13, 15, 16, 10, 14]
+        "13": [13, 15, 16, 10, 14],
+        "17": [17, 14]
       }
     },
     "service_area:holding:cup_A": 10,
-    "service_area:holding:cup_B": 10
+    "service_area:holding:cup_B": 10,
+    "service_area_center_station": {
+      "index": 17,
+      "routes": {
+        "10": [10, 17],
+        "14": [14, 17]
+      }
+    }
   },
   "samples": [
     {
@@ -171,6 +181,13 @@
       "xy": [1.476, -2.350],
       "yaw": 1.533,
       "record_source": "forward_service_return_from_button"
+    },
+    {
+      "index": 17,
+      "name": "service_slots_fixed_midpoint",
+      "xy": [1.476, -2.057],
+      "yaw": -0.038,
+      "record_source": "fixed_midpoint_between_service_slots"
     }
   ]
 }

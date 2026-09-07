@@ -90,6 +90,18 @@
           "record_source": "slot_2_service_station_from_slot_offset"
         }
       ]
+    },
+    "service_area_center_station": {
+      "samples": [
+        {
+          "station_id": "service_area_center_station",
+          "sample_index": 0,
+          "base_xy": [1.476, -2.057],
+          "base_yaw": -0.038,
+          "torso_height": 0.01,
+          "record_source": "fixed_midpoint_between_service_slots"
+        }
+      ]
     }
   }
 }

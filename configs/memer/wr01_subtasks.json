@@ -1,111 +1,22 @@
 {
   "task_id": "WR-01",
-  "spatial_reference": "Upper/lower name the two fixed world-coordinate WR01 cabinet levels, not positions in a camera image. The expert's initial color-to-level assignment is intentionally not exposed as a subtask oracle; only the remembered retrieval-door choice is level-specific.",
+  "spatial_reference": "Upper/lower name the fixed cabinet levels. The cans are already stored at reset; no storage relation is exposed in pre-handoff subtask labels.",
   "subtasks": {
-    "pick_first": {
-      "label": "pick up one of the two colored cans from the starting counter",
-      "keyframe": "last"
-    },
-    "store_lower": {
-      "label": "store the held can in the lower cabinet",
-      "keyframe": "last"
-    },
-    "pick_remaining": {
-      "label": "return to the starting counter and pick up the remaining can",
-      "keyframe": "last"
-    },
-    "store_upper": {
-      "label": "store the held can in the upper cabinet",
-      "keyframe": "last"
-    },
-    "close_upper": {
-      "label": "close the upper cabinet door",
-      "keyframe": "last"
-    },
-    "close_lower": {
-      "label": "close the lower cabinet door",
-      "keyframe": "last"
-    },
-    "open_upper": {
-      "label": "open the upper cabinet door",
-      "keyframe": "first"
-    },
-    "open_lower": {
-      "label": "open the lower cabinet door",
-      "keyframe": "first"
-    },
-    "retrieve": {
-      "label": "retrieve the can from the opened cabinet",
-      "keyframe": "last"
-    }
+    "observe": {"label": "observe the two open cabinets", "keyframe": "last"},
+    "close_first": {"label": "close the first cabinet door", "keyframe": "last"},
+    "close_second": {"label": "close the second cabinet door", "keyframe": "last"},
+    "handoff": {"label": "return to the neutral position and establish the memory handoff", "keyframe": "last"},
+    "open_remembered": {"label": "open the remembered cabinet door", "keyframe": "first"},
+    "retrieve": {"label": "retrieve the requested can", "keyframe": "last"},
+    "place": {"label": "bring the can back and place it on the table", "keyframe": "last"}
   },
   "stage_prefixes": {
-    "pick_first": [
-      "navigate_to_visible_items",
-      "pick_red_can_for_lower_storage",
-      "pick_blue_can_for_lower_storage",
-      "return_with_red_can_for_lower_transport",
-      "return_with_blue_can_for_lower_transport"
-    ],
-    "store_lower": [
-      "navigate_red_can_to_lower_cabinet",
-      "navigate_blue_can_to_lower_cabinet",
-      "place_red_can_in_lower_cabinet",
-      "place_blue_can_in_lower_cabinet",
-      "verify_red_can_stored_in_lower_cabinet",
-      "verify_blue_can_stored_in_lower_cabinet",
-      "return_after_red_can_stored_in_lower_cabinet",
-      "return_after_blue_can_stored_in_lower_cabinet"
-    ],
-    "pick_remaining": [
-      "navigate_to_red_can_for_upper_storage",
-      "navigate_to_blue_can_for_upper_storage",
-      "pick_red_can_for_upper_storage",
-      "pick_blue_can_for_upper_storage",
-      "return_with_red_can_for_upper_transport",
-      "return_with_blue_can_for_upper_transport"
-    ],
-    "store_upper": [
-      "navigate_red_can_to_upper_cabinet",
-      "navigate_blue_can_to_upper_cabinet",
-      "place_red_can_in_upper_cabinet",
-      "place_blue_can_in_upper_cabinet",
-      "verify_red_can_stored_in_upper_cabinet",
-      "verify_blue_can_stored_in_upper_cabinet",
-      "return_after_red_can_stored_in_upper_cabinet",
-      "return_after_blue_can_stored_in_upper_cabinet"
-    ],
-    "close_upper": [
-      "navigate_to_upper_door_for_closing",
-      "close_upper_cabinet_after_storage",
-      "return_after_closing_upper_cabinet"
-    ],
-    "close_lower": [
-      "navigate_to_lower_door_for_closing",
-      "close_lower_cabinet_after_storage",
-      "return_after_closing_lower_cabinet",
-      "latch_hidden_item_to_cabinet_relation"
-    ],
-    "open_remembered": [
-      "navigate_to_lower_door_for_retrieval",
-      "navigate_to_upper_door_for_retrieval",
-      "open_remembered_target_cabinet",
-      "verify_remembered_target_cabinet_open",
-      "return_after_opening_remembered_cabinet"
-    ],
-    "retrieve": [
-      "navigate_to_lower_storage_station_for_retrieval",
-      "navigate_to_upper_storage_station_for_retrieval",
-      "pick_requested_colored_item"
-    ]
-  },
-  "dynamic_stage_labels": {
-    "open_remembered": {
-      "field": "target_level",
-      "values": {
-        "upper": "open_upper",
-        "lower": "open_lower"
-      }
-    }
+    "observe": ["observe_open_cabinets"],
+    "close_first": ["navigate_to_door_1", "close_door_1", "return_after_door_1"],
+    "close_second": ["navigate_to_door_2", "close_door_2", "return_after_door_2"],
+    "handoff": ["navigate_to_neutral_reset", "canonical_memory_reset", "latch_memory_handoff"],
+    "open_remembered": ["navigate_to_remembered_cabinet", "open_remembered_target_cabinet", "verify_remembered_target_cabinet", "return_after_opening_target_cabinet"],
+    "retrieve": ["navigate_to_target_can", "pick_requested_colored_can", "return_with_requested_can"],
+    "place": ["navigate_to_initial_table", "place_requested_can_on_table", "verify_final_table_placement"]
   }
 }

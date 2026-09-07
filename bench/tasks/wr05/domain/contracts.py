@@ -2,8 +2,9 @@
 
 WR-05 is the dual-object plate-staging variant: a real ketchup bottle and a
 real mustard bottle start on the lower/upper open-shelf levels, are staged
-beside a fixed serving plate (plate_left / plate_right), and must be returned
-upright to their remembered shelf levels.
+beside a fixed serving plate, and must be returned upright to their remembered
+shelf levels. The seed-selected plate sides define expert geometry only;
+either side is valid task behavior.
 """
 
 from __future__ import annotations
@@ -21,8 +22,9 @@ ENV_NAME = "WR05ReturnCondimentPair"
 CONDIMENT_IDS = ("ketchup", "mustard")
 HOME_REGIONS = ("shelf_lower", "shelf_upper")
 USE_REGIONS = ("plate_left", "plate_right")
-# World offsets of the plate-left / plate-right staging targets relative to
-# the fixed serving plate center (legacy HS-WR-02 geometry: +/- 0.25 in X).
+# World offsets of the two valid staging targets relative to the fixed serving
+# plate center (legacy HS-WR-02 geometry: +/- 0.25 in X). The expert assigns
+# one target to each bottle, while task success accepts either target.
 PLATE_SIDE_WORLD_OFFSETS_M = {
     "plate_left": (-0.25, 0.0, 0.0),
     "plate_right": (0.25, 0.0, 0.0),

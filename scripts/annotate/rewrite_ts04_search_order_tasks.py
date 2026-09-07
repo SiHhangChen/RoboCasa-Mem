@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Rewrite a TS04 LeRobot copy with target-independent search instructions."""
+"""Restore the original generic TS04 task instruction in a LeRobot copy."""
 
 from __future__ import annotations
 
@@ -51,9 +51,9 @@ def rewrite_tasks(root: Path, boundaries: Path) -> None:
         raise ValueError("per-episode task instruction coverage is incomplete")
 
     instructions = sorted(set(instruction_by_episode.values()))
-    if len(instructions) != 2:
+    if len(instructions) != 1:
         raise ValueError(
-            f"TS04 must expose two search-order instructions, found {len(instructions)}"
+            f"TS04 must expose one generic instruction, found {len(instructions)}"
         )
     task_index_by_instruction = {
         instruction: index for index, instruction in enumerate(instructions)
@@ -129,7 +129,7 @@ def rewrite_tasks(root: Path, boundaries: Path) -> None:
     )
     print(
         f"rewrote {len(instruction_by_episode)} TS04 episodes with "
-        f"{len(instructions)} search-order task instructions"
+        "one generic task instruction"
     )
 
 

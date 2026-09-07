@@ -4,7 +4,7 @@
   "annotation_dir": "outputs/memer/ts04_annotations_v4",
   "camera_layout_config": "configs/memer/ts04_rgb_camera_layout.json",
   "keyframe_rule_file": "configs/memer/ts04_keyframe_rules.json",
-  "instruction_source": "meta/tasks.parquet (preserve the per-episode target-independent left/right search order)",
+  "instruction_source": "meta/tasks.parquet (original generic TS04 task; expert drawer order remains hidden)",
   "selection_seed": 20260822,
   "episode_indices": [
     0, 3, 7, 10, 13, 17, 19, 30, 31, 38,

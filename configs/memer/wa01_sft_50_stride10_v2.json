@@ -3,7 +3,7 @@
   "output_dir": "outputs/memer/wa01_sft_50_stride10_v2",
   "camera_layout_config": "configs/memer/wa01_rgb_camera_layout.json",
   "keyframe_rule_file": "configs/memer/wa01_keyframe_rules.json",
-  "high_level_instruction": "Start at the coffee machine with two identical prepared coffees. Add one sugar cube to either coffee, carry both coffees to the dining counter, and pick up the coffee cup you sugared.",
+  "high_level_instruction": "Start at the coffee machine with two identical prepared coffees. Add one sugar cube to either coffee, carry both coffees to the dining counter, and identify the coffee you sugared.",
   "episode_indices": [
     0,
     1,

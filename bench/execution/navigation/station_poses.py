@@ -18,6 +18,7 @@ import numpy as np
 from bench.execution.navigation.contracts import Pose
 from bench.execution.planning.config import NavigationConfig
 from bench.execution.planning.nav_algo import normalize_angle
+from bench.execution.sampling.circle_sampling import sample_uniform_disk, sample_uniform_yaw
 
 
 def station_id_for_navigation(
@@ -245,7 +246,13 @@ class StationPoseSelector:
 
 @dataclass
 class StationPoseSampler:
-    """StationSampler implementation backed by calibrated station JSON."""
+    """StationSampler implementation backed by calibrated station JSON.
+
+    Ordinary stations select one calibrated pose per episode. Stations with an
+    explicit ``circle`` entry resample a uniform point on every call, which is
+    useful when a task wants bounded positional variation without changing its
+    semantic target.
+    """
 
     payload: dict[str, Any]
     selector: StationPoseSelector = field(default_factory=StationPoseSelector)
@@ -254,6 +261,7 @@ class StationPoseSampler:
     station_aliases: dict[Any, str] = field(default_factory=dict)
     purpose_by_station: dict[str, str] = field(default_factory=dict)
     _summary_by_station: dict[str, dict[str, Any]] = field(default_factory=dict, init=False)
+    _circle_counts: dict[str, int] = field(default_factory=dict, init=False)
 
     @classmethod
     def from_file(
@@ -290,6 +298,82 @@ class StationPoseSampler:
         station = (self.payload.get("stations", {}) or {}).get(station_id)
         if station is None:
             raise KeyError(f"station {station_id!r} not found in calibrated pose payload")
+
+        circle = station.get("circle") if isinstance(station, Mapping) else None
+        if isinstance(circle, Mapping):
+            center = np.asarray(circle.get("center_xy", ()), dtype=float).reshape(-1)
+            radius = float(circle.get("radius_m", -1.0))
+            center_yaw = float(circle.get("base_yaw", 0.0))
+            yaw_half_range = float(circle.get("yaw_half_range_rad", 0.0))
+            torso_height = station_sample_torso_height(circle)
+            if center.size < 2 or not np.all(np.isfinite(center[:2])):
+                raise ValueError(f"station {station_id!r} has invalid circle center")
+            if not np.isfinite(radius) or radius < 0.0:
+                raise ValueError(f"station {station_id!r} has invalid circle radius")
+            if not np.isfinite(center_yaw):
+                raise ValueError(f"station {station_id!r} has invalid circle yaw")
+            if (
+                not np.isfinite(yaw_half_range)
+                or not 0.0 <= yaw_half_range <= np.pi
+            ):
+                raise ValueError(
+                    f"station {station_id!r} has invalid circle yaw half-range"
+                )
+            count = int(self._circle_counts.get(station_id, 0))
+            self._circle_counts[station_id] = count + 1
+            draw_seed = int(self.selector.seed) + count
+            station_salt = int(zlib.crc32(station_id.encode("utf-8")))
+            sampled = sample_uniform_disk(
+                center[:2],
+                radius,
+                seed=draw_seed,
+                salt=0x53544154 ^ station_salt,
+            )
+            yaw = normalize_angle(
+                sample_uniform_yaw(
+                    center_yaw,
+                    yaw_half_range,
+                    seed=draw_seed,
+                    salt=0x59415700 ^ station_salt,
+                )
+            )
+            sample = {
+                "sample_index": count,
+                "base_xy": sampled.astype(float).tolist(),
+                "base_yaw": yaw,
+                "torso_height": torso_height,
+                "record_source": str(circle.get("record_source", "circle_region")),
+                "circle": {
+                    "center_xy": center[:2].astype(float).tolist(),
+                    "radius_m": radius,
+                    "base_yaw": normalize_angle(center_yaw),
+                    "yaw_half_range_rad": yaw_half_range,
+                },
+            }
+            pose = Pose(
+                position=(float(sampled[0]), float(sampled[1]), 0.0),
+                quaternion=yaw_to_quat_xyzw(yaw),
+                torso_height=torso_height,
+            )
+            self._summary_by_station[station_name] = {
+                "station_name": station_name,
+                "purpose": purpose,
+                "station_id": station_id,
+                "station_pose_selection": {
+                    "policy": "circle_uniform",
+                    "episode_stable": False,
+                    "sample_index": count,
+                    "seed": draw_seed,
+                },
+                "record_source": sample["record_source"],
+                "sample_index": count,
+                "target_xy": sampled.astype(float).tolist(),
+                "target_yaw": yaw,
+                "torso_height": torso_height,
+                "sample": sample,
+            }
+            return pose
+
         records = station_sample_records(list(station.get("samples", [])))
         if not records:
             raise ValueError(f"station {station_id!r} has no valid calibrated samples")
@@ -337,6 +421,7 @@ class StationPoseSampler:
     def reset_choices(self) -> None:
         self.selector.reset_choices()
         self._summary_by_station.clear()
+        self._circle_counts.clear()
 
     def _current_base_xy(self) -> np.ndarray | None:
         provider = self.base_xy_provider

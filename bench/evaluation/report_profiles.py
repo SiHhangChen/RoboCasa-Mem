@@ -52,10 +52,11 @@ def _profile(
     *stage_ids: str,
     conditional: tuple[str, ...] = (),
     success_stage_id: str = "success",
+    version: int = 1,
 ) -> ReportStageProfile:
     return ReportStageProfile(
         task_id=task_id,
-        profile_id=f"{task_id}/report-v1",
+        profile_id=f"{task_id}/report-v{int(version)}",
         stage_ids=tuple(stage_ids),
         conditional_stage_ids=frozenset(conditional),
         success_stage_id=success_stage_id,
@@ -118,11 +119,12 @@ WA01_REPORT_PROFILE = _profile(
 )
 WA02_REPORT_PROFILE = _profile(
     "WA-02",
-    "hot_cup_filled",
-    "hot_cup_ready",
-    "cold_cup_filled",
+    "first_cup_filled",
+    "first_cup_ready",
+    "second_cup_filled",
     "both_cups_ready",
     "success",
+    version=2,
 )
 WA03_REPORT_PROFILE = _profile(
     "WA-03",
@@ -167,10 +169,41 @@ WR06_REPORT_PROFILE = _profile(
     "correct_return_level",
     "success",
 )
+WR07_REPORT_PROFILE = _profile(
+    "WR-07",
+    "item_picked",
+    "memory_color_latched",
+    "target_plate_matched",
+    "success",
+    version=3,
+)
+WR08_REPORT_PROFILE = _profile(
+    "WR-08",
+    "one_item_picked",
+    "one_item_color_latched",
+    "one_item_matched",
+    "two_items_picked",
+    "two_items_color_latched",
+    "two_items_matched",
+    "success",
+    version=2,
+)
 WX01_REPORT_PROFILE = _profile(
     "WX-01",
     "wipe_completed",
     "cleaning_completed",
+    "success",
+)
+WX02_REPORT_PROFILE = _profile(
+    "WX-02",
+    "tool_acquired",
+    "primary_cup_moved",
+    "primary_stain_cleaned",
+    "primary_cup_returned",
+    "secondary_cup_moved",
+    "secondary_stain_cleaned",
+    "secondary_cup_returned",
+    "tool_returned",
     "success",
 )
 
@@ -190,7 +223,10 @@ REPORT_STAGE_PROFILES = (
     WR03_REPORT_PROFILE,
     WR05_REPORT_PROFILE,
     WR06_REPORT_PROFILE,
+    WR07_REPORT_PROFILE,
+    WR08_REPORT_PROFILE,
     WX01_REPORT_PROFILE,
+    WX02_REPORT_PROFILE,
 )
 
 _PROFILES_BY_TASK = {profile.task_id: profile for profile in REPORT_STAGE_PROFILES}
@@ -238,6 +274,9 @@ __all__ = [
     "WR03_REPORT_PROFILE",
     "WR05_REPORT_PROFILE",
     "WR06_REPORT_PROFILE",
+    "WR07_REPORT_PROFILE",
+    "WR08_REPORT_PROFILE",
     "WX01_REPORT_PROFILE",
+    "WX02_REPORT_PROFILE",
     "get_report_stage_profile",
 ]

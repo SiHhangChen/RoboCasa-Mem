@@ -22,9 +22,9 @@ scene:
 episode:
   hot_cup_id: null
   requested_temperature: null
-  # Fill order is fixed while cup identity and final request stay balanced.
-  # Temperature is encoded only by the selected faucet, never by cup appearance.
-  fill_order: hot-first
+  # Cup identity, final request, service-slot assignment, and the per-episode
+  # execution sequence are independently seed-balanced. Temperature is encoded
+  # only by the selected faucet, never by appearance or recent placement.
   service_slot_by_cup: null
   max_horizon: 6000
 
@@ -78,7 +78,7 @@ sensors:
   wrist_rgb_camera: robot0_eye_in_hand
   width: 224
   height: 224
-  depth: true
+  depth: false
   use_camera_observations: true
   has_renderer: false
   has_offscreen_renderer: true
@@ -335,7 +335,7 @@ semantics:
   release_distance: 0.12
 
 recording:
-  record_depth: true
+  record_depth: false
   depth_dtype: uint16
   depth_scale: 0.001
   action_schema: membench.pandaomron_hybrid13.v2

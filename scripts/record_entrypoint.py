@@ -61,6 +61,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--camera-height", type=int, default=224)
     parser.add_argument("--fps", type=int, default=20)
     parser.add_argument("--save-navigation-snapshots", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument("--record-depth", action=argparse.BooleanOptionalAction, default=None)
     parser.add_argument("--accept-failed", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--overwrite", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--execute", action=argparse.BooleanOptionalAction, default=True)
@@ -152,6 +153,7 @@ def _record_item(item: Any, *, args: argparse.Namespace, dataset_root: Path) -> 
             cameras=args.camera,
             fps=args.fps,
             save_navigation_snapshots=args.save_navigation_snapshots,
+            record_depth=args.record_depth,
         )
         result, _ = RecordingRunner(runtime=runtime, runner=runner, config=config).run(plan)
         destination = accepted_dir if result.success or args.accept_failed else failed_dir

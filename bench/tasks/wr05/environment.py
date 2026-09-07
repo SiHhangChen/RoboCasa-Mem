@@ -1,10 +1,9 @@
 """RoboCasa scene and physical-state reader for WR-05.
 
 Two real condiment bottles start on the lower/upper open-shelf levels, are
-staged beside a fixed serving plate on the dining island (plate_left /
-plate_right), and must be returned upright to their remembered shelf levels.
-The plate asset and world position follow the legacy HS-WR-02 serving-plate
-geometry.
+staged on either side of a fixed serving plate on the dining island, and must
+be returned upright to their remembered shelf levels. The seed-selected side
+assignment remains expert demonstration metadata, not a success condition.
 """
 
 from __future__ import annotations
@@ -32,6 +31,7 @@ from bench.tasks.wr05.domain.contracts import (
 from bench.tasks.wr05.domain.semantics import (
     PhysicalState,
     SemanticState,
+    condiment_staged_at_any_plate_side,
     evaluate_success,
     record_plate_stage,
 )
@@ -424,22 +424,35 @@ class WR05ReturnCondimentPair(Kitchen):
     def use_station_pose(self, condiment_name: str) -> np.ndarray:
         condiment_name = str(condiment_name)
         use_region = self.use_assignment.get(condiment_name)
-        if use_region in PLATE_SIDE_WORLD_OFFSETS_M:
-            return np.asarray(self._obj_pos("plate"), dtype=float) + np.asarray(
-                PLATE_SIDE_WORLD_OFFSETS_M[use_region], dtype=float
-            )
-        raise KeyError(
-            f"unknown WR-05 condiment/use assignment {condiment_name!r}: {use_region!r}"
+        try:
+            return self.plate_stage_pose(str(use_region))
+        except KeyError as exc:
+            raise KeyError(
+                f"unknown WR-05 condiment/use assignment {condiment_name!r}: "
+                f"{use_region!r}"
+            ) from exc
+
+    def plate_stage_pose(self, region: str) -> np.ndarray:
+        resolved = str(region)
+        if resolved not in PLATE_SIDE_WORLD_OFFSETS_M:
+            raise KeyError(f"unknown WR-05 plate staging region {resolved!r}")
+        return np.asarray(self._obj_pos("plate"), dtype=float) + np.asarray(
+            PLATE_SIDE_WORLD_OFFSETS_M[resolved], dtype=float
         )
 
     def _condiment_at_plate_side(self, condiment_name: str) -> bool:
-        # Staged when the bottle is near its plate-left/right target or near
-        # the plate itself (legacy HS-WR-02 use-station semantics).
+        # Either plate-side target is task-valid. The episode assignment only
+        # determines which target the expert demonstration follows.
         return bool(
-            self._obj_near_pose(
-                condiment_name,
-                self.use_station_pose(condiment_name),
-                self.plate_stage_threshold,
+            condiment_staged_at_any_plate_side(
+                {
+                    region: self._obj_near_pose(
+                        condiment_name,
+                        self.plate_stage_pose(region),
+                        self.plate_stage_threshold,
+                    )
+                    for region in USE_REGIONS
+                }
             )
             or self._obj_near_obj(condiment_name, "plate", self.plate_stage_threshold)
         )

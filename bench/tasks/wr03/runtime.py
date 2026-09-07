@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+import json
+from pathlib import Path
 from typing import Any
 
 from bench.runtime import TaskRuntimeAdapter, default_close
@@ -58,7 +60,10 @@ def _initialize(descriptor: Any, env: Any, observation: Mapping[str, Any]):
         env,
         observation,
     )
-    evaluator = WR03Evaluator()
+    env.configure_canonical_reset_reference(updated)
+    _configure_canonical_reset_region(env, descriptor.resources["stations"])
+    env.start_physical_observer()
+    evaluator = WR03Evaluator(close_order=descriptor.episode_plan.close_order)
     evaluator.reset(env.evaluation_snapshot())
     env._wr03_evaluator = evaluator
     return (
@@ -66,6 +71,22 @@ def _initialize(descriptor: Any, env: Any, observation: Mapping[str, Any]):
         initialization,
         {**dict(metadata), TASK_EVALUATOR_METADATA_KEY: evaluator},
         targets,
+    )
+
+
+def _configure_canonical_reset_region(env: Any, stations_path: Any) -> None:
+    payload = json.loads(Path(stations_path).read_text(encoding="utf-8"))
+    circle = dict(
+        (payload.get("stations") or {}).get("cabinet_front_station", {}).get("circle")
+        or {}
+    )
+    if not circle:
+        raise ValueError("WR-03 stations must define cabinet_front_station.circle")
+    env.configure_canonical_reset_region(
+        center_xy=circle["center_xy"],
+        radius_m=float(circle["radius_m"]),
+        base_yaw=float(circle["base_yaw"]),
+        torso_height_m=float(circle.get("torso_height", 0.20)),
     )
 
 

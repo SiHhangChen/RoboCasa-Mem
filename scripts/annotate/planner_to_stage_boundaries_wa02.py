@@ -1,12 +1,11 @@
 #!/usr/bin/env python
 """Recover exact WA02 boundaries and task-semantic episode instructions.
 
-WA02's recorded expert happens to choose one starting cup and one service slot
-per seed.  Those choices are demonstration details, not policy-visible task
-requirements: the first held cup becomes the hot-water cup, the remaining cup
-becomes the cold-water cup, and either free dining-table position may be used.
-Only the requested final temperature belongs in the episode instruction.  The
-final left/right pickup label is recovered from what physically happened in
+WA02's recorded expert chooses a starting cup, a hot/cold fill order, and one
+service slot per cup. Those choices are demonstration details, not
+policy-visible task requirements. Only the requested final temperature belongs
+in the episode instruction. The fill order comes from the resolved episode, and
+the final left/right pickup label is recovered from what physically happened in
 the demonstration, preserving the actual memory challenge.
 
 The recorder-owned step counts are not uniform across WA02 primitives:
@@ -32,13 +31,13 @@ from typing import Any
 
 TASK_ID = "WA-02"
 EXPERT_PLAN_VERSION = "membench.expert_plan/v2"
-EXPECTED_STAGE_COUNT = 26
+EXPECTED_STAGE_COUNT = 28
 EPISODE_DIR_PATTERN = re.compile(r"^seed_(\d{6})_attempt_00$")
 STEP_KEYS = frozenset({"steps", "executed_steps", "release_settle_steps"})
 START_SIDE_BY_CUP = {"cup_A": "left", "cup_B": "right"}
 START_RELATION_BY_CUP = {"cup_A": "nearer the sink", "cup_B": "farther from the sink"}
 SERVICE_SIDE_BY_SLOT = {"slot_1": "right", "slot_2": "left"}
-NAVIGATE_STAGE_INDICES = frozenset({0, 3, 7, 11, 14, 18, 23})
+NAVIGATE_STAGE_INDICES = frozenset({0, 3, 7, 11, 14, 18, 23, 25})
 
 
 def _require(condition: bool, message: str) -> None:
@@ -180,6 +179,7 @@ def build_stage_names(
     cold_cup: str,
     service_slot_by_cup: Mapping[str, str],
     requested_cup: str,
+    fill_temperature_order: Sequence[str] = ("hot", "cold"),
 ) -> list[str]:
     _require(
         {hot_cup, cold_cup} == set(START_SIDE_BY_CUP),
@@ -192,10 +192,15 @@ def build_stage_names(
         "service slot assignment must be a cup/slot permutation",
     )
     _require(requested_cup in {hot_cup, cold_cup}, "requested cup is invalid")
+    order = tuple(str(value) for value in fill_temperature_order)
+    _require(
+        len(order) == 2 and set(order) == {"hot", "cold"},
+        "fill temperature order must contain hot and cold once",
+    )
+    cup_by_temperature = {"hot": hot_cup, "cold": cold_cup}
     names: list[str] = []
-    for ordinal, (temperature, cup) in enumerate(
-        (("hot", hot_cup), ("cold", cold_cup)), start=1
-    ):
+    for ordinal, temperature in enumerate(order, start=1):
+        cup = cup_by_temperature[temperature]
         label = "first" if ordinal == 1 else "second"
         slot = slots[cup]
         names.extend(
@@ -216,6 +221,8 @@ def build_stage_names(
     names.extend(
         [
             "verify_both_cups_staged_before_final_pick",
+            "navigate_final_selection_center",
+            "return_arm_at_final_selection_center",
             f"navigate_final_pick_{requested_cup}",
             f"physical_final_pick_{requested_cup}",
             f"record_final_take_{requested_cup}",
@@ -230,11 +237,8 @@ def build_task_instruction(requested_temperature: str) -> str:
         f"invalid requested temperature {requested_temperature!r}",
     )
     return (
-        "Pick up the first cup from the starting counter and fill it with hot "
-        "water. Place it on the dining table to the left of the sink. Return "
-        "to the starting counter, pick up the remaining cup, fill it with cold "
-        "water, and place it on the same dining table. After both cups are "
-        f"placed, pick up the {requested_temperature}-water cup."
+        "Fill two identical cups with hot and cold water, stage both cups, "
+        f"then take the {requested_temperature}-water cup."
     )
 
 
@@ -283,7 +287,10 @@ def build_boundary_record(episode_dir: Path) -> dict[str, Any]:
     _require(isinstance(slots_raw, Mapping), f"seed {seed}: missing slot mapping")
     assert isinstance(slots_raw, Mapping)
     slots = {str(key): str(value) for key, value in slots_raw.items()}
-    _require(fill_order == ["hot", "cold"], f"seed {seed}: fill order is not hot/cold")
+    _require(
+        len(fill_order) == 2 and set(fill_order) == {"hot", "cold"},
+        f"seed {seed}: fill order must contain hot and cold once",
+    )
     _require(
         requested_temperature in {"hot", "cold"},
         f"seed {seed}: requested temperature is invalid",
@@ -346,7 +353,13 @@ def build_boundary_record(episode_dir: Path) -> dict[str, Any]:
         f"seed {seed}: final selection mismatch",
     )
 
-    stage_names = build_stage_names(hot_cup, cold_cup, slots, requested_cup)
+    stage_names = build_stage_names(
+        hot_cup,
+        cold_cup,
+        slots,
+        requested_cup,
+        fill_order,
+    )
     stages = planner.get("rollout", {}).get("stages")
     _require(
         isinstance(stages, list) and len(stages) == EXPECTED_STAGE_COUNT,
@@ -429,6 +442,7 @@ def build_boundary_record(episode_dir: Path) -> dict[str, Any]:
         "cold_cup_id": cold_cup,
         "requested_cup_id": requested_cup,
         "requested_temperature": requested_temperature,
+        "fill_temperature_order": fill_order,
         "service_slot_by_cup": slots,
         "hot_start_side": START_SIDE_BY_CUP[hot_cup],
         "cold_start_side": START_SIDE_BY_CUP[cold_cup],

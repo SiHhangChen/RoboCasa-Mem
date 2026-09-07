@@ -15,6 +15,8 @@ class SemanticState:
     target_level: str
     stored_levels_by_item: dict[str, str] = field(default_factory=dict)
     storage_hidden: bool = False
+    canonical_reset_complete: bool = False
+    canonical_reset_required: bool = False
     retrieval_level_opened: str | None = None
     wrong_retrieval_level_opened: bool = False
     retrieved_item_id: str | None = None
@@ -37,6 +39,7 @@ class SuccessReport:
     no_wrong_retrieval_door: bool
     correct_target_retrieved: bool
     distractor_still_stored: bool
+    canonical_reset_complete: bool = False
 
     @property
     def success(self) -> bool:
@@ -46,6 +49,7 @@ class SuccessReport:
         return {
             "storage_assignment_complete": self.storage_assignment_complete,
             "storage_was_hidden": self.storage_was_hidden,
+            "canonical_reset_complete": self.canonical_reset_complete,
             "correct_retrieval_door": self.correct_retrieval_door,
             "no_wrong_retrieval_door": self.no_wrong_retrieval_door,
             "correct_target_retrieved": self.correct_target_retrieved,
@@ -64,12 +68,26 @@ def record_storage(state: SemanticState, item_id: str, level: str) -> bool:
     return True
 
 
-def latch_storage_hidden(state: SemanticState, *, all_stored: bool, cabinets_closed: bool) -> bool:
+def latch_storage_hidden(
+    state: SemanticState,
+    *,
+    all_stored: bool,
+    cabinets_closed: bool,
+    canonical_reset_complete: bool = False,
+) -> bool:
     """Latch the memory barrier only after both relation facts became hidden."""
 
-    if all_stored and cabinets_closed:
+    if all_stored and cabinets_closed and (
+        not state.canonical_reset_required or canonical_reset_complete
+    ):
         state.storage_hidden = True
     return state.storage_hidden
+
+
+def mark_canonical_reset(state: SemanticState, *, valid: bool) -> bool:
+    if valid:
+        state.canonical_reset_complete = True
+    return state.canonical_reset_complete
 
 
 def record_retrieval_door_open(state: SemanticState, level: str) -> bool:
@@ -92,16 +110,16 @@ def record_retrieval_pick(state: SemanticState, item_id: str) -> bool:
 
 
 def evaluate_success(state: SemanticState, physical: PhysicalState) -> SuccessReport:
-    expected_storage = {
-        item: state.target_level
-        if item == state.target_item_id
-        else _other_level(state.target_level)
-        for item in ITEM_IDS
-    }
-    assignment_complete = state.stored_levels_by_item == expected_storage
+    assignment_complete = (
+        set(state.stored_levels_by_item) == set(ITEM_IDS)
+        and set(state.stored_levels_by_item.values()) == set(CABINET_LEVELS)
+    )
     return SuccessReport(
         storage_assignment_complete=assignment_complete,
         storage_was_hidden=bool(state.storage_hidden),
+        canonical_reset_complete=(
+            bool(state.canonical_reset_complete) or not state.canonical_reset_required
+        ),
         correct_retrieval_door=state.retrieval_level_opened == state.target_level,
         no_wrong_retrieval_door=not state.wrong_retrieval_level_opened,
         correct_target_retrieved=state.retrieved_item_id == state.target_item_id,
@@ -133,6 +151,7 @@ __all__ = [
     "SuccessReport",
     "evaluate_success",
     "latch_storage_hidden",
+    "mark_canonical_reset",
     "record_retrieval_door_open",
     "record_retrieval_pick",
     "record_storage",

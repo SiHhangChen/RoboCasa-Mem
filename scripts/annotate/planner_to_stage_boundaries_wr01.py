@@ -21,10 +21,10 @@ from typing import Any
 
 TASK_ID = "WR-01"
 EXPERT_PLAN_VERSION = "membench.expert_plan/v2"
-EXPECTED_STAGE_COUNT = 27
+EXPECTED_STAGE_COUNT = 20
 EPISODE_DIR_PATTERN = re.compile(r"^seed_(\d{6})_attempt_00$")
 STEP_KEYS = frozenset({"steps", "executed_steps", "release_settle_steps"})
-NAVIGATE_STAGE_INDICES = frozenset({0, 3, 7, 10, 14, 17, 21, 25})
+NAVIGATE_STAGE_INDICES = frozenset({0, 1, 4, 7, 10, 14, 17})
 ITEM_IDS = frozenset({"red_can", "blue_can"})
 LEVELS = ("lower", "upper")
 
@@ -86,77 +86,46 @@ def _validate_assignment(value: Any, *, path: str) -> dict[str, str]:
     return assignment
 
 
-def build_stage_names(item_by_level: Mapping[str, str], target_level: str) -> list[str]:
-    assignment = _validate_assignment(item_by_level, path="item_by_level")
+def build_stage_names(
+    item_by_level: Mapping[str, str],
+    target_level: str,
+    close_order: Sequence[str] = ("lower", "upper"),
+) -> list[str]:
+    _validate_assignment(item_by_level, path="item_by_level")
     _require(target_level in LEVELS, f"invalid WR01 target level: {target_level!r}")
-    lower = assignment["lower"]
-    upper = assignment["upper"]
-    names = ["navigate_to_visible_items"]
-    for index, (level, item) in enumerate((("lower", lower), ("upper", upper))):
-        if index:
-            names.append(f"navigate_to_{item}_for_{level}_storage")
-        names.extend(
-            [
-                f"pick_{item}_for_{level}_storage",
-                f"return_with_{item}_for_{level}_transport",
-                f"navigate_{item}_to_{level}_cabinet",
-                f"place_{item}_in_{level}_cabinet",
-                f"verify_{item}_stored_in_{level}_cabinet",
-                f"return_after_{item}_stored_in_{level}_cabinet",
-            ]
-        )
-    for level in ("upper", "lower"):
-        names.extend(
-            [
-                f"navigate_to_{level}_door_for_closing",
-                f"close_{level}_cabinet_after_storage",
-                f"return_after_closing_{level}_cabinet",
-            ]
-        )
-    names.extend(
-        [
-            "latch_hidden_item_to_cabinet_relation",
-            f"navigate_to_{target_level}_door_for_retrieval",
-            "open_remembered_target_cabinet",
-            "verify_remembered_target_cabinet_open",
-            "return_after_opening_remembered_cabinet",
-            f"navigate_to_{target_level}_storage_station_for_retrieval",
-            "pick_requested_colored_item",
-        ]
-    )
+    order = tuple(str(value) for value in close_order)
+    _require(len(order) == 2 and set(order) == set(LEVELS), "invalid WR01 close order")
+    names = ["observe_open_cabinets"]
+    for index, level in enumerate(order, start=1):
+        names.extend([f"navigate_to_door_{index}", f"close_door_{index}", f"return_after_door_{index}"])
+    names.extend([
+        "navigate_to_neutral_reset",
+        "canonical_memory_reset",
+        "latch_memory_handoff",
+        "navigate_to_remembered_cabinet",
+        "open_remembered_target_cabinet",
+        "verify_remembered_target_cabinet",
+        "return_after_opening_target_cabinet",
+        "navigate_to_target_can",
+        "pick_requested_colored_can",
+        "return_with_requested_can",
+        "navigate_to_initial_table",
+        "place_requested_can_on_table",
+        "verify_final_table_placement",
+    ])
     _require(len(names) == EXPECTED_STAGE_COUNT, "WR01 stage reconstruction drifted")
     return names
 
 
 def _expected_primitives() -> list[str]:
     return [
-        "manual_base_path_navigate",
-        "pick_colored_item",
-        "return_arm_to_regular_pose",
-        "manual_base_path_navigate",
-        "place_in_storage",
-        "verify_storage",
-        "return_arm_to_regular_pose",
-        "manual_base_path_navigate",
-        "pick_colored_item",
-        "return_arm_to_regular_pose",
-        "manual_base_path_navigate",
-        "place_in_storage",
-        "verify_storage",
-        "return_arm_to_regular_pose",
-        "manual_base_path_navigate",
-        "close_storage_door",
-        "return_arm_to_regular_pose",
-        "manual_base_path_navigate",
-        "close_storage_door",
-        "return_arm_to_regular_pose",
-        "latch_storage_hidden",
-        "manual_base_path_navigate",
-        "open_storage_door",
-        "verify_retrieval_door",
-        "return_arm_to_regular_pose",
-        "manual_base_path_navigate",
-        "retrieve_item_from_cabinet",
+        "manual_base_path_navigate", "manual_base_path_navigate", "close_storage_door",
+        "return_arm_to_regular_pose", "manual_base_path_navigate", "close_storage_door",
+        "return_arm_to_regular_pose", "manual_base_path_navigate", "canonical_memory_reset",
+        "latch_storage_hidden", "manual_base_path_navigate", "open_storage_door",
+        "verify_retrieval_door", "return_arm_to_regular_pose", "manual_base_path_navigate",
+        "retrieve_item_from_cabinet", "return_arm_to_regular_pose", "manual_base_path_navigate",
+        "place_on_table", "verify_final_placement",
     ]
 
 
@@ -193,13 +162,14 @@ def build_boundary_record(episode_dir: Path) -> dict[str, Any]:
     _require(isinstance(expert_meta, Mapping), f"seed {seed}: missing expert metadata")
     assert isinstance(facts, Mapping) and isinstance(expert_meta, Mapping)
     assignment = _validate_assignment(facts.get("item_by_level"), path=f"seed {seed} item_by_level")
-    expert_assignment = _validate_assignment(expert_meta.get("item_by_level"), path=f"seed {seed} expert item_by_level")
-    _require(assignment == expert_assignment, f"seed {seed}: expert assignment mismatch")
     target_item = str(facts.get("target_item_id", ""))
     target_level = str(facts.get("target_level", ""))
     _require(target_item in ITEM_IDS, f"seed {seed}: invalid target item")
     _require(target_level in LEVELS, f"seed {seed}: invalid target level")
     _require(assignment[target_level] == target_item, f"seed {seed}: target relation mismatch")
+    close_order = tuple(str(value) for value in facts.get("close_order", ("lower", "upper")))
+    _require(len(close_order) == 2 and set(close_order) == set(LEVELS), f"seed {seed}: invalid close order")
+    _require(tuple(expert_meta.get("close_order", close_order)) == close_order, f"seed {seed}: expert close order mismatch")
     _require(expert_meta.get("target_item_id") == target_item and expert_meta.get("target_level") == target_level, f"seed {seed}: expert target mismatch")
 
     diagnostics = planner.get("final_diagnostics")
@@ -235,7 +205,7 @@ def build_boundary_record(episode_dir: Path) -> dict[str, Any]:
     _require(isinstance(recorded_total, int) and not isinstance(recorded_total, bool) and recorded_total > 0, f"seed {seed}: invalid frame count")
     assert isinstance(recorded_total, int)
 
-    stage_names = build_stage_names(assignment, target_level)
+    stage_names = build_stage_names(assignment, target_level, close_order)
     primitives = _expected_primitives()
     cumulative = 0
     output_stages: list[dict[str, Any]] = []
@@ -265,6 +235,7 @@ def build_boundary_record(episode_dir: Path) -> dict[str, Any]:
         "success": True,
         "expert_plan_version": EXPERT_PLAN_VERSION,
         "item_by_level": assignment,
+        "close_order": list(close_order),
         "target_item_id": target_item,
         "target_level": target_level,
         "high_level_instruction": instruction,

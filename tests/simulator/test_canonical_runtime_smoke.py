@@ -12,7 +12,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 MIGRATED_TASK_IDS = (
     "TM01", "TM02", "TM03", "TS01", "TS02", "TS03", "TS04",
-    "WA-01", "WA-02", "WR-02", "WR-03", "WR-04", "WR-05", "WR-06",
+    "WA-01", "WA-02", "WR-02", "WR-03", "WR-04", "WR-05", "WR-06", "WR-07", "WR-08",
 )
 
 

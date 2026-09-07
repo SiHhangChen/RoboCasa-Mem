@@ -145,7 +145,7 @@ def test_report_identity_and_success_must_match_episode(
         validate_report_stages(report, **kwargs)
 
 
-def test_frozen_profile_catalog_covers_exactly_the_fifteen_report_tasks() -> None:
+def test_frozen_profile_catalog_covers_all_report_tasks() -> None:
     expected = {
         "TM01": (
             ("burner_on", "one_drawer_inspected", "both_threads_completed", "success"),
@@ -189,9 +189,9 @@ def test_frozen_profile_catalog_covers_exactly_the_fifteen_report_tasks() -> Non
         ),
         "WA-02": (
             (
-                "hot_cup_filled",
-                "hot_cup_ready",
-                "cold_cup_filled",
+                "first_cup_filled",
+                "first_cup_ready",
+                "second_cup_filled",
                 "both_cups_ready",
                 "success",
             ),
@@ -238,8 +238,38 @@ def test_frozen_profile_catalog_covers_exactly_the_fifteen_report_tasks() -> Non
             ("item_removed", "item_staged", "correct_return_level", "success"),
             frozenset(),
         ),
+        "WR-07": (
+            ("item_picked", "memory_color_latched", "target_plate_matched", "success"),
+            frozenset(),
+        ),
+        "WR-08": (
+            (
+                "one_item_picked",
+                "one_item_color_latched",
+                "one_item_matched",
+                "two_items_picked",
+                "two_items_color_latched",
+                "two_items_matched",
+                "success",
+            ),
+            frozenset(),
+        ),
         "WX-01": (
             ("wipe_completed", "cleaning_completed", "success"),
+            frozenset(),
+        ),
+        "WX-02": (
+            (
+                "tool_acquired",
+                "primary_cup_moved",
+                "primary_stain_cleaned",
+                "primary_cup_returned",
+                "secondary_cup_moved",
+                "secondary_stain_cleaned",
+                "secondary_cup_returned",
+                "tool_returned",
+                "success",
+            ),
             frozenset(),
         ),
     }
@@ -247,7 +277,8 @@ def test_frozen_profile_catalog_covers_exactly_the_fifteen_report_tasks() -> Non
     assert {profile.task_id for profile in REPORT_STAGE_PROFILES} == set(expected)
     for task_id, (stage_ids, conditional_stage_ids) in expected.items():
         profile = get_report_stage_profile(task_id)
-        assert profile.profile_id == f"{task_id}/report-v1"
+        expected_version = {"WA-02": 2, "WR-07": 3, "WR-08": 2}.get(task_id, 1)
+        assert profile.profile_id == f"{task_id}/report-v{expected_version}"
         assert profile.stage_ids == stage_ids
         assert profile.conditional_stage_ids == conditional_stage_ids
         assert profile.success_stage_id == (

@@ -349,7 +349,12 @@ def validate_lerobot(
         root=annotated_root.resolve(),
         force_cache_sync=False,
     )
-    mapping = dataframe_index_map(metadata.subtasks, "subtask_index")
+    subtasks = getattr(metadata, "subtasks", None)
+    if subtasks is None:
+        subtasks = pq.read_table(
+            annotated_root / "meta" / "subtasks.parquet"
+        ).to_pandas()
+    mapping = dataframe_index_map(subtasks, "subtask_index")
     if mapping != dict(enumerate(expected_labels)):
         raise AssertionError(f"LeRobot subtask mapping is incorrect: {mapping}")
 
@@ -373,7 +378,7 @@ def validate_lerobot(
             raise AssertionError(
                 f"LeRobot subtask_index mismatch at episode {seed}, frame {offset}"
             )
-        if str(item["subtask"]) != expected_labels[expected_index]:
+        if "subtask" in item and str(item["subtask"]) != expected_labels[expected_index]:
             raise AssertionError(
                 f"LeRobot subtask label mismatch at episode {seed}, frame {offset}"
             )

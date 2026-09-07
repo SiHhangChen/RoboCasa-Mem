@@ -1,10 +1,10 @@
 {
   "source_dataset": "lerobot_data/memer/wr05_200seeds_v061_subtasks_v3",
-  "output_dir": "outputs/memer/wr05_sft_50_stride10_v3",
+  "output_dir": "outputs/memer/qwen-sft/wr05_sft_50_stride10_v3",
   "annotation_dir": "outputs/memer/wr05_annotations_v3",
   "camera_layout_config": "configs/memer/wr05_rgb_camera_layout.json",
   "keyframe_rule_file": "configs/memer/wr05_keyframe_rules.json",
-  "instruction_source": "meta/tasks.parquet (preserve each episode's complementary plate-side plan while keeping both original shelf levels hidden)",
+  "instruction_source": "meta/tasks.parquet (one complete generic WR05 instruction; expert plate sides remain hidden demonstration metadata)",
   "selection_seed": 20260822,
   "source_seeds": [
     3, 4, 5, 8, 11, 15, 20, 21, 30, 32,

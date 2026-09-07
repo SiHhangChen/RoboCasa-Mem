@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Rewrite a WR06 LeRobot copy with per-episode plate-side instructions."""
+"""Rewrite a WR06 LeRobot dataset with one generic complete instruction."""
 
 from __future__ import annotations
 
@@ -54,10 +54,8 @@ def rewrite_tasks(root: Path, boundaries: Path) -> None:
         raise ValueError("per-episode task instruction coverage is incomplete")
 
     instructions = sorted(set(instruction_by_episode.values()))
-    if len(instructions) != 2:
-        raise ValueError(
-            f"WR06 must expose left/right plate-side plans, found {len(instructions)}"
-        )
+    if len(instructions) != 1:
+        raise ValueError(f"WR06 must expose one generic instruction, found {len(instructions)}")
     task_index_by_instruction = {
         instruction: index for index, instruction in enumerate(instructions)
     }
@@ -130,7 +128,7 @@ def rewrite_tasks(root: Path, boundaries: Path) -> None:
     )
     print(
         f"rewrote {len(instruction_by_episode)} WR06 episodes with "
-        f"{len(instructions)} plate-side task plans"
+        "one generic task instruction"
     )
 
 

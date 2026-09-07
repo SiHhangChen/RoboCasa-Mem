@@ -122,9 +122,9 @@ def test_wa02_evaluator_qualifies_all_seven_stages_in_order() -> None:
     assert all(diagnostics["stage_checks"].values())
     report = result.to_report_stages()
     assert report["order"] == [
-        "hot_cup_filled",
-        "hot_cup_ready",
-        "cold_cup_filled",
+        "first_cup_filled",
+        "first_cup_ready",
+        "second_cup_filled",
         "both_cups_ready",
         "success",
     ]
@@ -132,16 +132,16 @@ def test_wa02_evaluator_qualifies_all_seven_stages_in_order() -> None:
         name: report["stages"][name]["first_pass_step"]
         for name in REPORT_STAGE_ORDER
     } == {
-        "hot_cup_filled": 2,
-        "hot_cup_ready": 3,
-        "cold_cup_filled": 5,
+        "first_cup_filled": 2,
+        "first_cup_ready": 3,
+        "second_cup_filled": 5,
         "both_cups_ready": 6,
         "success": 7,
     }
     assert validate_report_stages(
         report,
         expected_task_id="WA-02",
-        expected_profile_id="WA-02/report-v1",
+        expected_profile_id="WA-02/report-v2",
         expected_success=True,
     ) == report
 
@@ -197,8 +197,18 @@ def test_wa02_evaluator_binds_first_and_second_to_episode_order() -> None:
         "second_cup_id": "cup_A",
         "second_temperature": "hot",
     }
-    with pytest.raises(ValueError, match="hot-first"):
-        result.to_report_stages()
+    report = result.to_report_stages()
+    assert report["profile_id"] == "WA-02/report-v2"
+    assert {
+        name: report["stages"][name]["first_pass_step"]
+        for name in REPORT_STAGE_ORDER
+    } == {
+        "first_cup_filled": 2,
+        "first_cup_ready": 3,
+        "second_cup_filled": 5,
+        "both_cups_ready": 6,
+        "success": 7,
+    }
 
 
 def test_wa02_evaluator_rejects_second_pick_before_first_cup_ready() -> None:
@@ -404,5 +414,5 @@ def test_wa02_runtime_initialization_attaches_evaluator(
 def test_wa02_runtime_registers_public_report_stages() -> None:
     from bench.tasks.wa02 import runtime
 
-    assert runtime.TASK_RUNTIME_API.report_stage_profile_id == "WA-02/report-v1"
+    assert runtime.TASK_RUNTIME_API.report_stage_profile_id == "WA-02/report-v2"
     assert callable(runtime.TASK_RUNTIME_API.report_stages)

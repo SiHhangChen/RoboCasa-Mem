@@ -69,24 +69,25 @@ def test_wr05_labels_eight_executable_subtasks_with_nine_keyframes() -> None:
 
     assert labels == [
         *( ["pick up the ketchup bottle from the upper shelf"] * 5 ),
-        *( ["place the ketchup bottle upright on the left side of the serving plate"] * 3 ),
+        *( ["place the ketchup bottle beside the serving plate"] * 3 ),
         *( ["pick up the mustard bottle from the lower shelf"] * 3 ),
-        *( ["place the mustard bottle upright on the right side of the serving plate"] * 3 ),
-        *( ["pick up the ketchup bottle from the left side of the serving plate"] * 3 ),
+        *( ["place the mustard bottle beside the serving plate"] * 3 ),
+        *( ["pick up the ketchup bottle from beside the serving plate"] * 3 ),
         *( ["return the ketchup bottle upright to the upper shelf"] * 3 ),
-        *( ["pick up the mustard bottle from the right side of the serving plate"] * 3 ),
+        *( ["pick up the mustard bottle from beside the serving plate"] * 3 ),
         *( ["return the mustard bottle upright to the lower shelf"] * 3 ),
     ]
     assert labeled["keyframes"] == [0, 4, 7, 10, 13, 16, 19, 22, 25]
 
 
-def test_wr05_instruction_exposes_plate_sides_but_not_home_assignment() -> None:
-    instruction = build_task_instruction(
-        {"ketchup": "plate_right", "mustard": "plate_left"}
-    )
+def test_wr05_instruction_hides_plate_sides_and_home_assignment() -> None:
+    instruction = build_task_instruction()
 
-    assert "ketchup upright on the right side" in instruction
-    assert "mustard upright on the left side" in instruction
-    assert instruction.count("original shelf level") == 2
+    assert "First move the ketchup beside the serving plate" in instruction
+    assert "then move the mustard beside it" in instruction
+    assert "return the ketchup and then the mustard" in instruction
+    assert "original shelf levels" in instruction
     assert "shelf_upper" not in instruction
     assert "shelf_lower" not in instruction
+    assert "left side" not in instruction
+    assert "right side" not in instruction

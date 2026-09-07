@@ -6,6 +6,8 @@ from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+
 from bench.tasks.wr03.execution.geometry import storage_target
 from bench.tasks.wr03.execution.door import move_slide_door
 from bench.tasks.wr03.execution.retrieval import retrieve_item_from_cabinet
@@ -157,6 +159,47 @@ def build_stage_handlers(
         del kwargs
         return verify_and_latch_storage_hidden(controller)
 
+    def canonical_reset(_: str, **kwargs: Any) -> dict[str, Any]:
+        if not controller.runtime_config.execute:
+            return _dry("canonical_memory_reset")
+        result = controller.return_arm_to_regular_pose(
+            stage="canonical_memory_reset",
+            gripper_action=float(kwargs.pop("gripper_action", -1.0)),
+            settle_steps=kwargs.pop("settle_steps", None),
+        )
+        marked = bool(result.get("pass", False) and controller.env.mark_canonical_reset())
+        result.update({
+            "primitive": "canonical_memory_reset",
+            "checks": {**dict(result.get("checks") or {}), "canonical_reset": marked},
+            "pass": marked,
+            "reason": None if marked else "canonical_reset_not_reached",
+        })
+        return result
+
+    def place_on_table(target: str, **kwargs: Any) -> dict[str, Any]:
+        if not controller.runtime_config.execute:
+            return _dry("place_on_table", target)
+        result = controller.place_at_world_pose(
+            str(target),
+            target_name=f"{target}_table_reset_region",
+            target_pos_world=controller.env.table_target_position(),
+            **kwargs,
+        )
+        result["primitive"] = "place_on_table"
+        return result
+
+    def verify_final_placement(target: str, **kwargs: Any) -> dict[str, Any]:
+        del kwargs
+        if not controller.runtime_config.execute:
+            return _dry("verify_final_placement", target)
+        env = _refresh(controller)
+        current = env.get_object_world_position(str(target))
+        target_pos = env.table_target_position()
+        outside = not any(env.is_item_in_level(str(target), level) for level in env.storage_cabinets)
+        near = float(np.linalg.norm(current - target_pos)) <= 0.12
+        passed = bool(outside and near)
+        return {"primitive": "verify_final_placement", "object_name": str(target), "checks": {"outside_cabinets": outside, "near_table_target": near}, "pass": passed, "reason": None if passed else "final_placement_not_verified"}
+
     def verify_retrieval_door_handler(target: str, **kwargs: Any) -> dict[str, Any]:
         return verify_retrieval_door(controller, str(target), **kwargs)
 
@@ -168,6 +211,10 @@ def build_stage_handlers(
         "open_storage_door": open_storage_door,
         "open_retrieval_door": open_door,
         "latch_storage_hidden": hide,
+        "latch_memory_handoff": hide,
+        "canonical_memory_reset": canonical_reset,
+        "place_on_table": place_on_table,
+        "verify_final_placement": verify_final_placement,
         "verify_retrieval_door": verify_retrieval_door_handler,
     }
 
@@ -256,6 +303,7 @@ def verify_and_latch_storage_hidden(controller: Any) -> dict[str, Any]:
     checks = {
         "both_items_physically_stored": stored,
         "both_cabinets_closed": closed,
+        "canonical_reset_complete": bool(env._semantic_state.canonical_reset_complete),
         "storage_hidden_latched": latched,
     }
     return {

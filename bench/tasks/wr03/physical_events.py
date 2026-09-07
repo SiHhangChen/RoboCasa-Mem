@@ -10,6 +10,7 @@ from bench.tasks.wr03.domain.contracts import CABINET_LEVELS, CAN_ID
 from bench.tasks.wr03.domain.semantics import (
     SemanticState,
     latch_storage_hidden,
+    mark_canonical_reset,
     record_retrieval_door_open,
     record_retrieval_pick,
     record_storage,
@@ -26,6 +27,7 @@ class PhysicalSample:
     upper_door_closed: bool
     lower_door_open: bool
     upper_door_open: bool
+    canonical_reset: bool | None = None
 
     def can_in_level(self, level: str) -> bool:
         return self.can_in_lower if level == "lower" else self.can_in_upper
@@ -104,6 +106,12 @@ class WR03PhysicalObserver:
                     self._transition(self.CLOSE, sample.step_id)
 
         elif self._phase == self.CLOSE:
+            if (
+                sample.canonical_reset is not None
+                and sample.canonical_reset
+                and sample.both_doors_closed
+            ):
+                mark_canonical_reset(self.state, valid=True)
             stored = self.state.stored_level
             if stored is not None and not sample.can_in_level(stored):
                 self._counts.clear()
@@ -124,6 +132,9 @@ class WR03PhysicalObserver:
                         self.state,
                         can_still_stored=True,
                         cabinets_closed=True,
+                        canonical_reset_complete=(
+                            True if sample.canonical_reset is None else sample.canonical_reset
+                        ),
                     )
                 ):
                     events.append("memory_barrier")

@@ -1,9 +1,9 @@
 """Independent RoboCasa scene and physical-state boundary for WR-06.
 
-One real ketchup bottle starts on one open-shelf level, is staged beside a
-fixed serving plate on the dining island (plate_left or plate_right, seed
-decided), and must be returned to its remembered shelf level. The plate asset
-and its world position follow the WR-05 plate-staging scene.
+One real ketchup bottle starts on one open-shelf level, is staged on either
+side of a fixed serving plate on the dining island, and must be returned to its
+remembered shelf level. The expert demonstration side remains seed-decided,
+but it is not a task success condition.
 """
 
 from __future__ import annotations
@@ -32,6 +32,7 @@ from bench.tasks.wr06.domain.semantics import (
     PhysicalState,
     SemanticState,
     evaluate_success,
+    item_staged_at_any_plate_side,
     latch_memory_barrier,
     record_initial_level,
     record_transport_posture_normalized,
@@ -365,9 +366,14 @@ class WR06ReturnSingleBottleToOriginalLevel(Kitchen):
             raise RuntimeError(f"WR-06 initial shelf level is ambiguous: {distances}")
         return ordered[0]
 
-    def plate_stage_pose(self) -> np.ndarray:
+    def plate_stage_pose(self, region: str | None = None) -> np.ndarray:
+        resolved = (
+            self.plate_stage_region
+            if region is None
+            else validate_plate_stage_region(region)
+        )
         return np.asarray(self._obj_pos("plate"), dtype=float) + np.asarray(
-            PLATE_SIDE_WORLD_OFFSETS_M[self.plate_stage_region], dtype=float
+            PLATE_SIDE_WORLD_OFFSETS_M[resolved], dtype=float
         )
 
     def use_station_pose(self, object_name: str) -> np.ndarray:
@@ -431,14 +437,16 @@ class WR06ReturnSingleBottleToOriginalLevel(Kitchen):
         )
 
     def item_at_fixed_plate(self) -> bool:
-        """Whether the bottle rests at the episode's staged plate side."""
-        return self._item_at_plate_side(self.plate_stage_region)
+        """Whether the bottle rests at either valid side of the fixed plate."""
+        return item_staged_at_any_plate_side(
+            {region: self._item_at_plate_side(region) for region in PLATE_SIDES}
+        )
 
     def _item_at_plate_side(self, region: str) -> bool:
         resolved = validate_plate_stage_region(region)
         pos = self._obj_pos(ITEM_ID)
         distance = float(
-            np.linalg.norm(pos[:2] - self.plate_stage_pose()[:2])
+            np.linalg.norm(pos[:2] - self.plate_stage_pose(resolved)[:2])
         )
         if distance > self.plate_stage_threshold:
             return False
@@ -464,7 +472,7 @@ class WR06ReturnSingleBottleToOriginalLevel(Kitchen):
             )
         except Exception:
             return False
-        return abs(bottom_z - float(self.plate_stage_pose()[2])) <= 0.03
+        return abs(bottom_z - float(self.plate_stage_pose(resolved)[2])) <= 0.03
 
     def _item_supported_by_shelf(self) -> bool:
         level = self._semantic_state.initial_level

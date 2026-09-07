@@ -13,12 +13,14 @@ def resolve_prompt_spec(*, target_item_id: str, variant: str) -> PromptSpec:
         raise ValueError("WR-01 variant must be 'memory' or 'oracle_reveal'")
     return PromptSpec(
         initial_prompt=(
-            "Store both colored cans and close both cabinet doors. Then retrieve "
-            f"the {color} can."
+            f"Retrieve the {color} can. Observe both open cabinets, close both doors "
+            "in any order, return to the neutral position, then open the cabinet "
+            f"containing the {color} can and bring it back to the table."
         ),
         policy_prompt=(
-            "Store the red and blue cans in the two open cabinets. After both doors "
-            f"are closed, retrieve the {color} can."
+            f"Retrieve the {color} can. Close both open cabinet doors in any order, "
+            "return to the neutral position, then open the cabinet containing the "
+            f"{color} can and bring it back to the table."
         ),
         variant=variant,
     )

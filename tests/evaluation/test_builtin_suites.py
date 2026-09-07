@@ -24,7 +24,7 @@ def test_formal_suite_directory_contains_one_suite_per_benchmark_task() -> None:
     actual_names = {path.name for path in ALL_SUITE_PATHS}
 
     assert actual_names == EXPECTED_SUITE_NAMES
-    assert len(ALL_SUITE_PATHS) == len(BENCHMARK_TASK_IDS) == 15
+    assert len(ALL_SUITE_PATHS) == len(BENCHMARK_TASK_IDS) == 18
     assert all("smoke" not in name for name in actual_names)
     assert all("gr00t" not in name for name in actual_names)
     assert all("pi05" not in name for name in actual_names)

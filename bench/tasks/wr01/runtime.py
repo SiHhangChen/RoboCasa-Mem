@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+import json
+from pathlib import Path
 from typing import Any
 
 from bench.runtime import TaskRuntimeAdapter, default_close
 from bench.tasks.runtime_support import cabinet_initialization, manual_navigation, operations_actions, standard_plan, standard_scene
 from bench.tasks.wr01.config import load_task_config, resolve_action_config
 from bench.tasks.wr01.domain.episode import resolve_episode_plan, resolve_scene_config
+from bench.tasks.wr01.domain.contracts import TASK_REVISION
 from bench.tasks.wr01.evaluation import (
     REPORT_STAGE_PROFILE_ID,
     TASK_EVALUATOR_METADATA_KEY,
@@ -57,10 +60,14 @@ def _initialize(descriptor: Any, env: Any, observation: Mapping[str, Any]):
         env,
         observation,
     )
+    env.configure_canonical_reset_reference(updated)
+    _configure_canonical_reset_region(env, descriptor.resources["stations"])
+    env.start_physical_observer()
     evaluator = WR01Evaluator(
         storage_order=descriptor.episode_plan.storage_order,
         target_item_id=descriptor.episode_plan.target_item_id,
         target_level=descriptor.episode_plan.target_level,
+        close_order=descriptor.episode_plan.close_order,
     )
     evaluator.reset(env.evaluation_snapshot())
     env._wr01_evaluator = evaluator
@@ -69,6 +76,22 @@ def _initialize(descriptor: Any, env: Any, observation: Mapping[str, Any]):
         initialization,
         {**dict(metadata), TASK_EVALUATOR_METADATA_KEY: evaluator},
         targets,
+    )
+
+
+def _configure_canonical_reset_region(env: Any, stations_path: Any) -> None:
+    payload = json.loads(Path(stations_path).read_text(encoding="utf-8"))
+    circle = dict(
+        (payload.get("stations") or {}).get("cabinet_front_station", {}).get("circle")
+        or {}
+    )
+    if not circle:
+        raise ValueError("WR-01 stations must define cabinet_front_station.circle")
+    env.configure_canonical_reset_region(
+        center_xy=circle["center_xy"],
+        radius_m=float(circle["radius_m"]),
+        base_yaw=float(circle["base_yaw"]),
+        torso_height_m=float(circle.get("torso_height", 0.20)),
     )
 
 
@@ -84,6 +107,10 @@ _ADAPTER = TaskRuntimeAdapter(
     close=default_close,
     report_stage_profile_id=REPORT_STAGE_PROFILE_ID,
     report_stages=report_stages_for_runtime,
+    release_facts=lambda config, episode, resources, options: {
+        "task_revision": TASK_REVISION,
+        "task_id": episode.task_id,
+    },
     expert_runtime=build_operation_handlers,
 )
 TASK_RUNTIME_API = _ADAPTER.api()

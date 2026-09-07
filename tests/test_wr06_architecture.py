@@ -162,7 +162,19 @@ def test_public_prompt_does_not_reveal_original_level() -> None:
         assert "shelf_lower" not in text
         assert "plate_left" not in text
         assert "plate_right" not in text
+        assert prompt.initial_prompt == prompt.policy_prompt
         del seed
+
+
+def test_plate_staging_accepts_either_side() -> None:
+    from bench.tasks.wr06.domain.semantics import item_staged_at_any_plate_side
+
+    assert item_staged_at_any_plate_side(
+        {"plate_left": False, "plate_right": True}
+    )
+    assert not item_staged_at_any_plate_side(
+        {"plate_left": False, "plate_right": False}
+    )
 
 
 def test_all_resources_resolve_within_the_task_package() -> None:
