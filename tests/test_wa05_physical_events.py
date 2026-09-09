@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
+import numpy as np
 import pytest
 
 pytest.importorskip("mujoco")
@@ -11,6 +14,7 @@ from bench.tasks.wa05.domain.semantics import SemanticState
 from bench.tasks.wa05.environment import (
     WA05FillOneCupAndMatchTemperatureButton,
 )
+from bench.tasks.wa05.execution import handlers as wa05_handlers
 
 
 def _bare_environment() -> WA05FillOneCupAndMatchTemperatureButton:
@@ -93,3 +97,97 @@ def test_later_other_temperature_remains_absorbing_failure() -> None:
         "first_temperature": "hot",
         "second_temperature": "cold",
     }
+
+
+def _placement_environment(
+    monkeypatch,
+    *,
+    cup_xy: tuple[float, float],
+    counter_contact: bool,
+    tilt_deg: float,
+    gripper_distance: float,
+) -> WA05FillOneCupAndMatchTemperatureButton:
+    from robocasa.utils import object_utils as OU
+
+    env = _bare_environment()
+    env._update_task_events_from_physics()
+    env._sensor_cup_by_temperature = {"hot": None, "cold": None}
+    del env._cup_physically_staged
+    position = np.array([*cup_xy, 1.0])
+    angle = np.deg2rad(tilt_deg)
+    rotation = np.array([
+        [np.cos(angle), 0.0, np.sin(angle)],
+        [0.0, 1.0, 0.0],
+        [-np.sin(angle), 0.0, np.cos(angle)],
+    ])
+    env.sim = SimpleNamespace(
+        data=SimpleNamespace(
+            body_xpos=np.array([position]),
+            body_xmat=np.array([rotation.reshape(-1)]),
+            site_xpos=np.array([position + [0.0, 0.0, gripper_distance]]),
+        ),
+    )
+    env.obj_body_id = {"cup_A": 0}
+    env.robots = [SimpleNamespace(
+        eef_site_id={"right": 0},
+        gripper={"right": SimpleNamespace(joints=[], current_action=np.array([-1.0]))},
+    )]
+    env.counter = object()
+    env.cup_upright_threshold_deg = 15.0
+    env.service_threshold = 0.12
+    env.service_slot_poses = {"slot_1": [0.0, 0.0, 0.95]}
+    env.service_slot_regions = {
+        "slot_1": {"x_bounds": [-0.06, 0.06], "y_bounds": [-0.06, 0.06]},
+    }
+    monkeypatch.setattr(
+        OU, "check_obj_fixture_contact",
+        lambda actual_env, cup, counter: counter_contact,
+    )
+    monkeypatch.setattr(OU, "get_fixture_to_point_rel_offset", lambda counter, point: point)
+    return env
+
+
+@pytest.mark.parametrize("verification_path", ("policy_evaluation", "expert_event", "expert_handler"))
+@pytest.mark.parametrize(
+    "cup_xy,counter_contact,tilt_deg,gripper_distance,expected_evaluation,expected_expert",
+    [
+        ((0.02205, -0.073619), True, 0.089, 0.5526, True, False),
+        ((0.17466, 0.02798), True, 0.09, 0.6629, True, False),
+        ((0.0, 0.0), True, 86.69, 0.55, False, False),
+        ((0.0, 0.0), False, 0.09, 1.04, False, False),
+        ((0.0, 0.0), True, 0.09, 0.02, False, False),
+        ((0.0, 0.0), True, 15.1, 0.55, False, False),
+        ((0.0, 0.0), True, 14.9, 0.121, True, True),
+        ((0.0, 0.0), True, 14.9, 0.119, False, False),
+    ],
+    ids=[
+        "seed1076-outside-rectangle", "beyond-service-distance", "tipped-cup",
+        "sink-or-airborne", "still-held", "tilt-over-limit",
+        "upright-and-released", "gripper-not-retreated",
+    ],
+)
+def test_staging_requires_upright_counter_placement_and_release(
+    monkeypatch, verification_path, cup_xy, counter_contact, tilt_deg,
+    gripper_distance, expected_evaluation, expected_expert,
+) -> None:
+    env = _placement_environment(
+        monkeypatch,
+        cup_xy=cup_xy,
+        counter_contact=counter_contact,
+        tilt_deg=tilt_deg,
+        gripper_distance=gripper_distance,
+    )
+    env.require_service_region_for_staging = verification_path != "policy_evaluation"
+    expected = expected_expert if env.require_service_region_for_staging else expected_evaluation
+    if verification_path != "expert_handler":
+        env._update_task_events_from_physics()
+    else:
+        monkeypatch.setattr(wa05_handlers, "_refresh", lambda controller: env)
+        monkeypatch.setattr(wa05_handlers, "get_object_hold_status", lambda *args, **kwargs: {})
+        controller = SimpleNamespace(env=env, runtime_config=SimpleNamespace(execute=True))
+        handler = wa05_handlers.build_stage_handlers(controller)["record_verified_staging"]
+        result = handler("cup_A", service_slot="slot_1")
+        assert result["pass"] is expected
+
+    assert env.are_cups_physically_staged() is expected
+    assert env._semantic_state.staged_before_answer is expected

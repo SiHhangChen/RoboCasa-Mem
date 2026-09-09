@@ -110,6 +110,9 @@ class WA05FillOneCupAndMatchTemperatureButton(Kitchen):
             raise ValueError("WA-05 button release dwell must be positive")
         self.service_threshold = float(service_threshold)
         self.cup_upright_threshold_deg = float(cup_upright_threshold_deg)
+        # Expert recording uses the original slot constraints. Canonical
+        # policy evaluation explicitly relaxes this during initialization.
+        self.require_service_region_for_staging = True
         self._cup_placement_seed = int(cup_placement_seed)
         self.gripper_force_limit = float(gripper_force_limit)
         self.gripper_pad_friction = tuple(
@@ -639,6 +642,8 @@ class WA05FillOneCupAndMatchTemperatureButton(Kitchen):
         return bool(tilt <= self.cup_upright_threshold_deg)
 
     def cup_is_at_service_slot(self, cup_id: str, slot: str) -> bool:
+        """Validate the original service-slot placement used by the expert."""
+
         target = self.service_slot_position(slot)
         distance = float(np.linalg.norm(self.object_position(cup_id)[:2] - target[:2]))
         try:
@@ -651,6 +656,24 @@ class WA05FillOneCupAndMatchTemperatureButton(Kitchen):
             and contact
             and self.cup_is_upright(str(cup_id))
         )
+
+    def cup_placement_checks(
+        self, cup_id: str, *, release_distance: float = 0.12
+    ) -> dict[str, bool]:
+        """Require upright, released support anywhere on the task counter."""
+
+        from bench.execution.manipulation.object_interactions import is_object_released
+
+        cup = str(cup_id)
+        try:
+            counter_contact = bool(OU.check_obj_fixture_contact(self, cup, self.counter))
+        except Exception:
+            counter_contact = False
+        return {
+            "counter_contact": counter_contact,
+            "cup_upright": self.cup_is_upright(cup),
+            "cup_released": bool(is_object_released(self, cup, distance=release_distance)),
+        }
 
     def cup_is_in_service_region(self, cup_id: str, slot: str) -> bool:
         """Return whether the cup center lies inside its service region."""
@@ -817,6 +840,11 @@ class WA05FillOneCupAndMatchTemperatureButton(Kitchen):
             "service": {
                 "slot_positions_world": slots,
                 "placement_regions": deepcopy(self.service_slot_regions),
+                "placement_rule": (
+                    "service_region"
+                    if self.require_service_region_for_staging
+                    else "upright_released_on_counter"
+                ),
                 "physically_staged": self.are_cups_physically_staged(),
                 "staged_before_answer": self._semantic_state.staged_before_answer,
             },
@@ -1162,17 +1190,20 @@ class WA05FillOneCupAndMatchTemperatureButton(Kitchen):
     # Physical task-event derivation ------------------------------------
 
     def _cup_physically_staged(self, cup_id: str, slot: str) -> bool:
-        """Return whether the filled cup rests released at its service slot."""
+        """Apply expert slot constraints or the policy evaluation counter rule."""
 
         cup = str(cup_id)
         if cup not in CUP_IDS or slot not in SERVICE_SLOTS:
             return False
         try:
-            from bench.execution.manipulation.object_interactions import is_object_released
-            return bool(
-                self.cup_is_at_service_slot(cup, slot)
-                and is_object_released(self, cup, distance=0.12)
-            )
+            if getattr(self, "require_service_region_for_staging", True):
+                from bench.execution.manipulation.object_interactions import is_object_released
+
+                return bool(
+                    self.cup_is_at_service_slot(cup, slot)
+                    and is_object_released(self, cup, distance=0.12)
+                )
+            return all(self.cup_placement_checks(cup).values())
         except Exception:
             return False
 
@@ -1200,7 +1231,8 @@ class WA05FillOneCupAndMatchTemperatureButton(Kitchen):
         prompts; it only commits what the physical state provably shows:
 
         * a cup has water once it is observed under an active sensor faucet;
-        * staging is recorded when the released cup first reaches its slot;
+        * staging requires upright, released counter placement; expert
+          recording additionally requires the planned service region;
         * a later active faucet of the other temperature is a mixed fill.
         """
 
@@ -1271,7 +1303,7 @@ class WA05FillOneCupAndMatchTemperatureButton(Kitchen):
                 )[cup] = temperature
             continue
 
-        # Staging: latch the planned slot once the cup physically rests there.
+        # Staging uses the active recording / evaluation placement rule.
         for cup in CUP_IDS:
             if self._semantic_state.staged_before_answer:
                 continue

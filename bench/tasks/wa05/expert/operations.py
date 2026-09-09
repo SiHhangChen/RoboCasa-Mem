@@ -9,6 +9,9 @@ from bench.tasks.wa05.execution.navigation import build_navigation_assembly
 
 
 def build_operation_handlers(descriptor: Any, env: Any, observation: dict[str, Any]) -> dict[str, Any]:
+    # Expert-prefix recording can use an evaluation-split episode. Enforce
+    # the original expert placement standard before executing any stages.
+    env.require_service_region_for_staging = True
     navigation = build_navigation_assembly(env, observation, config=descriptor.navigation, seed=descriptor.scene.scene_seed)
     manipulation = build_manipulation_assembly(
         env,

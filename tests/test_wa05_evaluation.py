@@ -274,7 +274,8 @@ def test_runtime_callbacks_share_one_evaluator_result() -> None:
     )
 
 
-def test_runtime_initialize_mounts_fresh_evaluator(monkeypatch) -> None:
+@pytest.mark.parametrize("split", ("train", "evaluation"))
+def test_runtime_initialize_mounts_fresh_evaluator(monkeypatch, split) -> None:
     calls: dict[str, object] = {"reset": 0}
 
     class _FakeEvaluator:
@@ -310,6 +311,7 @@ def test_runtime_initialize_mounts_fresh_evaluator(monkeypatch) -> None:
             return "SNAPSHOT"
 
     descriptor = SimpleNamespace(
+        episode=SimpleNamespace(split=split),
         config=SimpleNamespace(
             initial_state=SimpleNamespace(
                 objects={"enabled": True},
@@ -335,6 +337,7 @@ def test_runtime_initialize_mounts_fresh_evaluator(monkeypatch) -> None:
     }
     assert targets is None
     assert metadata["task_evaluator"] is env._wa05_evaluator
+    assert env.require_service_region_for_staging is (split != "evaluation")
     assert calls == {
         "reset": 1,
         "snapshot": "SNAPSHOT",

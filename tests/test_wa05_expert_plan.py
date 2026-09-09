@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 from bench.execution.contracts import NavigateStage, OperateStage
 from bench.tasks import TaskCatalog, resolve_builtin_task_plugin
 from bench.tasks.contracts import EpisodeRequest, ExpertPlanInputs
@@ -43,3 +45,32 @@ def test_expert_plan_uses_one_fill_one_slot_and_matching_answer() -> None:
         assert len(answers) == 1
         assert answers[0].metadata["temperature"] == temperature
         assert all(stage.operation != "record_final_take" for stage in operations)
+
+
+def test_expert_recording_restores_region_gate_for_evaluation_episode(monkeypatch) -> None:
+    from bench.tasks.wa05.expert import operations
+
+    env = SimpleNamespace(require_service_region_for_staging=False)
+    descriptor = SimpleNamespace(
+        episode=SimpleNamespace(split="evaluation"),
+        navigation=object(),
+        scene=SimpleNamespace(scene_seed=0),
+        config=SimpleNamespace(manipulation={}),
+        resources={"planner_script": "planner.py", "cup_grasp_candidates": "grasps.json"},
+        execute=True,
+        actions=SimpleNamespace(handler_settings={}),
+    )
+    monkeypatch.setattr(
+        operations, "build_navigation_assembly",
+        lambda *args, **kwargs: SimpleNamespace(controller=object()),
+    )
+    monkeypatch.setattr(
+        operations, "build_manipulation_assembly",
+        lambda *args, **kwargs: SimpleNamespace(controller=SimpleNamespace()),
+    )
+    monkeypatch.setattr(operations, "StageRunner", lambda **kwargs: SimpleNamespace(**kwargs))
+
+    parts = operations.build_operation_handlers(descriptor, env, {})
+
+    assert env.require_service_region_for_staging is True
+    assert parts["runner"] is not None
