@@ -145,9 +145,24 @@ BUILTIN_TASK_PLUGINS: tuple[TaskPlugin, ...] = (
         env_name="WR06ReturnSingleBottleToOriginalLevel",
     ),
     _builtin_task_plugin(
+        "WR-07",
+        aliases=("WR07", "WR_07"),
+        env_name="WR07MatchMilkCartonToColoredSugarPlate",
+    ),
+    _builtin_task_plugin(
+        "WR-08",
+        aliases=("WR08", "WR_08"),
+        env_name="WR08MatchMilkCartonsToColoredSugarPlates",
+    ),
+    _builtin_task_plugin(
         "WX-01",
         aliases=("WX01", "WX_01"),
         env_name="WX01ReturnObjectToOriginalPlace",
+    ),
+    _builtin_task_plugin(
+        "WX-02",
+        aliases=("WX02", "WX_02"),
+        env_name="WX02CleanUnderCupAndReturnIt",
     ),
 )
 

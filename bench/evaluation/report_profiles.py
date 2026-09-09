@@ -169,10 +169,41 @@ WR06_REPORT_PROFILE = _profile(
     "correct_return_level",
     "success",
 )
+WR07_REPORT_PROFILE = _profile(
+    "WR-07",
+    "item_picked",
+    "memory_color_latched",
+    "target_plate_matched",
+    "success",
+    version=3,
+)
+WR08_REPORT_PROFILE = _profile(
+    "WR-08",
+    "one_item_picked",
+    "one_item_color_latched",
+    "one_item_matched",
+    "two_items_picked",
+    "two_items_color_latched",
+    "two_items_matched",
+    "success",
+    version=2,
+)
 WX01_REPORT_PROFILE = _profile(
     "WX-01",
     "wipe_completed",
     "cleaning_completed",
+    "success",
+)
+WX02_REPORT_PROFILE = _profile(
+    "WX-02",
+    "tool_acquired",
+    "primary_cup_moved",
+    "primary_stain_cleaned",
+    "primary_cup_returned",
+    "secondary_cup_moved",
+    "secondary_stain_cleaned",
+    "secondary_cup_returned",
+    "tool_returned",
     "success",
 )
 
@@ -192,7 +223,10 @@ REPORT_STAGE_PROFILES = (
     WR03_REPORT_PROFILE,
     WR05_REPORT_PROFILE,
     WR06_REPORT_PROFILE,
+    WR07_REPORT_PROFILE,
+    WR08_REPORT_PROFILE,
     WX01_REPORT_PROFILE,
+    WX02_REPORT_PROFILE,
 )
 
 _PROFILES_BY_TASK = {profile.task_id: profile for profile in REPORT_STAGE_PROFILES}
@@ -240,6 +274,9 @@ __all__ = [
     "WR03_REPORT_PROFILE",
     "WR05_REPORT_PROFILE",
     "WR06_REPORT_PROFILE",
+    "WR07_REPORT_PROFILE",
+    "WR08_REPORT_PROFILE",
     "WX01_REPORT_PROFILE",
+    "WX02_REPORT_PROFILE",
     "get_report_stage_profile",
 ]

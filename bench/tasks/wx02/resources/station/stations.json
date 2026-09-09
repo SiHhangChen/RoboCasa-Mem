@@ -1,0 +1,34 @@
+{
+  "config_kind": "station",
+  "description": "WX-02 stations aligned with the two-point manual path.",
+  "env_name": "WX02CleanUnderCupAndReturnIt",
+  "layout_id": 38,
+  "samples_per_station": 1,
+  "schema_version": 1,
+  "seed": 0,
+  "split": "pretrain",
+  "stations": {
+    "cleaning_tool_station": {
+      "samples": [{
+        "station_id": "cleaning_tool_station",
+        "sample_index": 0,
+        "base_pos": [2.17, -4.58, 0.7000042503740603],
+        "base_xy": [2.17, -4.58],
+        "base_yaw": -0.04,
+        "record_source": "manual_path_sample_0_cleaning_tool_region_front"
+      }]
+    },
+    "dining_table_station": {
+      "samples": [{
+        "station_id": "dining_table_station",
+        "sample_index": 0,
+        "base_pos": [2.171, -3.833, 0.7000042503740603],
+        "base_xy": [2.171, -3.833],
+        "base_yaw": -0.042,
+        "record_source": "manual_path_sample_1_dining_table_front"
+      }]
+    }
+  },
+  "style_id": 38,
+  "task": "WX-02"
+}

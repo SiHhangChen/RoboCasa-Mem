@@ -1,0 +1,19 @@
+{
+  "task_id": "WR-07",
+  "spatial_reference": "The source and target sides each contain left, center, and right sugar plates. The semantic target is the target plate with the same color as the source plate holding the milk carton.",
+  "high_level_instruction": "Observe the source plates, remember the source color, and move the carton to the matching target plate.",
+  "subtasks": {
+    "observe_source": {"label": "observe the three colored source sugar plates", "keyframe": "last"},
+    "pick_source": {"label": "pick up the milk carton from its source sugar plate", "keyframe": "last"},
+    "place_target": {"label": "place the milk carton on the matching target sugar plate", "keyframe": "last"},
+    "verify_target": {"label": "verify the milk carton is on the matching target sugar plate", "keyframe": "last"},
+    "finish": {"label": "return the arm after placing the milk carton", "keyframe": "last"}
+  },
+  "stage_prefixes": {
+    "observe_source": ["observe_source_colored_plates", "navigate_to_source_plate"],
+    "pick_source": ["pick_milk_carton_from_source_plate", "stow_item_after_source_pick"],
+    "place_target": ["latch_source_color_memory", "navigate_to_matching_target_plate", "place_milk_carton_on_matching_plate"],
+    "verify_target": ["verify_target_plate"],
+    "finish": ["return_arm_after_target_place"]
+  }
+}

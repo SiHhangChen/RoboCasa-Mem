@@ -1,0 +1,552 @@
+"""Single strict configuration boundary for production WX-02."""
+
+from __future__ import annotations
+
+from collections.abc import Mapping, Sequence
+from math import isfinite
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+from bench.tasks.wx02.domain.contracts import (
+    OBJECT_NAMES,
+    TASK_ID,
+    ActionConfig,
+    InitialStateConfig,
+    RobotBaseConfig,
+    RobotBaseMode,
+    RunContext,
+    StartStateConfig,
+    TaskConfig,
+)
+
+
+PACKAGE_ROOT = Path(__file__).resolve().parent
+DEFAULT_TASK_CONFIG_FILE = PACKAGE_ROOT / "resources" / "task.yaml"
+DEFAULT_INITIAL_STATION_ID = "dining_table_station"
+
+
+def load_task_config(path: str | Path = DEFAULT_TASK_CONFIG_FILE) -> TaskConfig:
+    """Load WX-02 YAML, reject unknown fields and validate local resources."""
+
+    config_path = Path(path)
+    payload = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+    if not isinstance(payload, Mapping):
+        raise ValueError(f"WX-02 config root must be a mapping: {config_path}")
+    _reject_unknown(
+        payload,
+        {
+            "schema_version",
+            "task",
+            "scene",
+            "episode",
+            "initial_state",
+            "sensors",
+            "resources",
+            "navigation",
+            "manipulation",
+            "operations",
+            "semantics",
+            "recording",
+        },
+        "config sections",
+    )
+    if int(payload.get("schema_version", 0)) != 1:
+        raise ValueError("WX-02 config requires schema_version=1")
+
+    task = dict(_mapping(payload, "task", config_path))
+    _reject_unknown(
+        task, {"id", "display_name", "description", "success_conditions"}, "task fields"
+    )
+    if str(task.get("id")) != TASK_ID:
+        raise ValueError(f"WX-02 config must declare task.id={TASK_ID!r}")
+
+    scene = dict(_mapping(payload, "scene", config_path))
+    _reject_unknown(
+        scene,
+        {
+            "env_name",
+            "fixed_scene",
+            "layout_id",
+            "style_id",
+            "scene_seed",
+            "cup_scale",
+            "cup_placement_size",
+            "primary_cup_placement_pos",
+            "secondary_cup_placement_pos",
+            "cup_rotation_deg",
+            "cleaning_tool_return_region_center_xy",
+            "cleaning_tool_return_region_size_xy",
+            "cleaning_tool_return_region_rgba",
+        },
+        "scene fields",
+    )
+    episode = dict(_mapping(payload, "episode", config_path))
+    _reject_unknown(
+        episode,
+        {"start_mode", "temporary_targets", "wipe_sampling", "max_horizon"},
+        "episode fields",
+    )
+
+    initial = _mapping(payload, "initial_state", config_path)
+    _reject_unknown(
+        initial, {"robot_base", "objects", "short_start"}, "initial_state fields"
+    )
+    base_payload = _mapping(initial, "robot_base", config_path)
+    _reject_unknown(
+        base_payload,
+        {"mode", "xy", "yaw", "sample_index", "station_id"},
+        "initial_state.robot_base fields",
+    )
+    objects = dict(_mapping(initial, "objects", config_path))
+    _reject_unknown(
+        objects,
+        {"enabled", *OBJECT_NAMES},
+        "initial_state.objects fields",
+    )
+    start_payload = _mapping(initial, "short_start", config_path)
+    _reject_unknown(
+        start_payload,
+        {
+            "mode",
+            "setup_operation",
+            "cleaning_tool",
+        },
+        "initial_state.short_start fields",
+    )
+    cleaning_tool_start = _mapping(start_payload, "cleaning_tool", config_path)
+    _reject_unknown(
+        cleaning_tool_start,
+        {
+            "lift_height",
+            "transport_probe_height",
+            "max_end_effector_distance",
+            "max_relative_offset_drift",
+            "minimum_motion_ratio",
+        },
+        "initial_state.short_start.cleaning_tool fields",
+    )
+    start = StartStateConfig(
+        mode=str(start_payload.get("mode", "cup_front_unheld")),
+        setup_operation=str(start_payload.get("setup_operation", "none")),
+        cleaning_tool_lift_height=float(cleaning_tool_start.get("lift_height", 0.20)),
+        transport_probe_height=float(
+            cleaning_tool_start.get("transport_probe_height", 0.03)
+        ),
+        max_end_effector_distance=float(
+            cleaning_tool_start.get("max_end_effector_distance", 0.10)
+        ),
+        max_relative_offset_drift=float(
+            cleaning_tool_start.get("max_relative_offset_drift", 0.02)
+        ),
+        minimum_motion_ratio=float(
+            cleaning_tool_start.get("minimum_motion_ratio", 0.70)
+        ),
+    )
+    if start.mode != "cup_front_unheld":
+        raise ValueError(
+            "WX-02 production config supports the fourteen-stage cup-front start only"
+        )
+    if start.setup_operation != "none":
+        raise ValueError("WX-02 cup-front start requires setup_operation='none'")
+    if start.cleaning_tool_lift_height <= 0.0:
+        raise ValueError("cleaning_tool_lift_height must be positive")
+    if start.transport_probe_height <= 0.0:
+        raise ValueError("transport_probe_height must be positive")
+    if start.max_end_effector_distance <= 0.0:
+        raise ValueError("max_end_effector_distance must be positive")
+    if start.max_relative_offset_drift <= 0.0:
+        raise ValueError("max_relative_offset_drift must be positive")
+    if not 0.0 < start.minimum_motion_ratio <= 1.0:
+        raise ValueError("minimum_motion_ratio must be in (0, 1]")
+
+    sensors = dict(_mapping(payload, "sensors", config_path))
+    _reject_unknown(
+        sensors,
+        {
+            "cameras",
+            "wrist_rgb_camera",
+            "width",
+            "height",
+            "depth",
+            "use_camera_observations",
+            "has_renderer",
+            "has_offscreen_renderer",
+        },
+        "sensor fields",
+    )
+    resources = dict(_mapping(payload, "resources", config_path))
+    _reject_unknown(
+        resources,
+        {
+            "station_poses",
+            "manual_base_path",
+            "planner_script",
+            "cleaning_tool_grasp_pose",
+            "cup_grasp_candidates",
+        },
+        "resource fields",
+    )
+    semantics = dict(_mapping(payload, "semantics", config_path))
+    _reject_unknown(
+        semantics,
+        {
+            "origin_threshold",
+            "tool_return_region_tolerance",
+            "wipe_radius",
+            "contact_separation",
+            "minimum_contact_count",
+            "minimum_wipe_sweep",
+            "release_distance",
+            "moved_threshold",
+            "stain_surface_z_offset",
+            "stain_color_rgba",
+            "stain_spots",
+        },
+        "semantic fields",
+    )
+    recording = dict(_mapping(payload, "recording", config_path))
+    _reject_unknown(
+        recording,
+        {
+            "record_depth",
+            "depth_dtype",
+            "depth_scale",
+            "action_schema",
+        },
+        "task-owned recording fields",
+    )
+    config = TaskConfig(
+        source_path=config_path,
+        task=task,
+        scene=scene,
+        episode=episode,
+        initial_state=InitialStateConfig(
+            robot_base=resolve_robot_base_config(**dict(base_payload)),
+            objects=objects,
+            short_start=start,
+        ),
+        sensors=sensors,
+        resources=resources,
+        navigation=dict(_mapping(payload, "navigation", config_path)),
+        manipulation=dict(_mapping(payload, "manipulation", config_path)),
+        operations=dict(_mapping(payload, "operations", config_path)),
+        semantics=semantics,
+        recording=recording,
+    )
+    _validate_resources(config)
+    return config
+
+
+def resolve_robot_base_config(
+    *,
+    mode: str | RobotBaseMode = RobotBaseMode.MANUAL_PATH_SAMPLE,
+    xy: Sequence[float] | None = None,
+    yaw: float | None = None,
+    sample_index: int | None = None,
+    station_id: str | None = None,
+) -> RobotBaseConfig:
+    """Resolve exactly one Base initialization mode."""
+
+    raw = mode.value if isinstance(mode, RobotBaseMode) else str(mode).strip().lower()
+    try:
+        resolved = RobotBaseMode(raw)
+    except ValueError as exc:
+        raise ValueError(f"unsupported WX-02 robot-base mode: {raw!r}") from exc
+    supplied = {
+        "xy": xy,
+        "yaw": yaw,
+        "sample_index": sample_index,
+        "station_id": station_id,
+    }
+    if resolved is RobotBaseMode.EXPLICIT_POSE:
+        _reject_supplied(resolved, supplied, allowed={"xy", "yaw"})
+        if xy is None or isinstance(xy, (str, bytes)) or len(xy) != 2:
+            raise ValueError("explicit_pose requires two-value robot_base.xy")
+        resolved_xy = (float(xy[0]), float(xy[1]))
+        resolved_yaw = _finite(yaw, "robot_base.yaw")
+        if not all(isfinite(value) for value in resolved_xy):
+            raise ValueError("robot_base.xy must be finite")
+        return RobotBaseConfig(resolved, xy=resolved_xy, yaw=resolved_yaw)
+    if resolved is RobotBaseMode.MANUAL_PATH_SAMPLE:
+        _reject_supplied(resolved, supplied, allowed={"sample_index"})
+        index = 0 if sample_index is None else int(sample_index)
+        if index < 0:
+            raise ValueError("robot_base.sample_index must be non-negative")
+        return RobotBaseConfig(resolved, sample_index=index)
+    if resolved is RobotBaseMode.STATION_SAMPLE:
+        _reject_supplied(resolved, supplied, allowed={"station_id"})
+        station = (
+            DEFAULT_INITIAL_STATION_ID
+            if station_id is None
+            else str(station_id).strip()
+        )
+        if not station:
+            raise ValueError("robot_base.station_id must be non-empty")
+        return RobotBaseConfig(resolved, station_id=station)
+    _reject_supplied(resolved, supplied, allowed=set())
+    return RobotBaseConfig(resolved)
+
+
+def resolve_action_config(
+    *, episode: Any, operations: Mapping[str, Any]
+) -> ActionConfig:
+    """Strictly resolve metadata used by the fourteen workflow stages."""
+
+    _reject_unknown(
+        operations,
+        {
+            "observe",
+            "cleaning_tool_pick",
+            "staged_tool_place",
+            "object_temporary_place",
+            "wipe",
+            "post_wipe_tool_place",
+            "object_pick",
+            "object_origin_place",
+            "cleaning_tool_return_place",
+            "handlers",
+            "pick_proxy",
+        },
+        "operation sections",
+    )
+    observe = _strict_section(
+        operations, "observe", {"settle_steps", "gripper_action"}
+    )
+    tool_pick = _strict_section(
+        operations, "cleaning_tool_pick", {"lift_height"}
+    )
+    staged_tool_place = _strict_section(
+        operations,
+        "staged_tool_place",
+        {
+            "place_height",
+            "retreat_height",
+            "retreat_x",
+            "retreat_y",
+            "post_release_clearance_z_offset",
+            "target_max_base_x",
+        },
+    )
+    temporary_place = _strict_section(
+        operations,
+        "object_temporary_place",
+        {
+            "place_height",
+            "retreat_height",
+            "retreat_x",
+            "retreat_y",
+            "placement_object_upright",
+            "post_release_clearance_z_offset",
+            "target_max_base_x",
+        },
+    )
+    wipe = _strict_section(
+        operations,
+        "wipe",
+        {
+            "plan_execute_wipe_sweep",
+            "contact_z_offset",
+            "settle_steps",
+            "allow_final_qpos_near_miss",
+            "max_final_qpos_error",
+        },
+    )
+    post_wipe_tool_place = _strict_section(
+        operations,
+        "post_wipe_tool_place",
+        {
+            "place_height",
+            "retreat_height",
+            "retreat_x",
+            "retreat_y",
+            "post_release_clearance_z_offset",
+            "target_max_base_x",
+        },
+    )
+    object_pick = _strict_section(
+        operations,
+        "object_pick",
+        {
+            "grasp_strategy",
+            "lift_height",
+            "object_max_base_x",
+        },
+    )
+    origin_place = _strict_section(
+        operations,
+        "object_origin_place",
+        {
+            "place_height",
+            "retreat_height",
+            "retreat_x",
+            "retreat_y",
+            "placement_object_upright",
+            "placement_approach_angles_deg",
+            "placement_entry_standoff",
+            "placement_entry_z_offset",
+            "placement_exit_standoff",
+            "placement_exit_z_offset",
+            "post_release_clearance_distance",
+            "post_release_clearance_z_offset",
+            "entry_settle_steps",
+            "place_settle_steps",
+            "clearance_settle_steps",
+            "retreat_settle_steps",
+            "require_pre_release_check",
+            "pre_release_xy_tolerance",
+            "pre_release_z_tolerance",
+            "pre_release_upright_threshold_deg",
+            "target_max_base_x",
+        },
+    )
+    tool_return_place = _strict_section(
+        operations,
+        "cleaning_tool_return_place",
+        {
+            "place_height",
+            "retreat_height",
+            "retreat_x",
+            "retreat_y",
+            "post_release_clearance_z_offset",
+            "target_max_base_x",
+        },
+    )
+    handlers = _strict_section(
+        operations,
+        "handlers",
+        {"dry_run_wipe_semantic_proxy", "accessible_place_dry_run_only"},
+    )
+    pick_proxy = _strict_section(
+        operations, "pick_proxy", {"dry_run_only", "object_max_base_x"}
+    )
+    return ActionConfig(
+        observe_metadata={"stage": "stand_in_front_of_cup", **dict(observe)},
+        cleaning_tool_pick_metadata=dict(tool_pick),
+        staged_tool_place_metadata={
+            "target_name": "pre_wipe_dining_sponge",
+            **dict(staged_tool_place),
+        },
+        object_temporary_place_metadata={
+            "target_name": "temporary_object_pose",
+            **dict(temporary_place),
+        },
+        wipe_metadata_by_object={
+            object_name: {
+                "target_pose_attr": f"original_{object_name}_pose",
+                "wipe_offsets_xy": [
+                    list(value)
+                    for value in episode.wipe_offsets_xy_by_object[object_name]
+                ],
+                "wipe_sampling": dict(
+                    episode.wipe_metadata_by_object[object_name]
+                ),
+                "stain_id": object_name,
+                **dict(wipe),
+            }
+            for object_name in episode.temporary_object_xy
+        },
+        post_wipe_tool_place_metadata={
+            "target_name": "post_wipe_dining_sponge",
+            **dict(post_wipe_tool_place),
+        },
+        object_pick_metadata=dict(object_pick),
+        object_origin_place_metadata={
+            "target_name": "object_origin",
+            **dict(origin_place),
+        },
+        cleaning_tool_return_place_metadata={
+            "target_name": "cleaning_tool_return_region",
+            **dict(tool_return_place),
+        },
+        handler_settings=dict(handlers),
+        pick_proxy_settings=dict(pick_proxy),
+    )
+
+
+def resolve_run_context(
+    *,
+    split: str,
+    variant: str,
+    execute: bool,
+    extra_metadata: Mapping[str, Any] | None = None,
+) -> RunContext:
+    """Keep invocation metadata separate from episode sampling."""
+
+    return RunContext(
+        split=str(split),
+        variant=str(variant),
+        execute=bool(execute),
+        extra_metadata=dict(extra_metadata or {}),
+    )
+
+
+def _validate_resources(config: TaskConfig) -> None:
+    required = {
+        "station_poses",
+        "manual_base_path",
+        "planner_script",
+        "cleaning_tool_grasp_pose",
+        "cup_grasp_candidates",
+    }
+    missing = required - set(config.resources)
+    if missing:
+        raise ValueError("missing WX-02 resources: " + ", ".join(sorted(missing)))
+    for name in required:
+        path = config.path(config.resources[name])
+        if path is None or not path.is_file():
+            raise FileNotFoundError(f"missing WX-02 resource {name!r}: {path}")
+
+
+def _mapping(payload: Mapping[str, Any], name: str, path: Path) -> Mapping[str, Any]:
+    value = payload.get(name)
+    if not isinstance(value, Mapping):
+        raise ValueError(f"WX-02 config section {name!r} must be a mapping: {path}")
+    return value
+
+
+def _strict_section(
+    payload: Mapping[str, Any], name: str, allowed: set[str]
+) -> Mapping[str, Any]:
+    value = payload.get(name, {})
+    if not isinstance(value, Mapping):
+        raise ValueError(f"WX-02 operations.{name} must be a mapping")
+    _reject_unknown(value, allowed, f"operations.{name} fields")
+    return value
+
+
+def _reject_unknown(payload: Mapping[str, Any], allowed: set[str], label: str) -> None:
+    unknown = set(payload) - allowed
+    if unknown:
+        raise ValueError(f"unknown WX-02 {label}: " + ", ".join(sorted(unknown)))
+
+
+def _reject_supplied(
+    mode: RobotBaseMode, values: Mapping[str, Any], *, allowed: set[str]
+) -> None:
+    invalid = sorted(
+        name
+        for name, value in values.items()
+        if value is not None and name not in allowed
+    )
+    if invalid:
+        raise ValueError(
+            f"robot_base mode {mode.value!r} does not allow: " + ", ".join(invalid)
+        )
+
+
+def _finite(value: Any, label: str) -> float:
+    resolved = float(value)
+    if not isfinite(resolved):
+        raise ValueError(f"{label} must be finite")
+    return resolved
+
+
+__all__ = [
+    "DEFAULT_TASK_CONFIG_FILE",
+    "load_task_config",
+    "resolve_action_config",
+    "resolve_robot_base_config",
+    "resolve_run_context",
+]

@@ -1,0 +1,139 @@
+schema_version: 1
+
+task:
+  id: WR-08
+  display_name: Move two milk cartons to matching colored sugar plates
+  description: Remember the colors of the source sugar plates, then move the two distinct milk carton models to the matching plates on the opposite counter.
+  success_conditions:
+    - both_items_initial_source_physically_verified
+    - both_items_picked
+    - both_source_colors_memory_latched
+    - both_items_placed_on_matching_target_plates
+    - no_protocol_violation
+
+scene:
+  env_name: WR08MatchMilkCartonsToColoredSugarPlates
+  fixed_scene: true
+  layout_id: 32
+  style_id: 32
+  scene_seed: 0
+
+episode:
+  max_horizon: 5200
+  color_count: 3
+  item_sample_radius_m: 0.045
+
+initial_state:
+  robot_base:
+    mode: preserve_reset_pose
+  source_regions:
+    source_left: {size: [0.34, 0.30], pos: [-1.0, -1.0], margin: 0.02, surface_z: 0.93}
+    source_center: {size: [0.34, 0.30], pos: [0.0, -1.0], margin: 0.02, surface_z: 0.93}
+    source_right: {size: [0.34, 0.30], pos: [1.0, -1.0], margin: 0.02, surface_z: 0.93}
+  objects: {}
+
+sensors:
+  cameras: [robot0_agentview_left, robot0_agentview_right, robot0_eye_in_hand]
+  wrist_rgb_camera: robot0_eye_in_hand
+  width: 224
+  height: 224
+  depth: false
+  has_renderer: false
+  has_offscreen_renderer: true
+  use_camera_observations: true
+
+resources:
+  planner_script: ../../../execution/planning/mplib_planner.py
+  stations: calibration/stations.json
+
+navigation:
+  kinematic_base_navigation: false
+  base_action_frame: world
+  base_translation_action_sign: 1.0
+  base_tolerance: 0.08
+  base_yaw_tolerance: 0.12
+  base_max_steps: 2000
+  base_holding_drop_tolerance: 0.10
+  base_profile_v_max: 0.50
+  base_profile_a_max: 1.00
+  base_profile_a_dec: 1.10
+  base_profile_v_min: 0.15
+  base_profile_dock_v_max: 0.22
+  base_profile_dock_v_min: 0.10
+  base_profile_w_max: 0.60
+  base_profile_alpha_max: 1.10
+  base_profile_alpha_dec: 1.00
+  base_profile_w_min: 0.08
+  station_nav_use_docking: false
+  use_station_base_poses: true
+  manual_base_path_enabled: false
+  use_station_astar_paths: false
+
+manipulation:
+  pick_place:
+    orientation_mode: object-y-topdown
+    pregrasp_height: 0.15
+    grasp_clearance: -0.04
+    lift_height: 0.12
+    place_height: 0.05
+    retreat_height: 0.18
+  planner:
+    conda_env: membench
+    subprocess_timeout_s: 60.0
+    planning_time: 5.0
+    time_step: 0.1
+    qpos_step: 0.02
+    rrt_range: 0.1
+    nearest_ik_samples: 64
+    nearest_ik_threshold: 0.01
+    nearest_ik_max_joint_delta: 2.15
+  runtime:
+    max_joint_step: 0.025
+    settle_steps: 8
+    position_threshold: 0.02
+    orientation_threshold_deg: 15.0
+    qpos_threshold: 0.05
+    open_steps: 4
+    close_steps: 20
+    release_steps: 20
+    release_settle_steps: 8
+  static_scene:
+    enabled: false
+
+operations:
+  source_pick:
+    orientation_mode: object-y-topdown
+    grasp_yaw_offsets_deg: [0.0, 90.0, 180.0, 270.0]
+    pregrasp_height: 0.06
+    pregrasp_settle_steps: 20
+    allow_pregrasp_near_miss: true
+    pregrasp_near_miss_max_position_error: 0.08
+    lift_height: 0.12
+    post_close_hold_steps: 12
+  target_place:
+    placement_reference: bbox_bottom_center
+    placement_object_upright: true
+    placement_yaw_offsets_deg: [0.0, 90.0, 180.0, 270.0]
+    place_height: 0.02
+    release_steps: 20
+    release_settle_steps: 8
+    allow_place_near_miss: true
+  return_arm_empty:
+    gripper_action: -1.0
+  return_arm_holding:
+    gripper_action: 1.0
+    settle_steps: 16
+    qpos_threshold: 0.06
+  handlers:
+    accessible_place_dry_run_only: true
+
+semantics:
+  plate_threshold: 0.16
+  physical_event_dwell_steps: 3
+  terminal_verification_steps: 1
+
+recording:
+  record_depth: false
+  depth_dtype: uint16
+  depth_scale: 0.001
+  action_schema: membench.pandaomron_hybrid13.v2
