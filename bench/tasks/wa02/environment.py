@@ -781,7 +781,6 @@ class WA02ServeHotColdWaterCups(Kitchen):
         return WA02EvaluationSnapshot(
             step_id=int(getattr(self, "timestep", 0)),
             requested_temperature=plan.requested_temperature,
-            fill_temperature_order=plan.fill_temperature_order,
             pickup_step_by_cup={
                 cup: int(event["step"])
                 for cup, event in self._physical_event_diagnostics.get(

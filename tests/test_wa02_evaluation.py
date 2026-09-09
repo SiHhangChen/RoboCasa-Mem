@@ -21,7 +21,7 @@ def _snapshot(
     step: int,
     *,
     requested_temperature: str = "hot",
-    temperature_order: tuple[str, str] = ("hot", "cold"),
+    temperature_order: tuple[str, str] | None = ("hot", "cold"),
     picked: tuple[str, ...] = (),
     pick_steps: dict[str, int] | None = None,
     filled: dict[str, str] | None = None,
@@ -156,16 +156,16 @@ def test_wa02_evaluator_qualifies_actual_hot_cold_binding() -> None:
         name: report["stages"][name]["first_pass_step"]
         for name in REPORT_STAGE_ORDER
     } == {
-        "hot_cup_filled": 2,
-        "hot_cup_ready": 3,
-        "cold_cup_filled": 5,
+        "first_cup_filled": 2,
+        "first_cup_ready": 3,
+        "second_cup_filled": 5,
         "both_cups_ready": 6,
         "success": 7,
     }
     assert validate_report_stages(
         report,
         expected_task_id="WA-02",
-        expected_profile_id="WA-02/report-v1",
+        expected_profile_id="WA-02/report-v2",
         expected_success=True,
     ) == report
 
@@ -219,13 +219,13 @@ def test_wa02_evaluator_binds_first_temperature_from_actual_fill() -> None:
     bindings = result.details["evaluation"]["stage_bindings"]
     assert bindings["first_temperature"] == "cold"
     assert bindings["second_temperature"] is None
-    assert not any(
-        stage["passed"] for stage in result.to_report_stages()["stages"].values()
-    )
+    report = result.to_report_stages()
+    assert report["stages"]["first_cup_filled"]["passed"]
+    assert not report["stages"]["first_cup_ready"]["passed"]
     validate_report_stages(
-        result.to_report_stages(),
+        report,
         expected_task_id="WA-02",
-        expected_profile_id="WA-02/report-v1",
+        expected_profile_id="WA-02/report-v2",
         expected_success=False,
     )
 
@@ -276,16 +276,16 @@ def test_wa02_evaluator_accepts_cold_first_execution(
         name: report["stages"][name]["first_pass_step"]
         for name in REPORT_STAGE_ORDER
     } == {
-        "hot_cup_filled": 5,
-        "hot_cup_ready": 6,
-        "cold_cup_filled": 6,
+        "first_cup_filled": 2,
+        "first_cup_ready": 3,
+        "second_cup_filled": 5,
         "both_cups_ready": 6,
         "success": 7,
     }
     assert validate_report_stages(
         report,
         expected_task_id="WA-02",
-        expected_profile_id="WA-02/report-v1",
+        expected_profile_id="WA-02/report-v2",
         expected_success=True,
     ) == report
 
@@ -422,6 +422,18 @@ def test_wa02_evaluator_is_idempotent_and_rejects_backward_steps() -> None:
         evaluator.observe(_snapshot(0))
 
 
+def test_wa02_evaluator_does_not_require_demonstration_order() -> None:
+    evaluator = WA02Evaluator(requested_temperature="hot")
+    evaluator.reset(_snapshot(0, temperature_order=None))
+
+    result = evaluator.observe(
+        _snapshot(1, temperature_order=("cold", "hot"), picked=("cup_B",))
+    )
+
+    assert result.stages["first_cup_pick"].qualified
+    assert result.details["evaluation"]["demonstration_temperature_order"] is None
+
+
 def test_wa02_runtime_callbacks_share_the_initialized_evaluator() -> None:
     evaluator = _evaluator()
 
@@ -495,5 +507,5 @@ def test_wa02_runtime_initialization_attaches_dynamic_evaluator(
 def test_wa02_runtime_registers_public_report_stages() -> None:
     from bench.tasks.wa02 import runtime
 
-    assert runtime.TASK_RUNTIME_API.report_stage_profile_id == "WA-02/report-v1"
+    assert runtime.TASK_RUNTIME_API.report_stage_profile_id == "WA-02/report-v2"
     assert callable(runtime.TASK_RUNTIME_API.report_stages)

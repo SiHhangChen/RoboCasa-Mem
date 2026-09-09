@@ -52,10 +52,11 @@ def _profile(
     *stage_ids: str,
     conditional: tuple[str, ...] = (),
     success_stage_id: str = "success",
+    version: int = 1,
 ) -> ReportStageProfile:
     return ReportStageProfile(
         task_id=task_id,
-        profile_id=f"{task_id}/report-v1",
+        profile_id=f"{task_id}/report-v{int(version)}",
         stage_ids=tuple(stage_ids),
         conditional_stage_ids=frozenset(conditional),
         success_stage_id=success_stage_id,
@@ -118,11 +119,12 @@ WA01_REPORT_PROFILE = _profile(
 )
 WA02_REPORT_PROFILE = _profile(
     "WA-02",
-    "hot_cup_filled",
-    "hot_cup_ready",
-    "cold_cup_filled",
+    "first_cup_filled",
+    "first_cup_ready",
+    "second_cup_filled",
     "both_cups_ready",
     "success",
+    version=2,
 )
 WA03_REPORT_PROFILE = _profile(
     "WA-03",

@@ -68,7 +68,6 @@ def _initialize(descriptor: Any, env: Any, observation: Mapping[str, Any]):
     env.configure_episode(descriptor.episode_plan)
     env.configure_canonical_physics()
     evaluator = WA02Evaluator(
-        fill_temperature_order=descriptor.episode_plan.fill_temperature_order,
         requested_temperature=descriptor.episode_plan.requested_temperature,
     )
     evaluator.reset(env.evaluation_snapshot())

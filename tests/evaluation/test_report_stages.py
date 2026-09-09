@@ -189,9 +189,9 @@ def test_frozen_profile_catalog_covers_exactly_the_fifteen_report_tasks() -> Non
         ),
         "WA-02": (
             (
-                "hot_cup_filled",
-                "hot_cup_ready",
-                "cold_cup_filled",
+                "first_cup_filled",
+                "first_cup_ready",
+                "second_cup_filled",
                 "both_cups_ready",
                 "success",
             ),
@@ -247,7 +247,8 @@ def test_frozen_profile_catalog_covers_exactly_the_fifteen_report_tasks() -> Non
     assert {profile.task_id for profile in REPORT_STAGE_PROFILES} == set(expected)
     for task_id, (stage_ids, conditional_stage_ids) in expected.items():
         profile = get_report_stage_profile(task_id)
-        assert profile.profile_id == f"{task_id}/report-v1"
+        expected_version = 2 if task_id == "WA-02" else 1
+        assert profile.profile_id == f"{task_id}/report-v{expected_version}"
         assert profile.stage_ids == stage_ids
         assert profile.conditional_stage_ids == conditional_stage_ids
         assert profile.success_stage_id == (

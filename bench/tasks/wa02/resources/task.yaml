@@ -22,9 +22,8 @@ scene:
 episode:
   hot_cup_id: null
   requested_temperature: null
-  # Expert demonstrations use a fixed order; learned-policy evaluation accepts
-  # either order and binds temperature only from the physically selected faucet.
-  fill_order: hot-first
+  # Expert execution order is seed-balanced. Policy evaluation binds cup order
+  # and temperature from physical events instead of this demonstration plan.
   service_slot_by_cup: null
   max_horizon: 6000
 
