@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+import os
 from typing import Any, Protocol
 import uuid
 
@@ -87,7 +88,10 @@ class RemotePolicyClient:
                     compression=None,
                     max_size=self.max_message_bytes,
                     additional_headers=headers,
-                    open_timeout=self.timeout_s,
+                    open_timeout=float(
+                        os.environ.get("MEMBENCH_WS_OPEN_TIMEOUT", str(self.timeout_s))
+                    ),
+                    ping_timeout=float(os.environ.get("MEMBENCH_WS_PING_TIMEOUT", "20")),
                 )
                 hello = self._receive()
                 raise_for_error_response(hello)

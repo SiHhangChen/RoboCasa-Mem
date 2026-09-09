@@ -13,9 +13,12 @@ import sys
 
 
 ROOT = Path(__file__).resolve().parents[2]
+OPENPI_SOURCE = Path(
+    os.environ.get("OPENPI_SOURCE", str(ROOT / "policy" / "openpi" / "src"))
+)
 for source in (
     ROOT,
-    ROOT / "policy" / "openpi" / "src",
+    OPENPI_SOURCE,
     ROOT / "policy" / "openpi" / "packages" / "openpi-client" / "src",
 ):
     if source.is_dir() and str(source) not in sys.path:

@@ -6,6 +6,7 @@ import asyncio
 import hmac
 import http
 import logging
+import os
 import time
 from typing import Any, Mapping
 
@@ -64,6 +65,7 @@ class WebsocketPolicyServer:
                 self.port,
                 compression=None,
                 max_size=self.max_message_bytes,
+                ping_timeout=float(os.environ.get("MEMBENCH_WS_PING_TIMEOUT", "20")),
                 process_request=_health_check,
             ) as server:
                 await server.serve_forever()

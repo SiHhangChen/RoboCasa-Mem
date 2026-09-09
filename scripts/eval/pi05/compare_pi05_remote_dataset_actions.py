@@ -75,7 +75,12 @@ def compare_frame(
             "prompt": resolved_prompt,
         }
     )
-    pred = np.asarray(response["actions"], dtype=np.float64)
+    if hasattr(response, "actions"):
+        pred = np.asarray(response.actions, dtype=np.float64)
+        server_timing = dict(getattr(response, "timing", {}) or {})
+    else:
+        pred = np.asarray(response["actions"], dtype=np.float64)
+        server_timing = response.get("server_timing", response.get("timing", {}))
     if pred.ndim == 1:
         pred = pred[None, :]
     pred = pred[:, :action_dim]
@@ -97,7 +102,7 @@ def compare_frame(
         "pred_first": per_dim_dict(pred[0]),
         "gt_first": per_dim_dict(gt[0]),
         "delta_first": per_dim_dict(delta_first),
-        "server_timing": response.get("server_timing"),
+        "server_timing": server_timing,
         "_pred": pred,
         "_gt": gt,
     }
