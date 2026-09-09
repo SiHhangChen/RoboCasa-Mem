@@ -7,18 +7,21 @@
 #   PORT=55040 ./scripts/eval/pi05/eval_pi05_wa02.sh preflight
 #   PORT=55040 ./scripts/eval/pi05/eval_pi05_wa02.sh eval
 #   PORT=55040 ./scripts/eval/pi05/eval_pi05_wa02.sh summary
+#   ./scripts/eval/pi05/eval_pi05_wa02.sh stage-prefix
+#   PORT=55040 ./scripts/eval/pi05/eval_pi05_wa02.sh stage-eval
+#   ./scripts/eval/pi05/eval_pi05_wa02.sh stage-summary
 #   PORT=55040 ./scripts/eval/pi05/eval_pi05_wa02.sh status
 #   PORT=55040 ./scripts/eval/pi05/eval_pi05_wa02.sh stop
 #   GPU=7 PORT=55040 ./scripts/eval/pi05/eval_pi05_wa02.sh full
 #
 # Environment overrides:
-#   CKPT_DIR      checkpoint directory (default: ckpts/pi05/wa02/59999)
+#   CKPT_DIR      checkpoint directory (default: ckpts/pi05/wa02/45000)
 #   CONFIG_NAME   OpenPI training config (default: pi05_membench_wa02_lora)
 #   PORT          policy server port (default: 55040)
 #   GPU           physical GPU visible to the policy server (default: 0)
 #   RENDER_GPU    physical GPU used by MuJoCo EGL in the rollout client (default: GPU)
 #   SUITE         evaluation suite (default: configs/eval/suites/wa02_v1.yaml)
-#   RUN_ID        output run ID (default: wa02-pi05-{checkpoint_step}-50seed-r50-actualbinding-v2)
+#   RUN_ID        output run ID (default: wa02-pi05-{checkpoint_step}-50seed-r20)
 #   OUTPUT_ROOT   evaluation output root (default: outputs/eval)
 #   SERVER_HOST   policy server host used by the client (default: 127.0.0.1)
 #   SERVER_INFERENCE_TIMEOUT_S server-side inference timeout (default: 300)
@@ -28,22 +31,28 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-CKPT_ROOT="${ROOT}/ckpts/pi05/wa02"
+CKPT_ROOT="${CKPT_ROOT:-${HOME}/ckpt/pi05/wa02}"
 
-CKPT_DIR="${CKPT_DIR:-${CKPT_ROOT}/59999}"
+CKPT_DIR="${CKPT_DIR:-${CKPT_ROOT}/45000}"
 CONFIG_NAME="${CONFIG_NAME:-pi05_membench_wa02_lora}"
 PORT="${PORT:-55040}"
 GPU="${GPU:-0}"
 RENDER_GPU="${RENDER_GPU:-${GPU}}"
 SUITE="${SUITE:-configs/eval/suites/wa02_v1.yaml}"
 CKPT_STEP="$(basename "${CKPT_DIR}")"
-RUN_ID="${RUN_ID:-wa02-pi05-${CKPT_STEP}-50seed-r50-actualbinding-v2}"
+RUN_ID="${RUN_ID:-wa02-pi05-${CKPT_STEP}-50seed-r20}"
 OUTPUT_ROOT="${OUTPUT_ROOT:-outputs/eval}"
 SERVER_HOST="${SERVER_HOST:-127.0.0.1}"
 SERVER_INFERENCE_TIMEOUT_S="${SERVER_INFERENCE_TIMEOUT_S:-300}"
 SERVER_STARTUP_TIMEOUT_S="${SERVER_STARTUP_TIMEOUT_S:-900}"
 XLA_PYTHON_CLIENT_MEM_FRACTION="${XLA_PYTHON_CLIENT_MEM_FRACTION:-0.75}"
 RETRY_ERRORS="${RETRY_ERRORS:-0}"
+STAGE_SUITE="${STAGE_SUITE:-configs/eval/stages/wa02_pi05_45000_r20_pilot_v1.yaml}"
+PREFIX_ROOT="${PREFIX_ROOT:-outputs/stage_prefixes/wa02_pi05_45000_r20_pilot_v1}"
+STAGE_OUTPUT_ROOT="${STAGE_OUTPUT_ROOT:-outputs/stage_eval}"
+STAGE_RUN_ID="${STAGE_RUN_ID:-wa02-pi05-${CKPT_STEP}-stage-50seed-r20-pilot-v1}"
+STAGE_RECORD_VIDEO="${STAGE_RECORD_VIDEO:-1}"
+MAIN_ROLLOUT_RUN="${MAIN_ROLLOUT_RUN:-${OUTPUT_ROOT}/wa02-pi05-${CKPT_STEP}-50seed-r20-dynamictemp-v3}"
 LOG_DIR="${OUTPUT_ROOT}/logs"
 
 OPENPI_PYTHON="${ROOT}/policy/openpi/.venv/bin/python"
@@ -194,6 +203,76 @@ run_summary() {
     "${ROBOCASA_PYTHON}" scripts/eval/summarize_run.py "${OUTPUT_ROOT}/${RUN_ID}"
 }
 
+stage_environment() {
+    [[ -x "${MPLIB_PYTHON}" ]] || {
+        echo "MPlib environment is missing: ${MPLIB_PYTHON}" >&2
+        exit 1
+    }
+    [[ -d "${MANISKILL_PANDA_DIR}" ]] || {
+        echo "ManiSkill Panda assets are missing: ${MANISKILL_PANDA_DIR}" >&2
+        exit 1
+    }
+    export PYTHONPATH=.
+    export MUJOCO_GL="${MUJOCO_GL:-egl}"
+    export PYOPENGL_PLATFORM="${PYOPENGL_PLATFORM:-egl}"
+    export MUJOCO_EGL_DEVICE_ID="${RENDER_GPU}"
+    export MEMBENCH_MPLIB_PYTHON="${MEMBENCH_MPLIB_PYTHON:-${MPLIB_PYTHON}}"
+    export MEMBENCH_MANISKILL_PANDA_DIR="${MEMBENCH_MANISKILL_PANDA_DIR:-${MANISKILL_PANDA_DIR}}"
+    export NO_PROXY="${NO_PROXY:+${NO_PROXY},}127.0.0.1,localhost"
+    export no_proxy="${no_proxy:+${no_proxy},}127.0.0.1,localhost"
+}
+
+run_stage_prefix() {
+    validate_common
+    [[ -f "${ROOT}/${STAGE_SUITE}" || -f "${STAGE_SUITE}" ]] || {
+        echo "Stage suite is missing: ${STAGE_SUITE}" >&2
+        exit 1
+    }
+    cd "${ROOT}"
+    stage_environment
+    "${ROBOCASA_PYTHON}" scripts/eval/build_expert_prefixes.py \
+        --stage-suite "${STAGE_SUITE}" \
+        --output-root "${PREFIX_ROOT}"
+}
+
+run_stage_eval() {
+    local video_args=()
+    validate_common
+    [[ -d "${PREFIX_ROOT}" ]] || {
+        echo "Expert prefix root is missing: ${PREFIX_ROOT}" >&2
+        exit 1
+    }
+    [[ -f "${MAIN_ROLLOUT_RUN}/summary.json" ]] || {
+        echo "Completed main rollout is required: ${MAIN_ROLLOUT_RUN}" >&2
+        exit 1
+    }
+    if [[ "${STAGE_RECORD_VIDEO}" == "1" ]]; then
+        video_args=(--record-video)
+    elif [[ "${STAGE_RECORD_VIDEO}" == "0" ]]; then
+        video_args=(--no-record-video)
+    else
+        echo "STAGE_RECORD_VIDEO must be 0 or 1" >&2
+        exit 2
+    fi
+    cd "${ROOT}"
+    stage_environment
+    "${ROBOCASA_PYTHON}" scripts/eval/run_stage_remote.py \
+        --endpoint "ws://${SERVER_HOST}:${PORT}" \
+        --stage-suite "${STAGE_SUITE}" \
+        --prefix-root "${PREFIX_ROOT}" \
+        --main-rollout-run "${MAIN_ROLLOUT_RUN}" \
+        --output-root "${STAGE_OUTPUT_ROOT}" \
+        --run-id "${STAGE_RUN_ID}" \
+        "${video_args[@]}"
+}
+
+run_stage_summary() {
+    validate_common
+    cd "${ROOT}"
+    "${ROBOCASA_PYTHON}" scripts/eval/summarize_stage_run.py \
+        "${STAGE_OUTPUT_ROOT}/${STAGE_RUN_ID}"
+}
+
 status() {
     if [[ -f "${PID_FILE}" ]] && kill -0 "$(<"${PID_FILE}")" 2>/dev/null; then
         echo "Server ${PORT}: running (pid $(<"${PID_FILE}"), checkpoint ${CKPT_STEP})"
@@ -214,6 +293,9 @@ case "${1:-}" in
     preflight) run_preflight ;;
     eval) run_eval ;;
     summary) run_summary ;;
+    stage-prefix) run_stage_prefix ;;
+    stage-eval) run_stage_eval ;;
+    stage-summary) run_stage_summary ;;
     stop) stop_server ;;
     status) status ;;
     full) run_full ;;

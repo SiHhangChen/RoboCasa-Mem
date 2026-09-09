@@ -28,6 +28,7 @@ class ExpertPrefixArtifact:
     stage_boundary_steps: Mapping[str, int]
     actions: np.ndarray
     success: bool
+    stage_order: tuple[str, ...] | None = None
     failure_reason: str | None = None
     diagnostics: Mapping[str, Any] = field(default_factory=dict)
     provenance: Mapping[str, Any] = field(default_factory=dict)
@@ -35,9 +36,17 @@ class ExpertPrefixArtifact:
     def __post_init__(self) -> None:
         actions = _actions(self.actions)
         boundaries = {str(key): int(value) for key, value in self.stage_boundary_steps.items()}
-        if any(step <= 0 or step > int(actions.shape[0]) for step in boundaries.values()):
+        stage_order = tuple(
+            str(value)
+            for value in (
+                tuple(boundaries) if self.stage_order is None else self.stage_order
+            )
+        )
+        if len(stage_order) != len(set(stage_order)) or set(stage_order) != set(boundaries):
+            raise ValueError("expert prefix stage_order must match stage boundaries")
+        if any(step < 0 or step > int(actions.shape[0]) for step in boundaries.values()):
             raise ValueError("expert prefix stage boundaries must index recorded actions")
-        ordered = list(boundaries.values())
+        ordered = [boundaries[stage_id] for stage_id in stage_order]
         if ordered != sorted(ordered):
             raise ValueError("expert prefix stage boundaries must be monotonic")
         object.__setattr__(self, "task_id", str(self.task_id))
@@ -45,6 +54,7 @@ class ExpertPrefixArtifact:
         object.__setattr__(self, "episode_identity", str(self.episode_identity))
         object.__setattr__(self, "expert_plan_version", str(self.expert_plan_version))
         object.__setattr__(self, "stage_boundary_steps", boundaries)
+        object.__setattr__(self, "stage_order", stage_order)
         object.__setattr__(self, "actions", actions)
         object.__setattr__(self, "diagnostics", dict(self.diagnostics or {}))
         object.__setattr__(self, "provenance", dict(self.provenance or {}))
@@ -82,6 +92,7 @@ class ExpertPrefixArtifact:
             "action_schema": ACTION_SCHEMA,
             "action_count": int(self.actions.shape[0]),
             "action_sha256": action_hash,
+            "stage_order": list(self.stage_order or ()),
             "stage_boundary_steps": dict(self.stage_boundary_steps),
             "success": bool(self.success),
             "failure_reason": self.failure_reason,
@@ -97,6 +108,9 @@ def capture_expert_trajectory(
     stage_ids: Sequence[str],
     stage_state_builder: Callable[[Any], Any],
     stage_completed: Callable[[Any, str], bool],
+    stage_boundary_builder: (
+        Callable[[Any, Any, Mapping[str, int]], Mapping[str, int]] | None
+    ) = None,
     provenance: Mapping[str, Any] | None = None,
 ) -> ExpertPrefixArtifact:
     """Run the existing expert while tapping every low-level ``env.step``."""
@@ -111,6 +125,7 @@ def capture_expert_trajectory(
 
     actions: list[np.ndarray] = []
     boundaries: dict[str, int] = {}
+    expert_stage_end_steps: dict[str, int] = {}
     original_step = env.step
 
     def tapped_step(action: Any) -> Any:
@@ -123,12 +138,43 @@ def capture_expert_trajectory(
                 boundaries[str(stage_id)] = len(actions)
         return result
 
+    def stage_finished(index: int, stage: Any, result: Any) -> None:
+        if not bool(getattr(result, "success", False)):
+            return
+        stage_name = str(getattr(stage, "name", "")).strip() or f"stage_{index}"
+        if stage_name in expert_stage_end_steps:
+            raise ValueError(f"duplicate expert stage name during capture: {stage_name!r}")
+        expert_stage_end_steps[stage_name] = len(actions)
+
     env.step = tapped_step
     expert_result = None
     try:
-        expert_result = runner.run(plan)
+        expert_result = runner.run(plan, on_stage_end=stage_finished)
     finally:
         env.step = original_step
+
+    if stage_boundary_builder is not None:
+        resolved = {
+            str(stage_id): int(step)
+            for stage_id, step in stage_boundary_builder(
+                runtime,
+                plan,
+                expert_stage_end_steps,
+            ).items()
+        }
+        unknown = sorted(set(resolved) - {str(stage_id) for stage_id in stage_ids})
+        if unknown:
+            raise ValueError(
+                f"expert stage boundary builder returned unknown stages: {unknown}"
+            )
+        invalid = {
+            stage_id: step
+            for stage_id, step in resolved.items()
+            if step < 0 or step > len(actions)
+        }
+        if invalid:
+            raise ValueError(f"expert stage boundary builder returned invalid steps: {invalid}")
+        boundaries.update(resolved)
 
     diagnostics_obj = runtime.diagnostics()
     diagnostics = {
@@ -136,6 +182,7 @@ def capture_expert_trajectory(
         "terminal": bool(diagnostics_obj.terminal),
         "failure_code": diagnostics_obj.failure_code,
         **dict(diagnostics_obj.details or {}),
+        "expert_stage_end_steps": dict(expert_stage_end_steps),
     }
     success = bool(expert_result.success and diagnostics_obj.success)
     failure_reason = None if success else str(
@@ -149,6 +196,15 @@ def capture_expert_trajectory(
         stage_boundary_steps=boundaries,
         actions=np.stack(actions) if actions else np.empty((0, ACTION_DIM), dtype=np.float32),
         success=success,
+        stage_order=tuple(
+            sorted(
+                boundaries,
+                key=lambda stage_id: (
+                    boundaries[stage_id],
+                    tuple(str(value) for value in stage_ids).index(stage_id),
+                ),
+            )
+        ),
         failure_reason=failure_reason,
         diagnostics=diagnostics,
         provenance=dict(provenance or {}),
@@ -196,6 +252,11 @@ def load_expert_prefix(root: str | Path, seed: int) -> ExpertPrefixArtifact:
         stage_boundary_steps=dict(manifest["stage_boundary_steps"]),
         actions=actions,
         success=bool(manifest["success"]),
+        stage_order=(
+            None
+            if manifest.get("stage_order") is None
+            else tuple(str(value) for value in manifest["stage_order"])
+        ),
         failure_reason=manifest.get("failure_reason"),
         diagnostics=dict(manifest.get("diagnostics") or {}),
         provenance=dict(manifest.get("provenance") or {}),

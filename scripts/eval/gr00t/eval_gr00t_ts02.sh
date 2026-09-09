@@ -5,6 +5,9 @@
 #   PORT=57010 ./scripts/eval/gr00t/eval_gr00t_ts02.sh preflight
 #   PORT=57010 ./scripts/eval/gr00t/eval_gr00t_ts02.sh eval
 #   PORT=57010 ./scripts/eval/gr00t/eval_gr00t_ts02.sh summary
+#   ./scripts/eval/gr00t/eval_gr00t_ts02.sh stage-prefix
+#   PORT=57010 ./scripts/eval/gr00t/eval_gr00t_ts02.sh stage-eval
+#   ./scripts/eval/gr00t/eval_gr00t_ts02.sh stage-summary
 #   PORT=57010 ./scripts/eval/gr00t/eval_gr00t_ts02.sh stop
 #
 # Override CKPT_DIR, GPU, PORT, RUN_ID, BASE_MODEL_DIR, VLM_MODEL_DIR,
@@ -13,9 +16,13 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-CKPT_ROOT="${ROOT}/ckpts/gr00t/ts02"
+CKPT_ROOT="${CKPT_ROOT:-${ROOT}/ckpts/gr00t/ts02}"
+if [[ ! -d "${CKPT_ROOT}" && -d "${ROOT}/../ckpts/gr00t/ts02" ]]; then
+    CKPT_ROOT="${ROOT}/../ckpts/gr00t/ts02"
+fi
 
-CKPT_DIR="${CKPT_DIR:-${CKPT_ROOT}/100000/pretrained_model}"
+CKPT_STEP="${CKPT_STEP:-100000}"
+CKPT_DIR="${CKPT_DIR:-${CKPT_ROOT}/${CKPT_STEP}/pretrained_model}"
 BASE_MODEL_DIR="${BASE_MODEL_DIR:-/data/shared_workspace/chensihang/pretrained/GR00T-N1.7-3B}"
 VLM_MODEL_DIR="${VLM_MODEL_DIR:-/data/shared_workspace/chensihang/pretrained/Cosmos-Reason2-2B}"
 SUITE="${SUITE:-configs/eval/suites/ts02_v1.yaml}"
@@ -24,11 +31,19 @@ SERVER_HOST="${SERVER_HOST:-127.0.0.1}"
 SERVER_INFERENCE_TIMEOUT_S="${SERVER_INFERENCE_TIMEOUT_S:-300}"
 PORT="${PORT:-57010}"
 GPU="${GPU:-2}"
+RENDER_GPU="${RENDER_GPU:-${GPU}}"
 RETRY_ERRORS="${RETRY_ERRORS:-0}"
 
-CKPT_STEP="$(basename "$(dirname "${CKPT_DIR}")")"
 RUN_ID="${RUN_ID:-ts02-gr00t-${CKPT_STEP}-50seeds-r50}"
+STAGE_SUITE="${STAGE_SUITE:-configs/eval/stages/ts02_gr00t_r40_formal_v1.yaml}"
+PREFIX_ROOT="${PREFIX_ROOT:-}"
+STAGE_OUTPUT_ROOT="${STAGE_OUTPUT_ROOT:-outputs/stage_eval}"
+STAGE_RUN_ID="${STAGE_RUN_ID:-ts02-gr00t-${CKPT_STEP}-stage-50seeds-r40-formal-v1}"
+STAGE_RECORD_VIDEO="${STAGE_RECORD_VIDEO:-}"
+MAIN_ROLLOUT_RUN="${MAIN_ROLLOUT_RUN:-${OUTPUT_ROOT}/ts02-gr00t-${CKPT_STEP}-50seeds-r40}"
 LOG_DIR="${OUTPUT_ROOT}/logs"
+PID_FILE="${LOG_DIR}/serve_gr00t_ts02_${PORT}.pid"
+LOG_FILE="${LOG_DIR}/serve_gr00t_ts02_${PORT}.log"
 
 GROOT_PYTHON="${GROOT_PYTHON:-${ROOT}/.venv-gr00t/bin/python}"
 ROBOCASA_PYTHON="${ROBOCASA_PYTHON:-${ROOT}/.venv-robocasa/bin/python}"
@@ -36,7 +51,7 @@ MPLIB_PYTHON="${MPLIB_PYTHON:-${ROOT}/.venv-mplib/bin/python}"
 MANISKILL_PANDA_DIR="${MANISKILL_PANDA_DIR:-${ROOT}/.venv-robocasa/lib/python3.11/site-packages/mani_skill/assets/robots/panda}"
 
 usage() {
-    sed -n '2,12p' "${BASH_SOURCE[0]}" | sed -n 's/^# \{0,1\}//p'
+    sed -n '2,15p' "${BASH_SOURCE[0]}" | sed -n 's/^# \{0,1\}//p'
 }
 
 validate_common() {
@@ -71,11 +86,9 @@ validate_server() {
 }
 
 serve_foreground() {
-    local pid_file="${LOG_DIR}/serve_gr00t_ts02_${PORT}.pid"
-
     validate_server
     mkdir -p "${LOG_DIR}"
-    echo $$ >"${pid_file}"
+    echo $$ >"${PID_FILE}"
     cd "${ROOT}"
     export CUDA_VISIBLE_DEVICES="${GPU}"
     exec "${GROOT_PYTHON}" scripts/serve/serve_gr00t.py \
@@ -89,14 +102,36 @@ serve_foreground() {
         --port "${PORT}"
 }
 
+start_server() {
+    validate_server
+    mkdir -p "${LOG_DIR}"
+    if [[ -f "${PID_FILE}" ]] && kill -0 "$(<"${PID_FILE}")" 2>/dev/null; then
+        echo "GR00T server ${PORT} is already running (pid $(<"${PID_FILE}"))"
+        return 0
+    fi
+    cd "${ROOT}"
+    CUDA_VISIBLE_DEVICES="${GPU}" nohup "${GROOT_PYTHON}" scripts/serve/serve_gr00t.py \
+        --checkpoint "${CKPT_DIR}" \
+        --base-model-dir "${BASE_MODEL_DIR}" \
+        --vlm-model-dir "${VLM_MODEL_DIR}" \
+        --image-size 224 \
+        --state-schema membench.robot_state37.v2 \
+        --inference-timeout-s "${SERVER_INFERENCE_TIMEOUT_S}" \
+        --host 0.0.0.0 \
+        --port "${PORT}" \
+        >"${LOG_FILE}" 2>&1 &
+    echo $! >"${PID_FILE}"
+    echo "Started GR00T server ${PORT} (pid $!, GPU ${GPU}, checkpoint ${CKPT_STEP})"
+    echo "Log: ${LOG_FILE}"
+}
+
 stop_server() {
-    local pid_file="${LOG_DIR}/serve_gr00t_ts02_${PORT}.pid"
-    if [[ -f "${pid_file}" ]] && kill -0 "$(<"${pid_file}")" 2>/dev/null; then
-        kill "$(<"${pid_file}")"
-        rm -f "${pid_file}"
+    if [[ -f "${PID_FILE}" ]] && kill -0 "$(<"${PID_FILE}")" 2>/dev/null; then
+        kill "$(<"${PID_FILE}")"
+        rm -f "${PID_FILE}"
         echo "Stopped GR00T server ${PORT}"
     else
-        rm -f "${pid_file}" 2>/dev/null || true
+        rm -f "${PID_FILE}" 2>/dev/null || true
         echo "GR00T server ${PORT} is not running"
     fi
 }
@@ -130,6 +165,7 @@ run_eval() {
     export PYTHONPATH=.
     export MUJOCO_GL="${MUJOCO_GL:-egl}"
     export PYOPENGL_PLATFORM="${PYOPENGL_PLATFORM:-egl}"
+    export MUJOCO_EGL_DEVICE_ID="${RENDER_GPU}"
     export MEMBENCH_MPLIB_PYTHON="${MEMBENCH_MPLIB_PYTHON:-${MPLIB_PYTHON}}"
     export MEMBENCH_MANISKILL_PANDA_DIR="${MEMBENCH_MANISKILL_PANDA_DIR:-${MANISKILL_PANDA_DIR}}"
     "${ROBOCASA_PYTHON}" scripts/eval/run_remote.py \
@@ -146,20 +182,84 @@ run_summary() {
     "${ROBOCASA_PYTHON}" scripts/eval/summarize_run.py "${OUTPUT_ROOT}/${RUN_ID}"
 }
 
+run_stage_prefix() {
+    local prefix_args=()
+
+    validate_common
+    if [[ -n "${PREFIX_ROOT}" ]]; then
+        prefix_args=(--output-root "${PREFIX_ROOT}")
+    fi
+    cd "${ROOT}"
+    export PYTHONPATH=.
+    export MUJOCO_GL="${MUJOCO_GL:-egl}"
+    export PYOPENGL_PLATFORM="${PYOPENGL_PLATFORM:-egl}"
+    export MUJOCO_EGL_DEVICE_ID="${RENDER_GPU}"
+    export MEMBENCH_MPLIB_PYTHON="${MEMBENCH_MPLIB_PYTHON:-${MPLIB_PYTHON}}"
+    export MEMBENCH_MANISKILL_PANDA_DIR="${MEMBENCH_MANISKILL_PANDA_DIR:-${MANISKILL_PANDA_DIR}}"
+    "${ROBOCASA_PYTHON}" scripts/eval/build_expert_prefixes.py \
+        --stage-suite "${STAGE_SUITE}" \
+        "${prefix_args[@]}"
+}
+
+run_stage_eval() {
+    local prefix_args=()
+    local video_args=()
+
+    validate_common
+    if [[ -n "${PREFIX_ROOT}" ]]; then
+        prefix_args=(--prefix-root "${PREFIX_ROOT}")
+    fi
+    if [[ "${STAGE_RECORD_VIDEO}" == "0" ]]; then
+        video_args=(--no-record-video)
+    elif [[ "${STAGE_RECORD_VIDEO}" == "1" ]]; then
+        video_args=(--record-video)
+    elif [[ -n "${STAGE_RECORD_VIDEO}" ]]; then
+        echo "STAGE_RECORD_VIDEO must be 0, 1, or empty" >&2
+        exit 2
+    fi
+    cd "${ROOT}"
+    export PYTHONPATH=.
+    export MUJOCO_GL="${MUJOCO_GL:-egl}"
+    export PYOPENGL_PLATFORM="${PYOPENGL_PLATFORM:-egl}"
+    export MUJOCO_EGL_DEVICE_ID="${RENDER_GPU}"
+    export MEMBENCH_MPLIB_PYTHON="${MEMBENCH_MPLIB_PYTHON:-${MPLIB_PYTHON}}"
+    export MEMBENCH_MANISKILL_PANDA_DIR="${MEMBENCH_MANISKILL_PANDA_DIR:-${MANISKILL_PANDA_DIR}}"
+    export NO_PROXY="${NO_PROXY:+${NO_PROXY},}127.0.0.1,localhost"
+    export no_proxy="${no_proxy:+${no_proxy},}127.0.0.1,localhost"
+    "${ROBOCASA_PYTHON}" scripts/eval/run_stage_remote.py \
+        --endpoint "ws://${SERVER_HOST}:${PORT}" \
+        --stage-suite "${STAGE_SUITE}" \
+        --main-rollout-run "${MAIN_ROLLOUT_RUN}" \
+        --output-root "${STAGE_OUTPUT_ROOT}" \
+        --run-id "${STAGE_RUN_ID}" \
+        "${prefix_args[@]}" \
+        "${video_args[@]}"
+}
+
+run_stage_summary() {
+    validate_common
+    cd "${ROOT}"
+    "${ROBOCASA_PYTHON}" scripts/eval/summarize_stage_run.py \
+        "${STAGE_OUTPUT_ROOT}/${STAGE_RUN_ID}"
+}
+
 status() {
-    local pid_file="${LOG_DIR}/serve_gr00t_ts02_${PORT}.pid"
-    if [[ -f "${pid_file}" ]] && kill -0 "$(<"${pid_file}")" 2>/dev/null; then
-        echo "GR00T server ${PORT}: running (pid $(<"${pid_file}"), checkpoint ${CKPT_STEP})"
+    if [[ -f "${PID_FILE}" ]] && kill -0 "$(<"${PID_FILE}")" 2>/dev/null; then
+        echo "GR00T server ${PORT}: running (pid $(<"${PID_FILE}"), checkpoint ${CKPT_STEP})"
     else
         echo "GR00T server ${PORT}: not running"
     fi
 }
 
 case "${1:-}" in
+    start) start_server ;;
     serve-fg|serve) serve_foreground ;;
     preflight) run_preflight ;;
     eval) run_eval ;;
     summary) run_summary ;;
+    stage-prefix) run_stage_prefix ;;
+    stage-eval) run_stage_eval ;;
+    stage-summary) run_stage_summary ;;
     stop) stop_server ;;
     status) status ;;
     help|-h|--help) usage ;;

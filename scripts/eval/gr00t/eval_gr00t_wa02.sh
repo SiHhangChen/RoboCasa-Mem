@@ -1,86 +1,213 @@
 #!/usr/bin/env bash
+# Evaluate one GR00T N1.7 LoRA checkpoint on the 50-seed WA-02 suite.
 #
-# 评测 GR00T N1.7 LoRA checkpoint(WA-02)的可复用入口。
+#   GPU=2 PORT=57120 CKPT_STEP=100000 ./scripts/eval/gr00t/eval_gr00t_wa02.sh start
+#   PORT=57120 CKPT_STEP=100000 ./scripts/eval/gr00t/eval_gr00t_wa02.sh wait
+#   PORT=57120 CKPT_STEP=100000 ./scripts/eval/gr00t/eval_gr00t_wa02.sh preflight
+#   PORT=57120 CKPT_STEP=100000 ./scripts/eval/gr00t/eval_gr00t_wa02.sh eval
+#   PORT=57120 CKPT_STEP=100000 ./scripts/eval/gr00t/eval_gr00t_wa02.sh summary
+#   PORT=57120 CKPT_STEP=100000 ./scripts/eval/gr00t/eval_gr00t_wa02.sh stop
 #
-# 用法(各子命令在对应终端执行):
-#   ./scripts/eval/gr00t/eval_gr00t_wa02.sh serve      终端1:启动 GR00T 策略服务(常驻)
-#   ./scripts/eval/gr00t/eval_gr00t_wa02.sh preflight  终端2:协议 preflight 检查
-#   ./scripts/eval/gr00t/eval_gr00t_wa02.sh eval       终端2:闭环评测
-#   ./scripts/eval/gr00t/eval_gr00t_wa02.sh summary    任意终端:重建评测汇总
-#
-# 可通过环境变量覆盖(保持默认即可复用):
-#   CKPT_DIR          checkpoint 目录,默认 ckpts/gr00t/WA02/100000/pretrained_model
-#   BASE_MODEL_DIR    NVIDIA 原版 GR00T-N1.7-3B 目录
-#   VLM_MODEL_DIR     Cosmos-Reason2-2B 目录(vlm_encode tokenizer)
-#   SUITE             评测 suite,默认 configs/eval/suites/wa02_v1.yaml
-#   RUN_ID            评测运行 ID,默认 wa02-gr00t-lora-100000
-#   OUTPUT_ROOT       评测输出根目录,默认 outputs/eval
-#   SERVER_HOST       客户端连接的服务端地址,默认 127.0.0.1(同机)
-#   PORT              服务端端口,默认 8000
+# These checkpoints have a 40-action horizon, so this launcher defaults to the
+# GR00T r40 suite instead of the canonical WA-02 suite's replan_steps=50.
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+CKPT_ROOT="${CKPT_ROOT:-/data/chensihang/ckpts/gr00t/wa02}"
 
-CKPT_DIR="${CKPT_DIR:-${ROOT}/ckpts/gr00t/WA02/090000/pretrained_model}"
-BASE_MODEL_DIR="${BASE_MODEL_DIR:-/home/user/chensihang/pretrained/GR00T-N1.7-3B}"
-VLM_MODEL_DIR="${VLM_MODEL_DIR:-/home/user/chensihang/pretrained/Cosmos-Reason2-2B}"
-SUITE="${SUITE:-configs/eval/suites/wa02_v1.yaml}"
-RUN_ID="${RUN_ID:-wa02-gr00t-lora-90000}"
+CKPT_STEP="${CKPT_STEP:-100000}"
+CKPT_DIR="${CKPT_DIR:-${CKPT_ROOT}/${CKPT_STEP}/pretrained_model}"
+BASE_MODEL_DIR="${BASE_MODEL_DIR:-/data/shared_workspace/chensihang/pretrained/GR00T-N1.7-3B}"
+VLM_MODEL_DIR="${VLM_MODEL_DIR:-/data/shared_workspace/chensihang/pretrained/Cosmos-Reason2-2B}"
+SUITE="${SUITE:-configs/eval/legacy_suites/wa02_gr00t_r40_v1.yaml}"
 OUTPUT_ROOT="${OUTPUT_ROOT:-outputs/eval}"
 SERVER_HOST="${SERVER_HOST:-127.0.0.1}"
-PORT="${PORT:-8000}"
+SERVER_INFERENCE_TIMEOUT_S="${SERVER_INFERENCE_TIMEOUT_S:-300}"
+PORT="${PORT:-57120}"
+GPU="${GPU:-2}"
+RENDER_GPU="${RENDER_GPU:-${GPU}}"
+RETRY_ERRORS="${RETRY_ERRORS:-0}"
 
-GROOT_PYTHON="/home/user/anaconda3/envs/lerobot061/bin/python"
-[[ -x "${GROOT_PYTHON}" ]] || GROOT_PYTHON="${ROOT}/policy/lerobot-0.6.1/.venv/bin/python"
-ROBOCASA_RUN=(conda run -n robocasa)
+# CKPT_DIR overrides win: recover the step label from the checkpoint path.
+CKPT_STEP="$(basename "$(dirname "${CKPT_DIR}")")"
+RUN_ID="${RUN_ID:-wa02-gr00t-${CKPT_STEP}-50seeds-r40}"
+LOG_DIR="${OUTPUT_ROOT}/logs"
+PID_FILE="${LOG_DIR}/serve_gr00t_wa02_${PORT}.pid"
+LOG_FILE="${LOG_DIR}/serve_gr00t_wa02_${PORT}.log"
+
+GROOT_PYTHON="${GROOT_PYTHON:-${ROOT}/.venv-gr00t/bin/python}"
+ROBOCASA_PYTHON="${ROBOCASA_PYTHON:-${ROOT}/.venv-robocasa/bin/python}"
+MPLIB_PYTHON="${MPLIB_PYTHON:-${ROOT}/.venv-mplib/bin/python}"
+MANISKILL_PANDA_DIR="${MANISKILL_PANDA_DIR:-${ROOT}/.venv-robocasa/lib/python3.11/site-packages/mani_skill/assets/robots/panda}"
+
+SERVER_ARGS=(
+    scripts/serve/serve_gr00t.py
+    --checkpoint "${CKPT_DIR}"
+    --base-model-dir "${BASE_MODEL_DIR}"
+    --vlm-model-dir "${VLM_MODEL_DIR}"
+    --image-size 224
+    --state-schema membench.robot_state37.v2
+    --inference-timeout-s "${SERVER_INFERENCE_TIMEOUT_S}"
+    --host 0.0.0.0
+    --port "${PORT}"
+)
 
 usage() {
-    sed -n '2,40p' "${BASH_SOURCE[0]}" | grep -E '^#' | sed 's/^# \{0,1\}//'
-    exit 0
+    sed -n '2,16p' "${BASH_SOURCE[0]}" | sed -n 's/^# \{0,1\}//p'
+}
+
+validate_common() {
+    [[ -x "${ROBOCASA_PYTHON}" ]] || {
+        echo "RoboCasa environment is missing: ${ROBOCASA_PYTHON}" >&2
+        exit 1
+    }
+    [[ -f "${ROOT}/${SUITE}" || -f "${SUITE}" ]] || {
+        echo "Evaluation suite is missing: ${SUITE}" >&2
+        exit 1
+    }
+}
+
+validate_server() {
+    validate_common
+    [[ -x "${GROOT_PYTHON}" ]] || {
+        echo "GR00T environment is missing: ${GROOT_PYTHON}" >&2
+        exit 1
+    }
+    [[ -f "${CKPT_DIR}/train_config.json" ]] || {
+        echo "GR00T checkpoint is missing: ${CKPT_DIR}" >&2
+        exit 1
+    }
+    [[ -f "${BASE_MODEL_DIR}/config.json" ]] || {
+        echo "GR00T base model is missing: ${BASE_MODEL_DIR}" >&2
+        exit 1
+    }
+    [[ -f "${VLM_MODEL_DIR}/tokenizer.json" ]] || {
+        echo "Cosmos tokenizer is missing: ${VLM_MODEL_DIR}" >&2
+        exit 1
+    }
+}
+
+serve_foreground() {
+    validate_server
+    mkdir -p "${LOG_DIR}"
+    echo $$ >"${PID_FILE}"
+    cd "${ROOT}"
+    export CUDA_VISIBLE_DEVICES="${GPU}"
+    exec "${GROOT_PYTHON}" "${SERVER_ARGS[@]}"
+}
+
+start_server() {
+    validate_server
+    mkdir -p "${LOG_DIR}"
+    if [[ -f "${PID_FILE}" ]] && kill -0 "$(<"${PID_FILE}")" 2>/dev/null; then
+        echo "GR00T server ${PORT} is already running (pid $(<"${PID_FILE}"))"
+        return 0
+    fi
+    cd "${ROOT}"
+    CUDA_VISIBLE_DEVICES="${GPU}" nohup "${GROOT_PYTHON}" "${SERVER_ARGS[@]}" \
+        >"${LOG_FILE}" 2>&1 &
+    echo $! >"${PID_FILE}"
+    echo "Started GR00T server ${PORT} (pid $!, GPU ${GPU}, checkpoint ${CKPT_STEP})"
+    echo "Log: ${LOG_FILE}"
+}
+
+stop_server() {
+    if [[ -f "${PID_FILE}" ]] && kill -0 "$(<"${PID_FILE}")" 2>/dev/null; then
+        kill "$(<"${PID_FILE}")"
+        rm -f "${PID_FILE}"
+        echo "Stopped GR00T server ${PORT}"
+    else
+        rm -f "${PID_FILE}" 2>/dev/null || true
+        echo "GR00T server ${PORT} is not running"
+    fi
+}
+
+wait_for_server() {
+    local attempts="${WAIT_ATTEMPTS:-120}"
+    local delay="${WAIT_DELAY_S:-10}"
+    for ((i = 1; i <= attempts; i++)); do
+        if grep -q "server listening" "${LOG_FILE}" 2>/dev/null; then
+            echo "GR00T server ${PORT} is ready"
+            return 0
+        fi
+        if [[ -f "${PID_FILE}" ]] && ! kill -0 "$(<"${PID_FILE}")" 2>/dev/null; then
+            echo "GR00T server ${PORT} died during startup; see ${LOG_FILE}" >&2
+            return 1
+        fi
+        sleep "${delay}"
+    done
+    echo "GR00T server ${PORT} did not become ready; see ${LOG_FILE}" >&2
+    return 1
+}
+
+run_preflight() {
+    validate_common
+    cd "${ROOT}"
+    "${ROBOCASA_PYTHON}" scripts/eval/run_remote.py \
+        --endpoint "ws://${SERVER_HOST}:${PORT}" \
+        --suite "${SUITE}" \
+        --preflight-only
+}
+
+run_eval() {
+    local retry_args=()
+
+    validate_common
+    [[ -x "${MPLIB_PYTHON}" ]] || {
+        echo "MPlib environment is missing: ${MPLIB_PYTHON}" >&2
+        exit 1
+    }
+    [[ -d "${MANISKILL_PANDA_DIR}" ]] || {
+        echo "ManiSkill Panda assets are missing: ${MANISKILL_PANDA_DIR}" >&2
+        exit 1
+    }
+    if [[ "${RETRY_ERRORS}" == "1" ]]; then
+        retry_args=(--retry-errors)
+    fi
+
+    cd "${ROOT}"
+    export PYTHONPATH=.
+    export MUJOCO_GL="${MUJOCO_GL:-egl}"
+    export PYOPENGL_PLATFORM="${PYOPENGL_PLATFORM:-egl}"
+    export MUJOCO_EGL_DEVICE_ID="${RENDER_GPU}"
+    export MEMBENCH_MPLIB_PYTHON="${MEMBENCH_MPLIB_PYTHON:-${MPLIB_PYTHON}}"
+    export MEMBENCH_MANISKILL_PANDA_DIR="${MEMBENCH_MANISKILL_PANDA_DIR:-${MANISKILL_PANDA_DIR}}"
+    "${ROBOCASA_PYTHON}" scripts/eval/run_remote.py \
+        --endpoint "ws://${SERVER_HOST}:${PORT}" \
+        --suite "${SUITE}" \
+        --output-root "${OUTPUT_ROOT}" \
+        --run-id "${RUN_ID}" \
+        "${retry_args[@]}"
+}
+
+run_summary() {
+    validate_common
+    cd "${ROOT}"
+    "${ROBOCASA_PYTHON}" scripts/eval/summarize_run.py "${OUTPUT_ROOT}/${RUN_ID}"
+}
+
+status() {
+    if [[ -f "${PID_FILE}" ]] && kill -0 "$(<"${PID_FILE}")" 2>/dev/null; then
+        echo "GR00T server ${PORT}: running (pid $(<"${PID_FILE}"), checkpoint ${CKPT_STEP})"
+    else
+        echo "GR00T server ${PORT}: not running"
+    fi
 }
 
 case "${1:-}" in
-    serve)
-        [[ -x "${GROOT_PYTHON}" ]] || { echo "GR00T python 不存在: ${GROOT_PYTHON}" >&2; exit 1; }
-        [[ -f "${CKPT_DIR}/train_config.json" ]] || { echo "checkpoint 不存在: ${CKPT_DIR}" >&2; exit 1; }
-        cd "${ROOT}"
-        exec "${GROOT_PYTHON}" scripts/serve/serve_gr00t.py \
-            --checkpoint "${CKPT_DIR}" \
-            --base-model-dir "${BASE_MODEL_DIR}" \
-            --vlm-model-dir "${VLM_MODEL_DIR}" \
-            --image-size 224 \
-            --state-schema membench.robot_state37.v2 \
-            --host 0.0.0.0 \
-            --port "${PORT}"
-        ;;
-    preflight)
-        cd "${ROOT}"
-        "${ROBOCASA_RUN[@]}" python scripts/eval/run_remote.py \
-            --endpoint "ws://${SERVER_HOST}:${PORT}" \
-            --suite "${SUITE}" \
-            --preflight-only
-        ;;
-    eval)
-        cd "${ROOT}"
-        export PYTHONPATH=.
-        export MUJOCO_GL="${MUJOCO_GL:-egl}"
-        export PYOPENGL_PLATFORM="${PYOPENGL_PLATFORM:-egl}"
-        "${ROBOCASA_RUN[@]}" python scripts/eval/run_remote.py \
-            --endpoint "ws://${SERVER_HOST}:${PORT}" \
-            --suite "${SUITE}" \
-            --output-root "${OUTPUT_ROOT}" \
-            --run-id "${RUN_ID}"
-        ;;
-    summary)
-        cd "${ROOT}"
-        "${ROBOCASA_RUN[@]}" python scripts/eval/summarize_run.py "${OUTPUT_ROOT}/${RUN_ID}"
-        ;;
-    help|-h|--help)
-        usage
-        ;;
+    start) start_server ;;
+    serve-fg|serve) serve_foreground ;;
+    wait) wait_for_server ;;
+    preflight) run_preflight ;;
+    eval) run_eval ;;
+    summary) run_summary ;;
+    stop) stop_server ;;
+    status) status ;;
+    help|-h|--help) usage ;;
     *)
-        echo "未知子命令: ${1:-}" >&2
-        usage
+        echo "Unknown command: ${1:-}" >&2
+        usage >&2
+        exit 2
         ;;
 esac

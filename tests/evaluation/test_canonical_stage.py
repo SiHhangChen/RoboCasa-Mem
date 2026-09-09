@@ -130,3 +130,10 @@ def test_recorded_expert_controller_replays_actions_in_order() -> None:
     np.testing.assert_array_equal(expert.predict({}), actions[0])
     np.testing.assert_array_equal(expert.predict({}), actions[1])
     assert expert.remaining_steps == 0
+
+
+def test_recorded_expert_controller_accepts_initial_state_handoff() -> None:
+    expert = RecordedExpertController(np.empty((0, 13), dtype=np.float32))
+
+    assert expert.consumed_steps == 0
+    assert expert.remaining_steps == 0

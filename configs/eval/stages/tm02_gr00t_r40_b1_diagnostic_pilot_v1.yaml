@@ -1,0 +1,20 @@
+stage_suite_version: tm02_gr00t_r40_b1_diagnostic_pilot_v1
+task_id: TM02
+base_suite: ../legacy_suites/tm02_gr00t_r40_v1.yaml
+expert_prefix_root: outputs/stage_prefixes/tm02_gr00t_r40_b1_diagnostic_v1
+stages:
+  - id: faucet_on
+    source: main_rollout
+    model_step_budget: 220
+  - id: pot_filled
+    source: expert_prefix
+    model_step_budget: 400
+  - id: cabinet_opened
+    source: expert_prefix
+    model_step_budget: 1200
+  - id: can_removed_from_cabinet
+    source: expert_prefix
+    model_step_budget: 1100
+  - id: can_released_in_place_region
+    source: expert_prefix
+    model_step_budget: 1100

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 import math
 from statistics import mean, median
 from typing import Any, Sequence
@@ -13,6 +14,7 @@ def summarize_expert_prefixes(
     artifacts: Sequence[ExpertPrefixArtifact],
     *,
     stage_order: Sequence[str],
+    stage_segments: Mapping[str, tuple[str | None, str]] | None = None,
     expected_seeds: Sequence[int] | None = None,
 ) -> dict[str, Any]:
     """Summarize valid prefix lengths and propose conservative stage budgets."""
@@ -20,6 +22,7 @@ def summarize_expert_prefixes(
     stages = tuple(str(value) for value in stage_order)
     if not stages or len(stages) != len(set(stages)):
         raise ValueError("stage_order must contain unique stage ids")
+    segments = _stage_segments(stages, stage_segments)
     items = tuple(artifacts)
     artifact_seeds = [artifact.seed for artifact in items]
     if len(artifact_seeds) != len(set(artifact_seeds)):
@@ -47,20 +50,25 @@ def summarize_expert_prefixes(
 
     lengths: dict[str, list[int]] = {stage_id: [] for stage_id in stages}
     for artifact in valid:
-        previous = 0
         for stage_id in stages:
+            start_stage, end_stage = segments[stage_id]
             try:
-                boundary = int(artifact.stage_boundary_steps[stage_id])
+                start = (
+                    0
+                    if start_stage is None
+                    else int(artifact.stage_boundary_steps[start_stage])
+                )
+                end = int(artifact.stage_boundary_steps[end_stage])
             except KeyError as exc:
                 raise ValueError(
-                    f"seed {artifact.seed} is missing stage boundary {stage_id!r}"
+                    f"seed {artifact.seed} is missing a boundary for stage {stage_id!r}"
                 ) from exc
-            if boundary <= previous or boundary > artifact.actions.shape[0]:
+            if start < 0 or end <= start or end > artifact.actions.shape[0]:
                 raise ValueError(
-                    f"seed {artifact.seed} has invalid boundary {stage_id}={boundary}"
+                    f"seed {artifact.seed} has invalid segment "
+                    f"{stage_id}=({start_stage!r}:{start}, {end_stage!r}:{end})"
                 )
-            lengths[stage_id].append(boundary - previous)
-            previous = boundary
+            lengths[stage_id].append(end - start)
 
     stage_payloads = {
         stage_id: _length_statistics(values)
@@ -78,6 +86,13 @@ def summarize_expert_prefixes(
     return {
         "schema_version": "membench.expert_prefix_summary/v1",
         "stage_order": list(stages),
+        "stage_segments": {
+            stage_id: {
+                "start_boundary": start,
+                "end_boundary": end,
+            }
+            for stage_id, (start, end) in segments.items()
+        },
         "attempted": attempted,
         "recorded": len(items),
         "valid": valid_count,
@@ -104,6 +119,34 @@ def summarize_expert_prefixes(
             ),
         },
     }
+
+
+def _stage_segments(
+    stages: tuple[str, ...],
+    configured: Mapping[str, tuple[str | None, str]] | None,
+) -> dict[str, tuple[str | None, str]]:
+    if configured is None:
+        return {
+            stage_id: (None if index == 0 else stages[index - 1], stage_id)
+            for index, stage_id in enumerate(stages)
+        }
+    if set(configured) != set(stages):
+        raise ValueError("stage_segments keys must match stage_order")
+    segments: dict[str, tuple[str | None, str]] = {}
+    for stage_id in stages:
+        value = configured[stage_id]
+        if not isinstance(value, tuple) or len(value) != 2:
+            raise ValueError("each stage segment must be a (start, end) tuple")
+        start, end = value
+        if start is not None and not str(start):
+            raise ValueError("stage segment start must be non-empty or None")
+        if not str(end):
+            raise ValueError("stage segment end must be non-empty")
+        segments[stage_id] = (
+            None if start is None else str(start),
+            str(end),
+        )
+    return segments
 
 
 def _length_statistics(values: Sequence[int]) -> dict[str, Any]:

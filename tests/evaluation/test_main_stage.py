@@ -74,6 +74,30 @@ def test_main_rollout_stage_result_applies_stage_budget() -> None:
     assert missing.total_model_inference_calls == 30
 
 
+def test_main_rollout_stage_result_supports_strict_diagnostic_stage() -> None:
+    episode = _episode(first_pass_step=None)
+    episode["diagnostics"] = {
+        "stages": {
+            "first_cup_pick": {
+                "qualified": True,
+                "qualified_step": 317,
+            }
+        }
+    }
+
+    result = main_rollout_stage_result(
+        episode,
+        task_id="WA-05",
+        target_stage="first_cup_pick",
+        model_step_budget=1200,
+        replan_steps=50,
+    )
+
+    assert result.status == SUCCESS
+    assert result.success_step == 317
+    assert result.total_model_inference_calls == 7
+
+
 def test_import_main_rollout_stage_validates_identity_and_commits(tmp_path: Path) -> None:
     main_run = tmp_path / "main"
     episode_dir = main_run / "episodes/seed_001050"

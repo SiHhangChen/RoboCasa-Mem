@@ -108,6 +108,43 @@ def test_first_stage_does_not_require_an_expert_controller() -> None:
     assert result.status == SUCCESS
 
 
+def test_first_target_can_replay_an_exact_frozen_prefix_before_handoff() -> None:
+    state = {"prefix_steps": 0, "done": False}
+
+    def step(action: list[int]) -> dict[str, object]:
+        if action == [0]:
+            state["prefix_steps"] += 1
+        else:
+            state["done"] = True
+        return {"observation": dict(state)}
+
+    task = FunctionalStageTask(
+        task_id="TEST",
+        instruction="remember the target",
+        stage_specs=(
+            StageSpec("A", lambda value: value["done"], model_step_budget=1),
+        ),
+        reset_fn=lambda seed: state.update(prefix_steps=0, done=False),
+        observe_fn=lambda: dict(state),
+        privileged_state_fn=lambda: dict(state),
+        step_fn=step,
+    )
+    result = evaluate_stage(
+        task,
+        "A",
+        7,
+        _Model([]),
+        _Expert(),
+        expert_prefix_budget=2,
+        minimum_expert_prefix_steps=2,
+    )
+
+    assert result.status == SUCCESS
+    assert result.expert_prefix_steps == 2
+    assert result.handoff_observation_id == 2
+    assert result.model_control_steps == 1
+
+
 def test_expert_crossing_target_is_invalid_prefix() -> None:
     result = evaluate_stage(_task(cross_target=True), "B", 7, _Model([]), _Expert())
     assert result.status == INVALID_PREFIX
@@ -197,6 +234,30 @@ def test_expert_prefix_matches_action_chunk_replan_cadence() -> None:
     assert model.calls[0]["prefix_steps"] == 0
     assert model.calls[1]["prefix_steps"] == 2
     assert model.calls[2]["prefix_steps"] == 3
+
+
+def test_handoff_can_wait_for_a_minimum_frozen_prefix_length() -> None:
+    model = _Model([])
+    result = evaluate_stage(
+        _task(),
+        "B",
+        7,
+        model,
+        _Expert(),
+        expert_prefix_budget=3,
+        minimum_expert_prefix_steps=3,
+    )
+
+    assert result.status == SUCCESS
+    assert result.expert_prefix_steps == 3
+    assert result.handoff_observation_id == 3
+    assert result.model_control_steps == 1
+    assert [item.action_source for item in result.logs] == [
+        "expert",
+        "expert",
+        "expert",
+        "model",
+    ]
 
 
 def test_expert_cannot_complete_multiple_prefix_stages_in_one_step() -> None:

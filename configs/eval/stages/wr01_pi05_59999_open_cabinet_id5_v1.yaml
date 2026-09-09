@@ -1,0 +1,11 @@
+stage_suite_version: wr01_pi05_59999_open_cabinet_id5_v1
+task_id: WR-01
+base_suite: ../legacy_suites/wr01_id_seeds0_4_r50_t300_v1.yaml
+expert_prefix_root: outputs/stage_prefixes/wr01_dataset_id5_v1
+stages:
+  - id: close_lower_cabinet
+    source: main_rollout
+    model_step_budget: 1200
+  - id: open_cabinet
+    source: expert_prefix
+    model_step_budget: 1200

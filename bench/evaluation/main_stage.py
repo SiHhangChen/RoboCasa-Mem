@@ -103,14 +103,15 @@ def main_rollout_stage_result(
         raise ValueError("main rollout result is missing report_stages")
     if str(report.get("task_id")) != str(task_id):
         raise ValueError("main rollout report_stages task_id mismatch")
-    stages = report.get("stages")
-    if not isinstance(stages, Mapping) or target_stage not in stages:
-        raise ValueError(f"main rollout report is missing stage {target_stage!r}")
-    verdict = stages[target_stage]
-    if not isinstance(verdict, Mapping) or verdict.get("applicable") is not True:
-        raise ValueError(f"main rollout stage {target_stage!r} is not applicable")
-    passed = verdict.get("passed") is True
-    first_pass_step = verdict.get("first_pass_step")
+    verdict, verdict_source = _stage_verdict(episode, report, target_stage)
+    if verdict_source == "report_stages":
+        if verdict.get("applicable") is not True:
+            raise ValueError(f"main rollout stage {target_stage!r} is not applicable")
+        passed = verdict.get("passed") is True
+        first_pass_step = verdict.get("first_pass_step")
+    else:
+        passed = verdict.get("qualified") is True
+        first_pass_step = verdict.get("qualified_step")
     if first_pass_step is not None:
         if isinstance(first_pass_step, bool) or not isinstance(first_pass_step, int):
             raise ValueError("main rollout first_pass_step must be an integer or null")
@@ -154,6 +155,32 @@ def main_rollout_stage_result(
         handoff_observation_id=0,
         failure_reason=failure_reason,
     )
+
+
+def _stage_verdict(
+    episode: Mapping[str, Any],
+    report: Mapping[str, Any],
+    target_stage: str,
+) -> tuple[Mapping[str, Any], str]:
+    stages = report.get("stages")
+    if isinstance(stages, Mapping) and target_stage in stages:
+        verdict = stages[target_stage]
+        if not isinstance(verdict, Mapping):
+            raise ValueError(f"main rollout stage {target_stage!r} verdict must be a map")
+        return verdict, "report_stages"
+
+    diagnostics = episode.get("diagnostics")
+    diagnostic_stages = (
+        diagnostics.get("stages") if isinstance(diagnostics, Mapping) else None
+    )
+    if isinstance(diagnostic_stages, Mapping) and target_stage in diagnostic_stages:
+        verdict = diagnostic_stages[target_stage]
+        if not isinstance(verdict, Mapping):
+            raise ValueError(
+                f"main rollout diagnostic stage {target_stage!r} verdict must be a map"
+            )
+        return verdict, "diagnostics.stages"
+    raise ValueError(f"main rollout report is missing stage {target_stage!r}")
 
 
 def _validate_main_manifest(

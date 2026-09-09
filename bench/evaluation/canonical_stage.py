@@ -202,7 +202,7 @@ class RecordedExpertController:
 
     def __init__(self, actions: Sequence[Any]) -> None:
         value = np.asarray(actions, dtype=np.float32)
-        if value.ndim != 2 or value.shape[1] != ACTION_DIM or value.shape[0] <= 0:
+        if value.ndim != 2 or value.shape[1] != ACTION_DIM:
             raise ValueError(
                 f"recorded expert actions must have shape (N, {ACTION_DIM}), got {value.shape}"
             )

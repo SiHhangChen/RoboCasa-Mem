@@ -1,0 +1,21 @@
+# Conservative pilot budgets; replace them with 2 x P95 after all prefixes validate.
+stage_suite_version: wa01_gr00t_stage_r20_pilot_v1
+task_id: WA-01
+base_suite: ../legacy_suites/wa01_gr00t_r20_v1.yaml
+expert_prefix_root: outputs/stage_prefixes/wa01_gr00t_r20_pilot_v1
+stages:
+  - id: sugar_added
+    source: main_rollout
+    model_step_budget: 1500
+  - id: one_cup_ready
+    source: expert_prefix
+    model_step_budget: 2000
+  - id: two_cups_ready
+    source: expert_prefix
+    model_step_budget: 2000
+  - id: selection
+    source: expert_prefix
+    model_step_budget: 1000
+  - id: success
+    source: expert_prefix
+    model_step_budget: 1000

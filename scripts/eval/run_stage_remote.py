@@ -9,6 +9,8 @@ import os
 from pathlib import Path
 import sys
 
+import numpy as np
+
 
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
@@ -23,6 +25,9 @@ from bench.evaluation.canonical_stage import (  # noqa: E402
 from bench.evaluation.client import RemotePolicyClient  # noqa: E402
 from bench.evaluation.expert_prefix import load_expert_prefix  # noqa: E402
 from bench.evaluation.main_stage import import_main_rollout_stage  # noqa: E402
+from bench.evaluation.stage_integration import (  # noqa: E402
+    get_stage_evaluation_integration,
+)
 from bench.evaluation.stage_artifacts import StageArtifactWriter  # noqa: E402
 from bench.evaluation.stage_rollout import (  # noqa: E402
     INVALID_PREFIX,
@@ -31,11 +36,6 @@ from bench.evaluation.stage_rollout import (  # noqa: E402
 )
 from bench.evaluation.stage_suite import load_stage_eval_suite  # noqa: E402
 from bench.tasks import register_builtin_task_plugins  # noqa: E402
-from bench.tasks.wa05.evaluation import STAGE_ORDER  # noqa: E402
-from bench.tasks.wa05.stage_evaluation import (  # noqa: E402
-    build_stage_specs,
-    privileged_stage_state,
-)
 
 
 DEFAULT_STAGE_SUITE = ROOT / "configs/eval/stages/wa05_gr00t_r40_v1.yaml"
@@ -51,9 +51,21 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--run-id")
     parser.add_argument("--target-stage", action="append", dest="target_stages")
     parser.add_argument("--seed", action="append", type=int, dest="seeds")
+    parser.add_argument("--seed-shard-index", type=int)
+    parser.add_argument("--seed-shard-count", type=int)
     parser.add_argument("--api-key-env", default="MEMBENCH_POLICY_API_KEY")
     parser.add_argument("--resume", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--record-video", action=argparse.BooleanOptionalAction, default=None)
+    parser.add_argument(
+        "--prefix-actions",
+        type=Path,
+        help="override the frozen prefix action stream for a one-seed handoff probe",
+    )
+    parser.add_argument(
+        "--handoff-step",
+        type=int,
+        help="delay model handoff until this many frozen prefix actions have executed",
+    )
     parser.add_argument("--preflight-only", action="store_true")
     return parser.parse_args(argv)
 
@@ -61,8 +73,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     stage_suite = load_stage_eval_suite(args.stage_suite)
-    if stage_suite.task_id != "WA-05":
-        raise ValueError("the first stage runner integration currently supports WA-05 only")
+    integration = get_stage_evaluation_integration(
+        stage_suite.task_id,
+        stage_ids=stage_suite.stage_ids,
+    )
+    integration.validate_stage_suite(stage_suite.stage_ids)
     suite = stage_suite.base_suite
     prefix_root = (
         stage_suite.expert_prefix_root
@@ -76,7 +91,23 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError(
                 f"target {target!r} uses {config.source}; extract it from the main rollout"
             )
-    seeds = tuple(args.seeds) if args.seeds else suite.seeds
+    manifest_seeds = tuple(args.seeds) if args.seeds else suite.seeds
+    seeds = _select_seed_shard(
+        manifest_seeds,
+        index=args.seed_shard_index,
+        count=args.seed_shard_count,
+    )
+    probe_enabled = args.prefix_actions is not None or args.handoff_step is not None
+    if probe_enabled:
+        if args.prefix_actions is None or args.handoff_step is None:
+            raise ValueError("--prefix-actions and --handoff-step must be provided together")
+        if args.handoff_step <= 0:
+            raise ValueError("--handoff-step must be positive")
+        if len(targets) != 1 or len(seeds) != 1:
+            raise ValueError("handoff probes require exactly one target stage and one seed")
+        probe_actions = _load_probe_actions(args.prefix_actions, args.handoff_step)
+    else:
+        probe_actions = None
 
     register_builtin_task_plugins()
     adapter = get_adapter(stage_suite.task_id)
@@ -132,7 +163,7 @@ def main(argv: list[str] | None = None) -> int:
                     for target in stage_suite.targets
                     if target.id in summary_targets
                 },
-                "seeds": list(seeds),
+                "seeds": list(manifest_seeds),
                 "expert_prefix_root": str(prefix_root),
                 "main_rollout_run": (
                     None
@@ -141,6 +172,14 @@ def main(argv: list[str] | None = None) -> int:
                 ),
                 "policy_contract": contract.to_hello(),
                 "preflight": preflight,
+                "handoff_probe": (
+                    None
+                    if probe_actions is None
+                    else {
+                        "prefix_actions": str(args.prefix_actions.expanduser().resolve()),
+                        "handoff_step": int(args.handoff_step),
+                    }
+                ),
             }
         )
         if args.main_rollout_run is not None:
@@ -165,8 +204,8 @@ def main(argv: list[str] | None = None) -> int:
             if args.record_video is None
             else bool(args.record_video)
         )
-        specs = build_stage_specs(stage_suite.budgets)
         for target in targets:
+            specs = integration.build_stage_specs(stage_suite.budgets, target)
             for seed in seeds:
                 if args.resume and writer.completed(target, seed):
                     print(f"stage={target} seed={seed} status=skipped")
@@ -201,8 +240,26 @@ def main(argv: list[str] | None = None) -> int:
                     )
                     print(f"stage={target} seed={seed} status={result.status}")
                     continue
+                if prefix.task_id != stage_suite.task_id:
+                    result = _invalid_prefix_result(
+                        stage_suite.task_id,
+                        target,
+                        seed,
+                        "expert_prefix_task_mismatch",
+                    )
+                    writer.write_result(
+                        result,
+                        source="expert_prefix",
+                        expert_prefix_manifest=prefix.manifest(),
+                    )
+                    print(f"stage={target} seed={seed} status={result.status}")
+                    continue
                 try:
-                    prefix_actions = prefix.prefix_for_target(STAGE_ORDER, target)
+                    prefix_actions = (
+                        integration.prefix_actions(prefix, target)
+                        if probe_actions is None
+                        else probe_actions
+                    )
                 except Exception as exc:
                     result = _invalid_prefix_result(
                         stage_suite.task_id,
@@ -224,7 +281,7 @@ def main(argv: list[str] | None = None) -> int:
                     adapter=adapter,
                     suite=suite,
                     policy_contract=contract,
-                    privileged_state_builder=privileged_stage_state,
+                    privileged_state_builder=integration.privileged_state_builder,
                     expected_episode_identity=prefix.episode_identity,
                 )
                 model = RemotePolicyModelAdapter(client=client, task=task)
@@ -245,6 +302,7 @@ def main(argv: list[str] | None = None) -> int:
                         model,
                         expert,
                         expert_prefix_budget=int(prefix_actions.shape[0]),
+                        minimum_expert_prefix_steps=int(prefix_actions.shape[0]),
                         replan_steps=suite.rollout.replan_steps,
                         record_logs=False,
                         logger=session,
@@ -257,6 +315,9 @@ def main(argv: list[str] | None = None) -> int:
                         evaluator_metadata={
                             "model_reset_calls": model.reset_calls,
                             "replan_steps": suite.rollout.replan_steps,
+                            "handoff_step": (
+                                None if probe_actions is None else int(args.handoff_step)
+                            ),
                         },
                     )
                 except BaseException:
@@ -282,7 +343,42 @@ def _default_run_id(server_id: str) -> str:
         character if character.isalnum() or character in "-_" else "-"
         for character in server_id
     )
-    return f"wa05-stage-{safe}-{timestamp}"
+    return f"stage-{safe}-{timestamp}"
+
+
+def _select_seed_shard(
+    seeds: tuple[int, ...],
+    *,
+    index: int | None,
+    count: int | None,
+) -> tuple[int, ...]:
+    if (index is None) != (count is None):
+        raise ValueError("seed shard index and count must be provided together")
+    if index is None or count is None:
+        return seeds
+    if count <= 0:
+        raise ValueError("seed shard count must be positive")
+    if index < 0 or index >= count:
+        raise ValueError("seed shard index must satisfy 0 <= index < count")
+    selected = tuple(seed for position, seed in enumerate(seeds) if position % count == index)
+    if not selected:
+        raise ValueError("seed shard selects no seeds")
+    return selected
+
+
+def _load_probe_actions(path: Path, handoff_step: int) -> np.ndarray:
+    source = path.expanduser().resolve()
+    with np.load(source) as payload:
+        actions = np.asarray(payload["actions"], dtype=np.float32)
+    if actions.ndim != 2 or actions.shape[1] != 13:
+        raise ValueError(f"probe actions must have shape (N, 13), got {actions.shape}")
+    if not np.all(np.isfinite(actions)):
+        raise ValueError("probe actions contain non-finite values")
+    if int(handoff_step) > int(actions.shape[0]):
+        raise ValueError(
+            f"handoff step {handoff_step} exceeds probe action count {actions.shape[0]}"
+        )
+    return np.ascontiguousarray(actions[: int(handoff_step)])
 
 
 def _invalid_prefix_result(

@@ -524,6 +524,7 @@ def evaluate_stage(
     *,
     tracker: StageTracker | None = None,
     expert_prefix_budget: int | None = None,
+    minimum_expert_prefix_steps: int | None = None,
     replan_steps: int = 1,
     record_logs: bool = True,
     logger: Callable[[Mapping[str, Any]], None] | Any | None = None,
@@ -539,6 +540,13 @@ def evaluate_stage(
     if isinstance(replan_steps, bool) or int(replan_steps) <= 0:
         raise ValueError("replan_steps must be a positive integer")
     replan_steps = int(replan_steps)
+    if minimum_expert_prefix_steps is not None:
+        if (
+            isinstance(minimum_expert_prefix_steps, bool)
+            or int(minimum_expert_prefix_steps) < 0
+        ):
+            raise ValueError("minimum_expert_prefix_steps must be a non-negative integer")
+        minimum_expert_prefix_steps = int(minimum_expert_prefix_steps)
     stages = _task_stages(task)
     tracker = tracker or StageTracker(stages)
     target_index = tracker._index(target_stage)
@@ -552,7 +560,8 @@ def evaluate_stage(
     expert_predict = getattr(expert, "predict", None)
     if not callable(reset_episode) or not callable(predict):
         raise TypeError("model must expose reset_episode(instruction) and predict(observation)")
-    if target_index > 0 and not callable(expert_predict):
+    requires_expert = target_index > 0 or bool(minimum_expert_prefix_steps)
+    if requires_expert and not callable(expert_predict):
         raise TypeError("expert must expose predict(privileged_state)")
 
     try:
@@ -571,7 +580,7 @@ def evaluate_stage(
     model_steps = 0
     success_step: int | None = None
     handoff_observation_id: int | None = None
-    handed_off = target_index == 0
+    handed_off = target_index == 0 and not minimum_expert_prefix_steps
     action_buffer: list[Any] = []
     logs: list[StageStepLog] = []
 
@@ -616,7 +625,11 @@ def evaluate_stage(
                         model_steps, model_inference_calls, env_steps, handoff_observation_id,
                         "expert_target_failure_during_prefix", logs,
                     )
-                if tracker.prefix_completed(target_id):
+                prefix_length_reached = (
+                    minimum_expert_prefix_steps is None
+                    or expert_steps >= minimum_expert_prefix_steps
+                )
+                if tracker.prefix_completed(target_id) and prefix_length_reached:
                     handed_off = True
                     handoff_observation_id = env_steps
                     # Any chunk proposed before handoff is intentionally lost.

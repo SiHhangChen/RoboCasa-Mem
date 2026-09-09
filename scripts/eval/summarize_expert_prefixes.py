@@ -18,6 +18,9 @@ if str(ROOT) not in sys.path:
 
 from bench.evaluation.expert_prefix import load_expert_prefix  # noqa: E402
 from bench.evaluation.prefix_statistics import summarize_expert_prefixes  # noqa: E402
+from bench.evaluation.stage_integration import (  # noqa: E402
+    get_stage_evaluation_integration,
+)
 from bench.evaluation.stage_suite import load_stage_eval_suite  # noqa: E402
 
 
@@ -40,6 +43,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     suite = load_stage_eval_suite(args.stage_suite)
+    integration = get_stage_evaluation_integration(
+        suite.task_id,
+        stage_ids=suite.stage_ids,
+    )
+    integration.validate_stage_suite(suite.stage_ids)
     root = (
         suite.expert_prefix_root
         if args.prefix_root is None
@@ -55,6 +63,7 @@ def main(argv: list[str] | None = None) -> int:
     summary = summarize_expert_prefixes(
         artifacts,
         stage_order=suite.stage_ids,
+        stage_segments=integration.budget_segments,
         expected_seeds=suite.base_suite.seeds,
     )
     summary.update(
