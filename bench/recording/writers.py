@@ -225,6 +225,10 @@ class EpisodeRecorder:
         }
         self.records.append(record)
         record["video_frame_indices"] = self._write_video_frames(frame)
+        stored_frame = record["frame"]
+        stored_frame.pop("images", None)
+        if not self.record_depth:
+            stored_frame.pop("depth", None)
         self._current_obs = dict(next_obs or obs or {})
 
     def finalize_terminal(

@@ -30,6 +30,7 @@ CUP_B_PICK_STATION = "cup_B_pick_station"
 SINK_FILL_STATION = "sink_fill_station"
 SERVICE_AREA_STATION = "service_area_station"
 SERVICE_AREA_SLOT_2_STATION = "service_area_slot_2_station"
+SERVICE_AREA_CENTER_STATION = "service_area_center_station"
 
 
 @dataclass(frozen=True)
@@ -219,6 +220,7 @@ def station_aliases() -> dict[Any, str]:
         SINK_FILL_STATION: SINK_FILL_STATION,
         SERVICE_AREA_STATION: SERVICE_AREA_STATION,
         SERVICE_AREA_SLOT_2_STATION: SERVICE_AREA_SLOT_2_STATION,
+        SERVICE_AREA_CENTER_STATION: SERVICE_AREA_CENTER_STATION,
         ("service_area", "slot_2"): SERVICE_AREA_SLOT_2_STATION,
         "service_area:slot_2": SERVICE_AREA_SLOT_2_STATION,
         "cup_A": CUP_A_PICK_STATION,
@@ -352,6 +354,16 @@ def station_specs(env: Any) -> dict[str, dict[str, Any]]:
             "stand_off": 0.16,
             "tangential_offsets": (-0.08, -0.04, 0.0, 0.04, 0.08),
         },
+        SERVICE_AREA_CENTER_STATION: {
+            "station_id": SERVICE_AREA_CENTER_STATION,
+            "fixture": counter,
+            # Fixed calibrated midpoint between slot_1 and slot_2.
+            "anchor_xy": service_xy,
+            "source_fixture": safe_name(counter),
+            "source_object_or_phase": "service_slots_midpoint",
+            "stand_off": 0.16,
+            "tangential_offsets": (0.0,),
+        },
     }
 
 
@@ -450,6 +462,7 @@ __all__ = [
     "NavigationAssembly",
     "SERVICE_AREA_STATION",
     "SERVICE_AREA_SLOT_2_STATION",
+    "SERVICE_AREA_CENTER_STATION",
     "SINK_FILL_STATION",
     "StationHeightBaseDriver",
     "build_navigation_assembly",

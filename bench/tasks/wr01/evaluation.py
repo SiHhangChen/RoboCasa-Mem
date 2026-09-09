@@ -16,24 +16,20 @@ from bench.tasks.wr01.domain.contracts import CABINET_LEVELS, ITEM_IDS
 
 
 STAGE_ORDER = (
-    "first_can_pick",
-    "first_can_store",
-    "second_can_pick",
-    "second_can_store",
-    "close_upper_cabinet",
-    "close_lower_cabinet",
+    "close_first_door",
+    "close_second_door",
+    "canonical_reset",
     "open_cabinet",
     "retrieve_item",
+    "place_on_table",
 )
 STAGE_LABELS = {
-    "first_can_pick": "第一罐头取",
-    "first_can_store": "第一罐头存",
-    "second_can_pick": "第二罐头取",
-    "second_can_store": "第二罐头存",
-    "close_upper_cabinet": "关上柜",
-    "close_lower_cabinet": "关下柜",
-    "open_cabinet": "开柜",
-    "retrieve_item": "取物",
+    "close_first_door": "关第一扇柜门",
+    "close_second_door": "关第二扇柜门",
+    "canonical_reset": "回到中性位",
+    "open_cabinet": "开记忆柜",
+    "retrieve_item": "取目标罐头",
+    "place_on_table": "放回桌面",
 }
 STAGE_PREREQUISITES: dict[str, str | None] = {
     name: None if index == 0 else STAGE_ORDER[index - 1]
@@ -44,11 +40,11 @@ REPORT_STAGE_PROFILE_ID = WR01_REPORT_PROFILE.profile_id
 TASK_EVALUATOR_METADATA_KEY = "task_evaluator"
 
 _REPORT_STAGE_SOURCES = {
-    "one_can_stored": "first_can_store",
-    "two_cans_stored": "second_can_store",
-    "storage_hidden": "close_lower_cabinet",
+    "one_can_stored": "close_first_door",
+    "two_cans_stored": "close_second_door",
+    "storage_hidden": "canonical_reset",
     "correct_cabinet_opened": "open_cabinet",
-    "success": "retrieve_item",
+    "success": "place_on_table",
 }
 
 
@@ -83,14 +79,18 @@ class WR01EvaluationSnapshot:
     storage_order: tuple[str, str]
     target_item_id: str
     target_level: str
+    close_order: tuple[str, str] = ("upper", "lower")
     item_grasped: Mapping[str, bool] = field(default_factory=dict)
     stored_levels_by_item: Mapping[str, str] = field(default_factory=dict)
+    storage_hidden: bool = False
     upper_door_closed: bool = False
     lower_door_closed: bool = False
     opened_level: str | None = None
     wrong_retrieval_level_opened: bool = False
     retrieved_item_id: str | None = None
     distractor_still_stored: bool = False
+    canonical_reset: bool = False
+    final_placement_verified: bool = False
     details: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -100,6 +100,9 @@ class WR01EvaluationSnapshot:
         order = _storage_order(self.storage_order)
         target = _item(self.target_item_id)
         target_level = _level(self.target_level)
+        close_order = tuple(_level(value) for value in self.close_order)
+        if len(close_order) != 2 or set(close_order) != set(CABINET_LEVELS):
+            raise ValueError("WR-01 close_order must contain lower and upper")
         grasped = {
             item_id: bool(self.item_grasped.get(item_id, False))
             for item_id in ITEM_IDS
@@ -115,8 +118,10 @@ class WR01EvaluationSnapshot:
         object.__setattr__(self, "storage_order", order)
         object.__setattr__(self, "target_item_id", target)
         object.__setattr__(self, "target_level", target_level)
+        object.__setattr__(self, "close_order", close_order)
         object.__setattr__(self, "item_grasped", grasped)
         object.__setattr__(self, "stored_levels_by_item", stored)
+        object.__setattr__(self, "storage_hidden", bool(self.storage_hidden))
         object.__setattr__(self, "upper_door_closed", bool(self.upper_door_closed))
         object.__setattr__(self, "lower_door_closed", bool(self.lower_door_closed))
         object.__setattr__(self, "opened_level", opened)
@@ -131,6 +136,8 @@ class WR01EvaluationSnapshot:
             "distractor_still_stored",
             bool(self.distractor_still_stored),
         )
+        object.__setattr__(self, "canonical_reset", bool(self.canonical_reset))
+        object.__setattr__(self, "final_placement_verified", bool(self.final_placement_verified))
         object.__setattr__(self, "details", dict(self.details or {}))
 
     @property
@@ -144,7 +151,8 @@ class WR01EvaluationSnapshot:
     @property
     def correct_cabinet_opened(self) -> bool:
         return bool(
-            self.opened_level == self.target_level
+            self.storage_hidden
+            and self.opened_level == self.target_level
             and not self.wrong_retrieval_level_opened
         )
 
@@ -157,18 +165,12 @@ class WR01EvaluationSnapshot:
 
     def raw_stage_values(self) -> dict[str, bool]:
         return {
-            "first_can_pick": self.item_grasped[self.first_item_id],
-            "first_can_store": (
-                self.stored_levels_by_item.get(self.first_item_id) == "lower"
-            ),
-            "second_can_pick": self.item_grasped[self.second_item_id],
-            "second_can_store": (
-                self.stored_levels_by_item.get(self.second_item_id) == "upper"
-            ),
-            "close_upper_cabinet": self.upper_door_closed,
-            "close_lower_cabinet": self.lower_door_closed,
+            "close_first_door": self.upper_door_closed if self.close_order[0] == "upper" else self.lower_door_closed,
+            "close_second_door": self.upper_door_closed if self.close_order[1] == "upper" else self.lower_door_closed,
+            "canonical_reset": self.canonical_reset,
             "open_cabinet": self.opened_level is not None,
             "retrieve_item": self.retrieved_item_id is not None,
+            "place_on_table": self.final_placement_verified,
         }
 
 
@@ -263,7 +265,7 @@ class _MutableStage:
 
 
 class WR01Evaluator:
-    """Strict, idempotent, history-aware evaluator for the eight WR-01 stages."""
+    """Strict, idempotent, history-aware evaluator for the six WR-01 stages."""
 
     def __init__(
         self,
@@ -271,10 +273,14 @@ class WR01Evaluator:
         storage_order: Sequence[str],
         target_item_id: str,
         target_level: str,
+        close_order: Sequence[str] = ("upper", "lower"),
     ) -> None:
         self.storage_order = _storage_order(storage_order)
         self.target_item_id = _item(target_item_id)
         self.target_level = _level(target_level)
+        self.close_order = tuple(_level(value) for value in close_order)
+        if len(self.close_order) != 2 or set(self.close_order) != set(CABINET_LEVELS):
+            raise ValueError("WR-01 close_order must contain lower and upper")
         self._stages = {name: _MutableStage() for name in STAGE_ORDER}
         self._rejected: dict[str, list[dict[str, Any]]] = {
             name: [] for name in STAGE_ORDER
@@ -319,6 +325,7 @@ class WR01Evaluator:
         qualified_before = {
             name: self._stages[name].qualified for name in STAGE_ORDER
         }
+        qualified_now = dict(qualified_before)
         for name, value in raw.items():
             if value:
                 self._mark_observed(name, snapshot.step_id)
@@ -331,7 +338,7 @@ class WR01Evaluator:
             ):
                 continue
             prerequisite = STAGE_PREREQUISITES[name]
-            if prerequisite is not None and not qualified_before[prerequisite]:
+            if prerequisite is not None and not qualified_now[prerequisite]:
                 self._reject(
                     name,
                     snapshot.step_id,
@@ -345,6 +352,7 @@ class WR01Evaluator:
                     self._terminal_failure_code = reason
                 continue
             self._qualify(name, snapshot.step_id)
+            qualified_now[name] = True
 
         self._previous_raw = raw
         self._last_step_id = snapshot.step_id
@@ -361,6 +369,7 @@ class WR01Evaluator:
             snapshot.storage_order != self.storage_order
             or snapshot.target_item_id != self.target_item_id
             or snapshot.target_level != self.target_level
+            or snapshot.close_order != self.close_order
         ):
             raise ValueError(
                 "WR-01 evaluation snapshot configuration changed within an episode"
@@ -371,13 +380,23 @@ class WR01Evaluator:
         name: str,
         snapshot: WR01EvaluationSnapshot,
     ) -> str | None:
-        if name == "open_cabinet" and not snapshot.correct_cabinet_opened:
+        if name in {"close_first_door", "close_second_door"}:
+            assigned_items = set(snapshot.stored_levels_by_item)
+            assigned_levels = set(snapshot.stored_levels_by_item.values())
+            if assigned_items != set(ITEM_IDS) or assigned_levels != set(CABINET_LEVELS):
+                return "storage_not_verified"
+        if name == "open_cabinet" and (
+            not snapshot.canonical_reset or not snapshot.correct_cabinet_opened
+        ):
             return "wrong_retrieval_cabinet"
         if name == "retrieve_item":
             if snapshot.retrieved_item_id != snapshot.target_item_id:
                 return "wrong_item_retrieved"
             if not snapshot.distractor_still_stored:
                 return "distractor_not_stored"
+        elif name == "place_on_table":
+            if not snapshot.final_placement_verified:
+                return "final_placement_not_verified"
         return None
 
     def _mark_observed(self, name: str, step_id: int) -> None:
@@ -439,6 +458,7 @@ class WR01Evaluator:
                 "stage_prerequisites": dict(STAGE_PREREQUISITES),
                 "qualification_policy": "rising_edge_after_prerequisite",
                 "storage_order": list(self.storage_order),
+                "close_order": list(self.close_order),
                 "stage_bindings": {
                     "first_can": self.storage_order[0],
                     "first_store_level": "lower",

@@ -11,16 +11,13 @@
   "split": "pretrain",
   "stations": {
     "item_station": {
-      "samples": [
-        {
-          "station_id": "item_station",
-          "sample_index": 0,
-          "base_xy": [5.216, -1.055],
-          "base_yaw": 1.571,
-          "torso_height": 0.20,
-          "record_source": "manual_base_path_sample_0_item_grasp"
-        }
-      ]
+      "circle": {
+        "center_xy": [5.216, -1.055],
+        "radius_m": 0.05,
+        "base_yaw": 1.571,
+        "torso_height": 0.20,
+        "record_source": "item_station_10cm_diameter_region"
+      }
     },
     "lower_storage_station": {
       "samples": [
@@ -69,6 +66,15 @@
           "record_source": "terminal_manual_capture_lower_door_operation"
         }
       ]
+    },
+    "cabinet_front_station": {
+      "circle": {
+        "center_xy": [3.05, -1.31],
+        "radius_m": 0.05,
+        "base_yaw": 1.569,
+        "torso_height": 0.20,
+        "record_source": "cabinet_front_10cm_diameter_region"
+      }
     },
     "door_station": {
       "samples": [

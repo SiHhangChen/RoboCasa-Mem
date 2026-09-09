@@ -34,26 +34,25 @@ def test_wr01_step_count_does_not_double_count_nested_aggregates() -> None:
         ({"lower": "blue_can", "upper": "red_can"}, "upper"),
     ],
 )
-def test_wr01_stage_names_match_eight_semantic_groups(assignment: dict[str, str], target_level: str) -> None:
+def test_wr01_stage_names_match_current_semantic_groups(assignment: dict[str, str], target_level: str) -> None:
     root = Path(__file__).resolve().parents[2]
     config = load_config(root / "configs" / "memer" / "wr01_subtasks.json")
     names = build_stage_names(assignment, target_level)
     matched = [match_subtask(name, config["stage_prefixes"]) for name in names]
-    assert len(names) == 27
+    assert len(names) == 20
     assert matched == [
-        *(["pick_first"] * 3),
-        *(["store_lower"] * 4),
-        *(["pick_remaining"] * 3),
-        *(["store_upper"] * 4),
-        *(["close_upper"] * 3),
-        *(["close_lower"] * 4),
+        "observe",
+        *(["close_first"] * 3),
+        *(["close_second"] * 3),
+        *(["handoff"] * 3),
         *(["open_remembered"] * 4),
-        *(["retrieve"] * 2),
+        *(["retrieve"] * 3),
+        *(["place"] * 3),
     ]
 
 
-@pytest.mark.parametrize(("target_level", "open_index"), [("upper", 6), ("lower", 7)])
-def test_wr01_only_retrieval_door_label_depends_on_hidden_relation(target_level: str, open_index: int) -> None:
+@pytest.mark.parametrize("target_level", ["upper", "lower"])
+def test_wr01_labels_do_not_expose_the_hidden_relation(target_level: str) -> None:
     root = Path(__file__).resolve().parents[2]
     config = load_config(root / "configs" / "memer" / "wr01_subtasks.json")
     assignment = {"lower": "blue_can", "upper": "red_can"}
@@ -66,15 +65,13 @@ def test_wr01_only_retrieval_door_label_depends_on_hidden_relation(target_level:
     }
     labeled = label_episode(record, config, recorded_total=len(names))
     assert labeled["subtask_indices"] == [
-        *([0] * 3),
-        *([1] * 4),
+        0,
+        *([1] * 3),
         *([2] * 3),
-        *([3] * 4),
-        *([4] * 3),
-        *([5] * 4),
-        *([open_index] * 4),
-        *([8] * 2),
+        *([3] * 3),
+        *([4] * 4),
+        *([5] * 3),
+        *([6] * 3),
     ]
-    assert labeled["keyframes"] == [2, 6, 9, 13, 16, 20, 21, 26]
-    assert labeled["subtask_order"][6] == "open the upper cabinet door"
-    assert labeled["subtask_order"][7] == "open the lower cabinet door"
+    assert labeled["keyframes"] == [0, 3, 6, 9, 10, 16, 19]
+    assert labeled["subtask_order"][4] == "open the remembered cabinet door"

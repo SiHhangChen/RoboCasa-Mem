@@ -184,6 +184,9 @@ class BaseDriverAdapter:
     ) -> StageResult:
         """Execute a base movement to the target pose."""
         use_manual_path = move_overrides.pop("use_manual_path", None)
+        use_sampled_terminal_pose = bool(
+            move_overrides.pop("use_sampled_terminal_pose", False)
+        )
         manual_executor = (
             self._manual_path_executor()
             if use_manual_path is not False
@@ -230,11 +233,20 @@ class BaseDriverAdapter:
                         and yaw_tolerance_override is not None
                         else None
                     ),
+                    terminal_target_xy=(
+                        np.asarray(target_xy, dtype=float)[:2]
+                        if use_sampled_terminal_pose
+                        else None
+                    ),
+                    terminal_target_yaw=(
+                        target_yaw if use_sampled_terminal_pose else None
+                    ),
                 )
             finally:
                 manual_executor.xy_tolerance = original_xy_tolerance
                 manual_executor.yaw_tolerance = original_yaw_tolerance
             nav["terminal_tolerance_only"] = terminal_tolerance_only
+            nav["use_sampled_terminal_pose"] = use_sampled_terminal_pose
             if xy_tolerance_override is not None:
                 nav["xy_tolerance_override"] = float(xy_tolerance_override)
             if yaw_tolerance_override is not None:
@@ -349,6 +361,14 @@ class BaseDriverAdapter:
                 post_step_callback=self._post_step_callback,
                 **kwargs,
             )
+            # A direct move can be followed by a manual-path move in the same
+            # episode (a task may use this for a canonical reset circle).
+            # Keep the manual executor's route cursor synchronized with the
+            # actual base pose so the next manual request starts from the
+            # nearest calibrated waypoint instead of the stale/default index.
+            sync = self._sync_manual_path_cursor()
+            if sync is not None:
+                nav["manual_path_cursor_sync"] = sync
         if (
             self._nav_config is not None
             and bool(getattr(self._nav_config, "base_snap_to_target_after_success", False))
@@ -389,6 +409,25 @@ class BaseDriverAdapter:
             details=nav,
             failure_code=nav.get("reason") if not nav.get("pass") else None,
         )
+
+    def _sync_manual_path_cursor(self) -> dict[str, Any] | None:
+        """Synchronize a lazily-created manual path executor after direct motion."""
+
+        executor = self._manual_path_executor()
+        if executor is None:
+            return None
+        try:
+            index, summary = executor.nearest_index(self._obs)
+            executor.current_index = int(index)
+            return {
+                "current_index": int(index),
+                "nearest": dict(summary),
+            }
+        except Exception as exc:
+            return {
+                "current_index": None,
+                "reason": f"manual_path_cursor_sync_failed: {type(exc).__name__}: {exc}",
+            }
 
 
 # New NavigationController (no ctx dependency)

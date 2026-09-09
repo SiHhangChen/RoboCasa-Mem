@@ -1535,6 +1535,13 @@ class ManipulationController:
         current_object_pose_world = self._virtual_object_pose_world(object_name)
         if current_object_pos_world is None:
             current_object_pos_world = self._object_pos_world(object_name)
+        # Candidate placement must use the live object orientation after a
+        # physical grasp; otherwise upright placement can be evaluated against
+        # a stale or missing object pose.
+        if current_object_pose_world is None:
+            current_object_pose_world = self._object_pose_world(object_name)
+            if current_object_pos_world is None:
+                current_object_pos_world = current_object_pose_world[:3, 3]
 
         candidate_records: list[dict[str, Any]] = []
         group_records: list[dict[str, Any]] = []
@@ -2069,6 +2076,7 @@ class ManipulationController:
         gripper_action: float | None = None,
         arm_qpos: list[float] | np.ndarray | None = None,
         settle_steps: int | None = None,
+        qpos_threshold: float | None = None,
         post_step_callback: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         gripper_action_value = (
@@ -2086,6 +2094,13 @@ class ManipulationController:
             if settle_steps is None
             else max(0, int(settle_steps))
         )
+        resolved_qpos_threshold = (
+            self.runtime_config.qpos_threshold
+            if qpos_threshold is None
+            else float(qpos_threshold)
+        )
+        if not np.isfinite(resolved_qpos_threshold) or resolved_qpos_threshold <= 0.0:
+            raise ValueError("qpos_threshold must be a finite positive value")
         if not self.runtime_config.execute:
             finite = bool(np.all(np.isfinite(target_qpos)))
             if finite:
@@ -2097,6 +2112,7 @@ class ManipulationController:
                 "target_qpos": target_qpos.astype(float).tolist(),
                 "gripper_action": float(gripper_action_value),
                 "settle_steps": int(resolved_settle_steps),
+                "qpos_threshold": float(resolved_qpos_threshold),
                 "dry_run": True,
                 "checks": {"target_qpos_finite": finite},
                 "pass": finite,
@@ -2110,7 +2126,7 @@ class ManipulationController:
         )
         self._sync_obs(execution["obs"])
         self.stage_executor.clear_virtual_state()
-        qpos_ok = float(execution["final_qpos_error"]) < self.runtime_config.qpos_threshold
+        qpos_ok = float(execution["final_qpos_error"]) < resolved_qpos_threshold
         runtime_collision_free = not bool(execution.get("collision", {}).get("collision", False))
         return {
             "primitive": "return_arm_to_regular_pose",
@@ -2119,6 +2135,7 @@ class ManipulationController:
             "target_qpos": target_qpos.astype(float).tolist(),
             "gripper_action": float(gripper_action_value),
             "settle_steps": int(resolved_settle_steps),
+            "qpos_threshold": float(resolved_qpos_threshold),
             "execution": self._without_obs(execution),
             "checks": {
                 "final_qpos": qpos_ok,

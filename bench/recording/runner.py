@@ -21,6 +21,7 @@ def build_recording_config(
     cameras: list[str] | tuple[str, ...] | None = None,
     fps: int | None = None,
     save_navigation_snapshots: bool = False,
+    record_depth: bool | None = None,
 ) -> RecordingConfig:
     """Resolve recorder settings from the same canonical runtime descriptor."""
 
@@ -44,8 +45,8 @@ def build_recording_config(
         )
     camera_names = _recording_camera_names(sensors, cameras)
     recording = dict(getattr(descriptor.config, "recording", {}) or {})
-    record_depth = bool(recording.get("record_depth", True))
-    if record_depth and not sensors.camera_depths:
+    requested_depth = bool(recording.get("record_depth", True)) if record_depth is None else bool(record_depth)
+    if requested_depth and not sensors.camera_depths:
         raise ValueError("record_depth requires a depth-enabled observation profile")
     return RecordingConfig(
         output_dir=Path(output_dir),
@@ -54,7 +55,7 @@ def build_recording_config(
         camera_height=sensors.height,
         fps=requested_fps,
         save_navigation_snapshots=bool(save_navigation_snapshots),
-        record_depth=record_depth,
+        record_depth=requested_depth,
         depth_dtype=str(recording.get("depth_dtype", "uint16")),
         depth_scale=float(recording.get("depth_scale", 0.001)),
         env_meta=_runtime_env_meta(descriptor, initialized),

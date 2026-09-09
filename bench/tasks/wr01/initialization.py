@@ -8,6 +8,7 @@ import numpy as np
 
 from bench.execution.navigation.base_motion import set_base_pose_kinematic
 from bench.runtime.contracts import InitializationReport
+from bench.execution.sampling.circle_sampling import sample_uniform_disk
 from bench.tasks.wr01.domain.contracts import (
     CABINET_LEVELS,
     EpisodePlan,
@@ -22,6 +23,7 @@ def apply_robot_base_initial_state(
     obs: dict[str, Any],
     *,
     config: RobotBaseConfig,
+    seed: int = 0,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Apply the one declared base-reset mode and return an auditable summary."""
 
@@ -30,13 +32,40 @@ def apply_robot_base_initial_state(
     if config.mode is RobotBaseMode.EXPLICIT_POSE:
         if config.xy is None or config.yaw is None:
             raise ValueError("explicit WR-01 base pose is incomplete")
-        return _set_base_pose(
+        radius = float(getattr(config, "sampling_radius_m", 0.0))
+        center = np.asarray(config.xy, dtype=float)
+        target = (
+            sample_uniform_disk(
+                center,
+                radius,
+                seed=int(seed),
+                salt=0x57523149,
+            )
+            if radius > 0.0
+            else center
+        )
+        updated, summary = _set_base_pose(
             env,
             obs,
-            np.asarray(config.xy, dtype=float),
+            target,
             float(config.yaw),
             config.mode.value,
         )
+        summary.update(
+            {
+                "sampling_region": {
+                    "shape": "disk",
+                    "center_xy": center.tolist(),
+                    "radius_m": radius,
+                    "seed": int(seed),
+                    "salt": 0x57523149,
+                }
+                if radius > 0.0
+                else None,
+                "sampled_xy": target.tolist(),
+            }
+        )
+        return updated, summary
     raise ValueError(f"unsupported WR-01 base mode: {config.mode!r}")
 
 
@@ -106,11 +135,17 @@ def initialize_episode_state(
     episode: EpisodePlan,
     cabinets: dict[str, Any],
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Configure episode facts while preserving RoboCasa's sampled item poses."""
+    """Place both cans in their sampled cabinet interiors at reset.
+
+    The reset is not an expert action: no pick/place stages are emitted and the
+    relation is recorded privately for evaluation while remaining unlatched
+    until the doors and canonical neutral reset are complete.
+    """
 
     env.configure_episode(
         item_by_level=episode.item_by_level,
         target_item_id=episode.target_item_id,
+        close_order=episode.close_order,
     )
     env.configure_canonical_physics()
     placements: dict[str, Any] = {}
@@ -128,16 +163,23 @@ def initialize_episode_state(
         ):
             raise ValueError(f"invalid WR-01 sampled pose for {item_id!r}")
         placements[item_id] = {
-            "world_position": position.astype(float).tolist(),
+            "table_world_position": position.astype(float).tolist(),
             "world_quat_xyzw": quat_xyzw.astype(float).tolist(),
-            "visible_before_storage": True,
+            "visible_before_storage": False,
         }
+        env._table_target_positions[item_id] = position.copy()
+    # Move the already-spawned rigid bodies into their assigned open cabinets.
+    # This is reset-time scene construction, not a recorded manipulation.
+    for level, item_id in episode.item_by_level.items():
+        target = np.asarray(env.cabinet_for_level(level).interior_pose(), dtype=float)
+        env.set_object_pose(item_id, target, placements[item_id]["world_quat_xyzw"])
+        placements[item_id]["cabinet_level"] = level
+        placements[item_id]["world_position"] = target.astype(float).tolist()
     initial_fraction = float(cabinets.get("open_fraction", 1.0))
     doors_initially_open = bool(cabinets.get("doors_initially_open", True))
     for level in CABINET_LEVELS:
         env.set_level_door_open_fraction(level, initial_fraction if doors_initially_open else 0.0)
     env.sim.forward()
-    env.start_physical_observer()
     obs = env._get_observations(force_update=True)
     return obs, {
         "seed": episode.seed,
@@ -146,10 +188,11 @@ def initialize_episode_state(
         "doors_initially_open": doors_initially_open,
         "door_open_fraction": initial_fraction if doors_initially_open else 0.0,
         "placements": placements,
-        "placement_mode": "sampled_regions",
+        "placement_mode": "reset_into_open_cabinets",
         "placement_seed": int(env.item_placement_seed),
         "sampling_regions": env.item_sampling_regions(),
         "setup_recorded_in_hdf5_actions": False,
+        "storage_hidden": False,
     }
 
 

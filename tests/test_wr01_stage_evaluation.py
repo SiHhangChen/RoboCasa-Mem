@@ -13,12 +13,12 @@ def test_wr01_open_cabinet_replays_the_closed_cabinet_prefix() -> None:
     integration = get_stage_evaluation_integration("WR-01")
 
     assert integration.target_stage_ids == (
-        "close_lower_cabinet",
+        "canonical_reset",
         "open_cabinet",
     )
     assert integration.prefix_stage_by_target == {
-        "close_lower_cabinet": None,
-        "open_cabinet": "close_lower_cabinet",
+        "canonical_reset": None,
+        "open_cabinet": "canonical_reset",
     }
     assert tuple(spec.id for spec in build_stage_specs(target_stage="open_cabinet")) == (
         "open_cabinet",

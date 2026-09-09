@@ -30,20 +30,28 @@ def _snapshot(
     wrong_opened: bool = False,
     retrieved: str | None = None,
     distractor_stored: bool = True,
+    close_order: tuple[str, str] = ("upper", "lower"),
+    storage_hidden: bool = False,
+    canonical_reset: bool = False,
+    final_placement_verified: bool = False,
 ) -> WR01EvaluationSnapshot:
     return WR01EvaluationSnapshot(
         step_id=step,
         storage_order=order,
         target_item_id=target,
         target_level=target_level,
+        close_order=close_order,
         item_grasped={item_id: item_id in grasped for item_id in order},
         stored_levels_by_item=stored or {},
+        storage_hidden=storage_hidden,
         upper_door_closed=upper_closed,
         lower_door_closed=lower_closed,
         opened_level=opened,
         wrong_retrieval_level_opened=wrong_opened,
         retrieved_item_id=retrieved,
         distractor_still_stored=distractor_stored,
+        canonical_reset=canonical_reset,
+        final_placement_verified=final_placement_verified,
     )
 
 
@@ -57,45 +65,62 @@ def _evaluator() -> WR01Evaluator:
     return evaluator
 
 
-def _complete_through_closed_cabinets(evaluator: WR01Evaluator) -> None:
-    first_stored = {"blue_can": "lower"}
+def _complete_through_handoff(evaluator: WR01Evaluator) -> dict[str, str]:
     both_stored = {"blue_can": "lower", "red_can": "upper"}
-    evaluator.observe(_snapshot(1, grasped=("blue_can",)))
-    evaluator.observe(_snapshot(2, stored=first_stored))
-    evaluator.observe(_snapshot(3, grasped=("red_can",), stored=first_stored))
-    evaluator.observe(_snapshot(4, stored=both_stored))
-    evaluator.observe(_snapshot(5, stored=both_stored, upper_closed=True))
+    evaluator.observe(_snapshot(1, stored=both_stored, upper_closed=True))
+    evaluator.observe(
+        _snapshot(2, stored=both_stored, upper_closed=True, lower_closed=True)
+    )
     evaluator.observe(
         _snapshot(
-            6,
+            3,
             stored=both_stored,
+            storage_hidden=True,
             upper_closed=True,
             lower_closed=True,
+            canonical_reset=True,
         )
     )
+    return both_stored
 
 
-def test_wr01_evaluator_qualifies_the_eight_ordered_stages() -> None:
+def test_wr01_evaluator_qualifies_the_new_ordered_stages() -> None:
     evaluator = _evaluator()
-    both_stored = {"blue_can": "lower", "red_can": "upper"}
-    _complete_through_closed_cabinets(evaluator)
+    both_stored = _complete_through_handoff(evaluator)
     evaluator.observe(
         _snapshot(
-            7,
+            4,
             stored=both_stored,
             upper_closed=True,
             lower_closed=True,
+            storage_hidden=True,
+            canonical_reset=True,
             opened="lower",
         )
     )
     result = evaluator.observe(
         _snapshot(
-            8,
+            5,
             stored=both_stored,
             upper_closed=True,
             lower_closed=True,
+            storage_hidden=True,
+            canonical_reset=True,
             opened="lower",
             retrieved="blue_can",
+        )
+    )
+    result = evaluator.observe(
+        _snapshot(
+            6,
+            stored=both_stored,
+            upper_closed=True,
+            lower_closed=True,
+            storage_hidden=True,
+            canonical_reset=True,
+            opened="lower",
+            retrieved="blue_can",
+            final_placement_verified=True,
         )
     )
 
@@ -104,7 +129,7 @@ def test_wr01_evaluator_qualifies_the_eight_ordered_stages() -> None:
     assert result.failure_code is None
     assert {
         name: result.stages[name].qualified_step for name in STAGE_ORDER
-    } == {name: index for index, name in enumerate(STAGE_ORDER, start=1)}
+    } == {name: index for name, index in zip(STAGE_ORDER, range(1, 7))}
     diagnostics = result.to_diagnostics()
     assert diagnostics["stage_checks"] == {name: True for name in STAGE_ORDER}
     assert diagnostics["evaluation"]["stage_bindings"] == {
@@ -132,27 +157,27 @@ def test_wr01_evaluator_qualifies_the_eight_ordered_stages() -> None:
             "one_can_stored": {
                 "applicable": True,
                 "passed": True,
-                "first_pass_step": 2,
+                "first_pass_step": 1,
             },
             "two_cans_stored": {
                 "applicable": True,
                 "passed": True,
-                "first_pass_step": 4,
+                "first_pass_step": 2,
             },
             "storage_hidden": {
                 "applicable": True,
                 "passed": True,
-                "first_pass_step": 6,
+                "first_pass_step": 3,
             },
             "correct_cabinet_opened": {
                 "applicable": True,
                 "passed": True,
-                "first_pass_step": 7,
+                "first_pass_step": 4,
             },
             "success": {
                 "applicable": True,
                 "passed": True,
-                "first_pass_step": 8,
+                "first_pass_step": 6,
             },
         },
     }
@@ -165,37 +190,39 @@ def test_wr01_evaluator_qualifies_the_eight_ordered_stages() -> None:
     ) == report
 
 
-def test_wr01_evaluator_rejects_a_skipped_pick_until_a_new_grasp_edge() -> None:
+def test_wr01_evaluator_rejects_a_skipped_close_until_a_new_close_edge() -> None:
     evaluator = _evaluator()
-    first_stored = {"blue_can": "lower"}
+    both_stored = {"blue_can": "lower", "red_can": "upper"}
 
-    skipped = evaluator.observe(_snapshot(1, grasped=("red_can",)))
-    evaluator.observe(_snapshot(2))
-    evaluator.observe(_snapshot(3, grasped=("blue_can",)))
-    evaluator.observe(_snapshot(4, stored=first_stored))
+    skipped = evaluator.observe(
+        _snapshot(1, stored=both_stored, lower_closed=True)
+    )
+    assert skipped.stages["close_second_door"].observed
+    assert skipped.stages["close_second_door"].invalidated
+    assert skipped.stages["close_second_door"].reason == (
+        "prerequisite_not_qualified:close_first_door"
+    )
+    evaluator.observe(_snapshot(2, stored=both_stored, upper_closed=True, lower_closed=True))
+    evaluator.observe(_snapshot(3, stored=both_stored, upper_closed=True))
     recovered = evaluator.observe(
-        _snapshot(5, grasped=("red_can",), stored=first_stored)
+        _snapshot(4, stored=both_stored, upper_closed=True, lower_closed=True)
     )
-
-    assert skipped.stages["second_can_pick"].observed
-    assert skipped.stages["second_can_pick"].invalidated
-    assert skipped.stages["second_can_pick"].reason == (
-        "prerequisite_not_qualified:first_can_store"
-    )
-    assert recovered.stages["second_can_pick"].qualified
-    assert recovered.stages["second_can_pick"].qualified_step == 5
+    assert recovered.stages["close_second_door"].qualified
+    assert recovered.stages["close_second_door"].qualified_step == 4
 
 
 def test_wr01_evaluator_makes_the_wrong_retrieval_cabinet_terminal() -> None:
     evaluator = _evaluator()
-    both_stored = {"blue_can": "lower", "red_can": "upper"}
-    _complete_through_closed_cabinets(evaluator)
+    both_stored = _complete_through_handoff(evaluator)
 
     result = evaluator.observe(
         _snapshot(
-            7,
+            4,
             stored=both_stored,
+            storage_hidden=True,
+            canonical_reset=True,
             lower_closed=True,
+            upper_closed=True,
             opened="upper",
             wrong_opened=True,
         )
@@ -218,9 +245,17 @@ def test_wr01_evaluator_makes_the_wrong_retrieval_cabinet_terminal() -> None:
 
 def test_wr01_runtime_callbacks_share_one_evaluator_result() -> None:
     evaluator = _evaluator()
+    both_stored = _complete_through_handoff(evaluator)
 
     class FakeEnv:
-        snapshot = _snapshot(1, grasped=("blue_can",))
+        snapshot = _snapshot(
+            3,
+            stored=both_stored,
+            storage_hidden=True,
+            upper_closed=True,
+            lower_closed=True,
+            canonical_reset=True,
+        )
 
         def evaluation_snapshot(self) -> WR01EvaluationSnapshot:
             return self.snapshot
@@ -231,12 +266,12 @@ def test_wr01_runtime_callbacks_share_one_evaluator_result() -> None:
     )
 
     diagnostics = diagnostics_for_runtime(runtime)
-    assert diagnostics["stage_checks"]["first_can_pick"]
+    assert diagnostics["stage_checks"]["canonical_reset"]
     assert not success_for_runtime(runtime, {})
     assert diagnostics_for_runtime(runtime) == diagnostics
     report = report_stages_for_runtime(runtime)
     assert report["order"] == list(REPORT_STAGE_ORDER)
-    assert not any(stage["passed"] for stage in report["stages"].values())
+    assert report["stages"]["success"]["passed"] is False
 
 
 def test_wr01_runtime_registers_public_report_stage_projector() -> None:

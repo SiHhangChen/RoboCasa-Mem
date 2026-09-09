@@ -10,6 +10,7 @@ from typing import Any
 
 
 TASK_ID = "WR-01"
+TASK_REVISION = "WR01-v3"
 ENV_NAME = "WR01RetrieveRememberedCan"
 ITEM_IDS = ("red_can", "blue_can")
 CABINET_LEVELS = ("lower", "upper")
@@ -27,6 +28,7 @@ class RobotBaseConfig:
     mode: RobotBaseMode
     xy: tuple[float, float] | None = None
     yaw: float | None = None
+    sampling_radius_m: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -88,8 +90,13 @@ class EpisodePlan:
     level_by_item: Mapping[str, str]
     target_item_id: str
     target_level: str
-    storage_order: tuple[str, str]
+    close_order: tuple[str, str]
     max_horizon: int
+
+    @property
+    def storage_order(self) -> tuple[str, str]:
+        """Legacy alias retained for serialized descriptors."""
+        return tuple(self.item_by_level[level] for level in CABINET_LEVELS)
 
     @property
     def distractor_item_id(self) -> str:
@@ -127,6 +134,7 @@ __all__ = [
     "RunContext",
     "SceneConfig",
     "TASK_ID",
+    "TASK_REVISION",
     "TaskConfig",
     "TaskDefinition",
 ]

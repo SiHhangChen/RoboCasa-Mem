@@ -177,6 +177,7 @@ def cabinet_initialization(
             env,
             dict(updated),
             config=descriptor.config.initial_state.robot_base,
+            seed=int(descriptor.episode_plan.seed),
         )
         updated, torso = apply_robot_torso_initial_state(
             env,
