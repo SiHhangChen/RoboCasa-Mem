@@ -47,6 +47,7 @@ from .stage_rollout import (
     wilson_interval,
 )
 from .stage_suite import StageEvalSuiteConfig, StageTargetConfig, load_stage_eval_suite
+from .subtask import SubtaskScheduler, SubtaskTransition
 
 __all__ = [
     "ActionChunkQueue",
@@ -97,4 +98,6 @@ __all__ = [
     "StageEvalSuiteConfig",
     "StageTargetConfig",
     "load_stage_eval_suite",
+    "SubtaskScheduler",
+    "SubtaskTransition",
 ]

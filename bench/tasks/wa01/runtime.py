@@ -24,6 +24,7 @@ from bench.tasks.wa01.evaluation import (
     report_stages_for_runtime,
     success_for_runtime,
 )
+from bench.tasks.wa01.subtask_evaluation import build_subtask_scheduler
 from bench.tasks.wa01.expert.operations import build_operation_handlers
 from bench.tasks.wa01.initialization import (
     apply_fixed_initial_object_regions,
@@ -108,6 +109,7 @@ _ADAPTER = TaskRuntimeAdapter(
     report_stage_profile_id=REPORT_STAGE_PROFILE_ID,
     report_stages=report_stages_for_runtime,
     expert_runtime=build_operation_handlers,
+    subtask_scheduler=build_subtask_scheduler,
 )
 TASK_RUNTIME_API = _ADAPTER.api()
 build_descriptor = _ADAPTER.build_descriptor

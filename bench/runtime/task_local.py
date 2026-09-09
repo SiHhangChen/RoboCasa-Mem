@@ -70,6 +70,7 @@ class TaskRuntimeAdapter:
         validate_descriptor: DescriptorValidator | None = None,
         release_facts: ReleaseFactsBuilder | None = None,
         expert_runtime: ExpertRuntimeBuilder | None = None,
+        subtask_scheduler: Callable[[Any, str], Any] | None = None,
         task_validated_resource_names: tuple[str, ...] = (),
     ) -> None:
         self.task_id = str(task_id)
@@ -94,6 +95,7 @@ class TaskRuntimeAdapter:
         self._validate_descriptor = validate_descriptor
         self._release_facts = release_facts
         self._expert_runtime = expert_runtime
+        self._subtask_scheduler = subtask_scheduler
         self._validated = tuple(task_validated_resource_names)
         if not callable(actions):
             raise TypeError(f"{self.task_id} runtime requires an ActionConfig resolver")
@@ -211,6 +213,7 @@ class TaskRuntimeAdapter:
                 self.report_stages if self._report_stages is not None else None
             ),
             build_expert_runtime=self._expert_runtime,
+            build_subtask_scheduler=self._subtask_scheduler,
         )
 
 

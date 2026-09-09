@@ -23,6 +23,7 @@ from bench.policy.protocol import (
 from bench.policy.protocol.contracts import ACTION_SCHEMA
 from bench.runtime.data_contract import STATE_SCHEMA
 from bench.runtime.contracts import RuntimeStep, TaskDiagnostics
+from bench.evaluation.subtask import SubtaskTransition
 
 
 def _contract() -> PolicyContract:
@@ -59,6 +60,16 @@ class FakeClient:
             actions=np.zeros((2, 13), dtype=np.float32),
             timing={"model_ms": 1.0},
         )
+
+
+class PromptRecordingClient(FakeClient):
+    def __init__(self) -> None:
+        super().__init__()
+        self.prompts: list[str] = []
+
+    def infer(self, observation, *, episode_id: str, step: int) -> InferenceResponse:
+        self.prompts.append(observation.prompt)
+        return super().infer(observation, episode_id=episode_id, step=step)
 
 
 class FakeEnv:
@@ -106,6 +117,48 @@ class FakeAdapter:
 
     def close(self, runtime):
         runtime.env.close()
+
+
+class FakeSubtaskScheduler:
+    def __init__(self) -> None:
+        self.step = 0
+        self.prompt = "subtask one"
+
+    @property
+    def current_prompt(self) -> str:
+        return self.prompt
+
+    @property
+    def current_subtask(self) -> str:
+        return "one" if self.step < 2 else "two"
+
+    def after_step(self, runtime, info):
+        del info
+        self.step += 1
+        if self.step == 1:
+            self.prompt = "subtask two"
+            return SubtaskTransition(
+                changed=True,
+                previous_subtask="one",
+                current_subtask="two",
+                prompt=self.prompt,
+                environment_step=runtime.env.steps,
+            )
+        return SubtaskTransition(
+            complete=self.step >= 3,
+            current_subtask="two",
+            prompt=self.prompt,
+            environment_step=runtime.env.steps,
+        )
+
+    def to_metadata(self):
+        return {"current_subtask": self.current_subtask, "step": self.step}
+
+
+class SubtaskAdapter(FakeAdapter):
+    def create_subtask_scheduler(self, runtime, suite):
+        del runtime, suite
+        return FakeSubtaskScheduler()
 
 
 class ReportAdapter(FakeAdapter):
@@ -186,6 +239,27 @@ def test_runner_replans_and_stops_on_success(tmp_path: Path):
     assert result.policy_actions_consumed == 3
     assert result.reward_sum == 3
     assert (writer.episodes_dir / "seed_001000" / "result.json").is_file()
+
+
+def test_runner_switches_prompt_and_discards_old_action_queue():
+    suite = EvalSuiteConfig(
+        suite_version="test",
+        task_id="WX-01",
+        env_split="pretrain",
+        seeds=(1000,),
+        rollout=RolloutConfig(max_steps=10, replan_steps=2),
+        artifacts=ArtifactConfig(record_video=False),
+    )
+    client = PromptRecordingClient()
+    result = RolloutRunner(client=client, suite=suite).run_episode(
+        SubtaskAdapter(), 1000
+    )
+
+    assert result.status == "success"
+    # The second action from the first chunk is discarded at the handoff, so
+    # the second inference is made with the new prompt at environment step 1.
+    assert client.prompts[:2] == ["subtask one", "subtask two"]
+    assert result.episode_metadata["subtask_scheduler"]["step"] == 3
 
 
 def test_runner_persists_declared_report_stage_profile(tmp_path: Path) -> None:

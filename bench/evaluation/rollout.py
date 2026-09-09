@@ -88,6 +88,7 @@ class RolloutRunner:
         episode_id = f"{self.suite.task_id.lower()}-seed-{seed:06d}"
         result: EpisodeResult | None = None
         interrupted: KeyboardInterrupt | None = None
+        scheduler: Any | None = None
         try:
             runtime = adapter.create_episode(
                 seed=seed,
@@ -95,6 +96,14 @@ class RolloutRunner:
                 suite=self.suite,
             )
             episode_id = runtime.episode_id
+            scheduler_factory = getattr(adapter, "create_subtask_scheduler", None)
+            if callable(scheduler_factory):
+                scheduler = scheduler_factory(runtime, self.suite)
+                if scheduler is not None:
+                    prompt = str(getattr(scheduler, "current_prompt", "")).strip()
+                    if not prompt:
+                        raise ValueError("subtask scheduler returned an empty initial prompt")
+                    runtime.prompt = prompt
             self.client.reset(episode_id)
             queue = ActionChunkQueue()
             while env_steps < self.suite.rollout.max_steps:
@@ -119,6 +128,12 @@ class RolloutRunner:
                             {
                                 "request_id": response.request_id,
                                 "step": env_steps,
+                                "prompt": observation.prompt,
+                                "subtask": (
+                                    getattr(scheduler, "current_subtask", None)
+                                    if scheduler is not None
+                                    else None
+                                ),
                                 "client_latency_ms": client_latency_ms,
                                 "returned_action_count": int(response.actions.shape[0]),
                                 "queued_action_count": int(queued_count),
@@ -127,6 +142,7 @@ class RolloutRunner:
                         )
                 action = queue.pop()
                 policy_actions_consumed += 1
+                prompt_changed = False
                 for _ in range(self.suite.rollout.action_repeat):
                     if env_steps >= self.suite.rollout.max_steps:
                         break
@@ -170,6 +186,25 @@ class RolloutRunner:
                         success = False
                         failure_reason = task_failure_code
                         break
+                    if scheduler is not None:
+                        subtask_event = scheduler.after_step(runtime, info)
+                        if subtask_event.changed:
+                            next_prompt = str(subtask_event.prompt or "").strip()
+                            if not next_prompt:
+                                raise ValueError(
+                                    "subtask scheduler returned an empty handoff prompt"
+                                )
+                            runtime.prompt = next_prompt
+                            queue.clear()
+                            prompt_changed = True
+                        if subtask_event.failed:
+                            failure_reason = (
+                                subtask_event.failure_reason or "subtask_failed"
+                            )
+                            break
+                        if subtask_event.complete and not step_success:
+                            failure_reason = "subtask_complete_without_task_success"
+                            break
                     if step_success:
                         success = True
                         if success_step is None:
@@ -185,6 +220,8 @@ class RolloutRunner:
                         break
                     if done and not self.suite.rollout.ignore_done:
                         failure_reason = "env_done"
+                        break
+                    if prompt_changed:
                         break
                 if success and self.suite.rollout.stop_on_success:
                     break
@@ -217,7 +254,7 @@ class RolloutRunner:
                 actions=actions,
                 policy_actions_returned=policy_actions_returned,
                 policy_actions_consumed=policy_actions_consumed,
-                episode_metadata=runtime.result_metadata,
+                episode_metadata=_episode_metadata(runtime, scheduler),
             )
         except KeyboardInterrupt as exc:
             interrupted = exc
@@ -242,9 +279,7 @@ class RolloutRunner:
                 actions=actions,
                 policy_actions_returned=policy_actions_returned,
                 policy_actions_consumed=policy_actions_consumed,
-                episode_metadata=(
-                    runtime.result_metadata if runtime is not None else {}
-                ),
+                episode_metadata=_episode_metadata(runtime, scheduler),
             )
         except Exception as exc:
             result = self._make_result(
@@ -270,9 +305,7 @@ class RolloutRunner:
                 actions=actions,
                 policy_actions_returned=policy_actions_returned,
                 policy_actions_consumed=policy_actions_consumed,
-                episode_metadata=(
-                    runtime.result_metadata if runtime is not None else {}
-                ),
+                episode_metadata=_episode_metadata(runtime, scheduler),
             )
         finally:
             if runtime is not None:
@@ -298,7 +331,7 @@ class RolloutRunner:
                             actions=actions,
                             policy_actions_returned=policy_actions_returned,
                             policy_actions_consumed=policy_actions_consumed,
-                            episode_metadata=runtime.result_metadata,
+                            episode_metadata=_episode_metadata(runtime, scheduler),
                         )
                     else:
                         result.status = "error"
@@ -504,6 +537,21 @@ def _format_episode_progress(
         f"steps={result.env_steps} calls={result.policy_calls} "
         f"dur={result.duration_s:.1f}s"
     )
+
+
+def _episode_metadata(
+    runtime: EpisodeRuntime | None,
+    scheduler: Any | None,
+) -> Mapping[str, Any]:
+    if runtime is None:
+        return {}
+    metadata = dict(runtime.result_metadata)
+    if scheduler is not None:
+        to_metadata = getattr(scheduler, "to_metadata", None)
+        if not callable(to_metadata):
+            raise TypeError("subtask scheduler must expose to_metadata()")
+        metadata["subtask_scheduler"] = dict(to_metadata())
+    return metadata
 
 
 def _normalize_env_step(

@@ -82,6 +82,7 @@ def aggregate_episode_results(
         and completed == recorded
     )
     report_stage_summary = _aggregate_report_stages(aggregate_items)
+    subtask_summary = _aggregate_subtask_schedulers(aggregate_items)
     if (
         report_stage_summary is not None
         and not report_stage_summary["complete"]
@@ -112,6 +113,8 @@ def aggregate_episode_results(
     }
     if report_stage_summary is not None:
         summary["report_stages"] = report_stage_summary
+    if subtask_summary is not None:
+        summary["subtask_scheduler"] = subtask_summary
     return summary
 
 
@@ -194,6 +197,91 @@ def _aggregate_report_stages(
         "reported_episodes": len(reported),
         "missing_episodes": len(eligible) - len(reported),
         "complete": len(eligible) == len(reported),
+        "stages": stages,
+    }
+
+
+def _aggregate_subtask_schedulers(
+    results: Iterable[Mapping[str, Any]],
+) -> dict[str, Any] | None:
+    """Aggregate optional oracle prompt-scheduler stage handoffs."""
+
+    eligible = [
+        result
+        for result in results
+        if result.get("status") in {"success", "failure"}
+        and isinstance(result.get("episode_metadata"), Mapping)
+        and isinstance(
+            result["episode_metadata"].get("subtask_scheduler"), Mapping
+        )
+    ]
+    if not eligible:
+        return None
+
+    scheduler_records = [
+        result["episode_metadata"]["subtask_scheduler"] for result in eligible
+    ]
+    schedule_ids = {str(record.get("schedule_id", "unknown")) for record in scheduler_records}
+    if len(schedule_ids) != 1:
+        raise ValueError(
+            "cannot aggregate incompatible subtask schedulers: "
+            f"{sorted(schedule_ids)}"
+        )
+    orders = {
+        tuple(str(item) for item in record.get("subtasks", ()))
+        for record in scheduler_records
+    }
+    if len(orders) != 1 or not next(iter(orders), ()):
+        raise ValueError("subtask scheduler records must declare one common non-empty order")
+    order = next(iter(orders))
+    stages: dict[str, dict[str, Any]] = {}
+    for index, stage_id in enumerate(order):
+        attempted = completed = 0
+        completion_steps: list[int] = []
+        for record in scheduler_records:
+            current = str(record.get("current_subtask", ""))
+            try:
+                current_index = order.index(current)
+            except ValueError:
+                continue
+            if current_index < index:
+                continue
+            attempted += 1
+            transitions = record.get("transitions", ())
+            stage_completed = False
+            for transition in transitions:
+                if not isinstance(transition, Mapping):
+                    continue
+                if transition.get("changed") and transition.get("previous_subtask") == stage_id:
+                    stage_completed = True
+                if transition.get("complete") and transition.get("current_subtask") == stage_id:
+                    stage_completed = True
+                if stage_completed and transition.get("environment_step") is not None:
+                    completion_steps.append(int(transition["environment_step"]))
+                    break
+            if stage_completed:
+                completed += 1
+        stages[stage_id] = {
+            "attempted": attempted,
+            "completed": completed,
+            "completion_rate": completed / attempted if attempted else None,
+            "completion_step_mean": (
+                sum(completion_steps) / len(completion_steps)
+                if completion_steps
+                else None
+            ),
+        }
+    return {
+        "schema_version": "membench.subtask_scheduler_summary/v1",
+        "schedule_id": next(iter(schedule_ids)),
+        "order": list(order),
+        "eligible_episodes": len(eligible),
+        "completed_episodes": sum(
+            bool(record.get("finished", False)) for record in scheduler_records
+        ),
+        "failed_episodes": sum(
+            bool(record.get("failed", False)) for record in scheduler_records
+        ),
         "stages": stages,
     }
 

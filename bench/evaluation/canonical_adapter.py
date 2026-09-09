@@ -28,6 +28,7 @@ _ALLOWED_OPTIONS = frozenset(
         "observation_profile_file",
         "task_options",
         "variant",
+        "prompt_scheduler",
     }
 )
 
@@ -151,6 +152,13 @@ class CanonicalEvaluationAdapter:
         episode = self._resolve_episode(seed=suite.seeds[0], suite=suite, options=options)
         self._validate_episode(episode, suite=suite, policy_contract=policy_contract)
         descriptor = self._runtime_api().build_descriptor(episode, True)
+        scheduler_id = options.get("prompt_scheduler")
+        if scheduler_id is not None:
+            builder = getattr(self._runtime_api(), "build_subtask_scheduler", None)
+            if not callable(builder):
+                raise ValueError(
+                    f"task {self.task_id} does not support prompt_scheduler={scheduler_id!r}"
+                )
         if descriptor.sensors.profile_id != OBSERVATION_PROFILE:
             raise ProtocolError(
                 ErrorCode.CONTRACT_MISMATCH,
@@ -173,6 +181,7 @@ class CanonicalEvaluationAdapter:
             "effective_rollout_max_steps": resolve_rollout_max_steps(
                 suite.rollout.max_steps, episode
             ),
+            "prompt_scheduler": scheduler_id,
         }
 
     def _resolve_episode(
@@ -257,7 +266,28 @@ class CanonicalEvaluationAdapter:
             "observation_profile_file": _optional_path(raw.get("observation_profile_file")),
             "task_options": dict(task_options),
             "variant": str(raw.get("variant", "memory")),
+            "prompt_scheduler": _optional_scheduler_id(raw.get("prompt_scheduler")),
         }
+
+    def create_subtask_scheduler(
+        self,
+        runtime: EpisodeRuntime,
+        suite: EvalSuiteConfig,
+    ) -> Any | None:
+        """Create an optional task-owned scheduler selected by suite options."""
+
+        options = self._parse_options(suite)
+        schedule_id = options.get("prompt_scheduler")
+        if schedule_id is None:
+            return None
+        if not isinstance(schedule_id, str) or not schedule_id.strip():
+            raise ValueError("task.options.prompt_scheduler must be a non-empty string")
+        builder = getattr(self._runtime_api(), "build_subtask_scheduler", None)
+        if not callable(builder):
+            raise ValueError(
+                f"task {self.task_id} does not support prompt_scheduler={schedule_id!r}"
+            )
+        return builder(runtime, schedule_id.strip())
 
     def _runtime_api(self) -> Any:
         api = resolve_builtin_task_plugin(self.task_id).load_runtime_api()
@@ -271,6 +301,14 @@ def _optional_path(value: Any) -> Path | None:
         return None
     path = Path(value).expanduser()
     return (path if path.is_absolute() else _ROOT / path).resolve()
+
+
+def _optional_scheduler_id(value: Any) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("task.options.prompt_scheduler must be a non-empty string")
+    return value.strip()
 
 
 def _safe_name(value: str) -> str:

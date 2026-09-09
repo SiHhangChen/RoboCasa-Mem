@@ -53,6 +53,12 @@ class EvaluationAdapter(Protocol):
         runtime: EpisodeRuntime,
     ) -> Mapping[str, Any] | None: ...
 
+    def create_subtask_scheduler(
+        self,
+        runtime: EpisodeRuntime,
+        suite: EvalSuiteConfig,
+    ) -> Any | None: ...
+
     def close(self, runtime: EpisodeRuntime) -> None: ...
 
 

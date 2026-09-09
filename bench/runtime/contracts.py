@@ -132,6 +132,7 @@ class TaskRuntimeAPI:
     build_expert_runtime: Callable[
         [RuntimeDescriptor, Any, Mapping[str, Any]], Mapping[str, Any]
     ] | None = None
+    build_subtask_scheduler: Callable[[Any, str], Any] | None = None
 
 
 @dataclass(frozen=True, slots=True)
