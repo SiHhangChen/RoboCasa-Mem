@@ -355,22 +355,30 @@ def build_boundary_record(episode_dir: Path) -> dict[str, Any]:
 
 
 def collect_boundary_records(
-    episodes_root: Path, *, expected_episodes: int
+    episodes_roots: Path | Sequence[Path], *, expected_episodes: int
 ) -> list[dict[str, Any]]:
+    if isinstance(episodes_roots, Path):
+        roots = [episodes_roots]
+    else:
+        roots = list(episodes_roots)
     episode_dirs = sorted(
-        path
-        for path in episodes_root.glob("seed_*_attempt_00")
-        if path.is_dir() and EPISODE_DIR_PATTERN.fullmatch(path.name)
+        (
+            path
+            for root in roots
+            for path in root.glob("seed_*_attempt_00")
+            if path.is_dir() and EPISODE_DIR_PATTERN.fullmatch(path.name)
+        ),
+        key=_episode_seed,
     )
     if expected_episodes > 0:
         _require(
             len(episode_dirs) == expected_episodes,
-            f"expected {expected_episodes} WA-01 episodes under {episodes_root}, "
+            f"expected {expected_episodes} WA-01 episodes across {roots}, "
             f"found {len(episode_dirs)}",
         )
     records = [build_boundary_record(path) for path in episode_dirs]
     seeds = [int(record["seed"]) for record in records]
-    _require(len(seeds) == len(set(seeds)), f"duplicate seeds discovered under {episodes_root}")
+    _require(len(seeds) == len(set(seeds)), f"duplicate seeds discovered across {roots}")
     if expected_episodes > 0:
         _require(
             seeds == list(range(expected_episodes)),
@@ -393,8 +401,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--episodes-root",
         type=Path,
+        action="append",
         required=True,
-        help="Native WA-01 episode root containing seed_XXXXXX_attempt_00 directories.",
+        help=(
+            "Native WA-01 episode root containing seed_XXXXXX_attempt_00 directories; "
+            "repeat for recordings split across multiple roots."
+        ),
     )
     parser.add_argument("--output", type=Path, required=True, help="Output boundaries.jsonl path.")
     parser.add_argument(
@@ -412,7 +424,8 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     records = collect_boundary_records(
-        args.episodes_root.resolve(), expected_episodes=args.expected_episodes
+        [root.resolve() for root in args.episodes_root],
+        expected_episodes=args.expected_episodes,
     )
     write_boundary_records(records, args.output)
     total_frames = sum(int(record["total_frames"]) for record in records)

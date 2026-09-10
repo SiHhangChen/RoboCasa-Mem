@@ -2,11 +2,11 @@
 """Recover exact WA-05 stage boundaries from recorded planner summaries.
 
 The native WA-05 planner records action counts for every primitive except the
-compact answer-button diagnostic.  We count all other stages with the
+compact answer-button diagnostic. We count all other stages with the
 aggregate-aware WA02 counter and recover the button stage as the exact
-remainder of ``episode.json.step_count``.  This preserves an exact partition
-of every recorded frame while keeping the hot/cold choice as a final-stage
-semantic label only.
+remainder of ``episode.json.step_count``. This preserves an exact partition
+of every recorded frame while retaining the demonstrated hot/cold choice only
+in the answer-button semantic label; filling itself remains a valid open choice.
 """
 
 from __future__ import annotations
@@ -34,6 +34,10 @@ EPISODE_DIR_PATTERN = re.compile(r"^seed_(\d{6})_attempt_00$")
 TEMPERATURES = frozenset({"hot", "cold"})
 NAVIGATE_STAGE_INDICES = frozenset({0, 3, 7})
 STEP_KEYS = ("executed_steps", "release_settle_steps", "steps")
+TASK_INSTRUCTION = (
+    "Fill the cup with either hot or cold water, place it in the service area, "
+    "then press red for hot water or blue for cold water."
+)
 
 
 def require(condition: bool, message: str) -> None:
@@ -266,7 +270,7 @@ def build_boundary_record(episode_dir: Path) -> dict[str, Any]:
         "cup_id": cup_id,
         "service_slot": service_slot,
         "expert_fill_temperature": temperature,
-        "high_level_instruction": "Fill the cup with either hot or cold water, place it in the service area, then press the matching button.",
+        "high_level_instruction": TASK_INSTRUCTION,
         "total_frames": cumulative,
         "recorded_total_frames": recorded_total,
         "step_field_totals": {**field_totals, "base_translation_steps": base_translation_steps},

@@ -1,7 +1,7 @@
 {
   "task_id": "WA-05",
-  "spatial_reference": "The service area and answer-button colors are task-local world semantics, not directions in an arbitrary camera image. The cup identity, service-slot id, and expert's hidden temperature choice are demonstration details; the subtask labels expose only the operation required at the current stage.",
-  "high_level_instruction": "Fill the cup with either hot or cold water, place it in the service area, then press the matching button.",
+  "spatial_reference": "The service area and answer-button colors are task-local world semantics, not directions in an arbitrary camera image. The cup identity, service-slot id, and expert's temperature choice are demonstration details. The fill subtask intentionally leaves the valid hot-or-cold choice open; the final button subtask records the matching answer after that choice has been observed.",
+  "high_level_instruction": "Fill the cup with either hot or cold water, place it in the service area, then press red for hot water or blue for cold water.",
   "keyframes_from_record": true,
   "subtasks": {
     "pick_cup": {
@@ -9,7 +9,7 @@
       "keyframe": "last"
     },
     "fill_cup": {
-      "label": "fill the cup with water",
+      "label": "fill the cup with either hot or cold water",
       "keyframe": "last"
     },
     "place_cup": {

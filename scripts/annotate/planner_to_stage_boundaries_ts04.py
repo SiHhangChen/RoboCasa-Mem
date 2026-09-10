@@ -2,8 +2,8 @@
 """Recover exact TS04 drawer-search boundaries and memory events.
 
 TS04 samples a left/right search order independently from the hidden red-cube
-location.  The emitted high-level instruction exposes only that executable
-search order.  It never exposes the target drawer.
+location. The sampled order remains an expert-trajectory detail while the
+policy-visible instruction stays equal to the original generic search task.
 """
 
 from __future__ import annotations
@@ -23,6 +23,11 @@ FIXTURE_DISPLAY_NAMES = {
     "cabinet_slot_0": "left",
     "cabinet_slot_1": "right",
 }
+TASK_INSTRUCTION = (
+    "Search the drawers for the red cube, closing each drawer after inspection. "
+    "Stop after finding and closing its drawer, then press the completion "
+    "button once for each drawer you inspected."
+)
 EPISODE_DIR_PATTERN = re.compile(r"^seed_(\d{6})_attempt_00$")
 STEP_KEYS = frozenset({"steps", "executed_steps", "release_settle_steps"})
 DRAWER_TRACE_PRIMITIVES = frozenset(
@@ -136,15 +141,8 @@ def build_stage_names(
     return names
 
 
-def build_search_instruction(fixture_order: Sequence[str]) -> str:
-    names = [FIXTURE_DISPLAY_NAMES[str(value)] for value in fixture_order]
-    return (
-        f"Search the drawers in this order: {names[0]}, then {names[1]}. "
-        "Open each drawer, look inside for the bright red cube, and close it "
-        "before continuing. Stop after finding and closing the drawer that "
-        "contains the cube. Then press the completion button once for each "
-        "drawer you inspected, releasing it between presses."
-    )
+def build_search_instruction() -> str:
+    return TASK_INSTRUCTION
 
 
 def _episode_seed(episode_dir: Path) -> int:
@@ -337,7 +335,7 @@ def build_boundary_record(episode_dir: Path) -> dict[str, Any]:
         "fixture_order": list(fixture_order),
         "target_fixture": target_fixture,
         "search_count": search_count,
-        "high_level_instruction": build_search_instruction(full_order),
+        "high_level_instruction": build_search_instruction(),
         "total_frames": cumulative,
         "recorded_total_frames": total_frames,
         "step_field_totals": field_totals,

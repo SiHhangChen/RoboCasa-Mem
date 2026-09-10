@@ -210,3 +210,16 @@ def test_collect_boundary_records_requires_contiguous_complete_seeds(tmp_path: P
 
     with pytest.raises(ValueError, match="expected contiguous seeds"):
         collect_boundary_records(tmp_path, expected_episodes=2)
+
+
+def test_collect_boundary_records_accepts_multiple_roots(tmp_path: Path) -> None:
+    first_root = tmp_path / "part1"
+    second_root = tmp_path / "part2"
+    _write_episode(first_root, seed=0)
+    _write_episode(second_root, seed=1)
+
+    records = collect_boundary_records(
+        [second_root, first_root], expected_episodes=2
+    )
+
+    assert [record["seed"] for record in records] == [0, 1]

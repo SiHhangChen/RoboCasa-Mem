@@ -41,12 +41,15 @@ TASK_LAYOUT_STYLE_DEFAULTS = {
     "TM04": (15, 34),
     "WA-02": (15, 34),
     "WR-01": (24, 24),
+    "WR-03": (24, 24),
 }
 TASK_ENV_DEFAULTS = {
     "TM01": "TM01BoilWaterAndInspectTwoDrawers",
     "TM03": "TM03BoilWaterInspectDrawersAndRunToasterOven",
     "TM04": "TM04FillPotRetrieveCanAndAddTwoSugars",
     "WA-02": "WA02ServeHotColdWaterCups",
+    "WR-01": "WR01RetrieveRememberedCan",
+    "WR-03": "WR03StoreAndRetrieveRememberedCan",
 }
 TASK_STATION_DEFAULTS = {
     "TM03": TM03_DEFAULT_STATIONS,

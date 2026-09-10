@@ -2,10 +2,9 @@
 """Recover exact TS02 stage boundaries and search-memory events.
 
 TS02 samples a drawer search order independently from the hidden red-cube
-location.  This bridge reconstructs the variable-length expert plan, verifies
-the physically observed search history, and emits the boundary contract used
-by ``apply_subtask_labels.py``.  The per-episode high-level instruction exposes
-the sampled search order but never the target drawer.
+location. This bridge reconstructs the variable-length expert plan and keeps
+that sampled order only in the recorded stages. The policy-visible instruction
+remains the original target-independent search task.
 """
 
 from __future__ import annotations
@@ -26,6 +25,11 @@ FIXTURE_DISPLAY_NAMES = {
     "cabinet_slot_1": "center",
     "cabinet_slot_2": "right",
 }
+TASK_INSTRUCTION = (
+    "Search the three drawers for the red cube. Close every drawer after "
+    "looking inside. Once you find the cube and close its drawer, press the "
+    "completion button once for each drawer you inspected."
+)
 EPISODE_DIR_PATTERN = re.compile(r"^seed_(\d{6})_attempt_00$")
 STEP_KEYS = frozenset({"steps", "executed_steps", "release_settle_steps"})
 DRAWER_TRACE_PRIMITIVES = frozenset(
@@ -144,16 +148,8 @@ def build_stage_names(
     return names
 
 
-def build_search_instruction(fixture_order: Sequence[str]) -> str:
-    names = [FIXTURE_DISPLAY_NAMES[str(value)] for value in fixture_order]
-    order_text = f"{names[0]}, {names[1]}, then {names[2]}"
-    return (
-        f"Search the drawers in this order: {order_text}. Open each drawer, "
-        "look inside for the bright red cube, and close it before continuing. "
-        "Stop after finding and closing the drawer that contains the cube. "
-        "Then press the completion button once for each drawer you inspected, "
-        "releasing it between presses."
-    )
+def build_search_instruction() -> str:
+    return TASK_INSTRUCTION
 
 
 def _episode_seed(episode_dir: Path) -> int:
@@ -312,7 +308,7 @@ def build_boundary_record(episode_dir: Path) -> dict[str, Any]:
         "fixture_order": list(fixture_order),
         "target_fixture": target_fixture,
         "search_count": search_count,
-        "high_level_instruction": build_search_instruction(full_order),
+        "high_level_instruction": build_search_instruction(),
         "total_frames": cumulative,
         "recorded_total_frames": total_frames,
         "step_field_totals": field_totals,

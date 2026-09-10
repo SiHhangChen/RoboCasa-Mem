@@ -1,10 +1,10 @@
 {
   "source_dataset": "lerobot_data/memer/ts02_200seeds_v061_subtasks_v3",
-  "output_dir": "outputs/memer/ts02_sft_50_stride10_v3",
+  "output_dir": "outputs/memer/qwen-sft/ts02_sft_50_stride10_v3",
   "annotation_dir": "outputs/memer/ts02_annotations_v3",
   "camera_layout_config": "configs/memer/ts02_rgb_camera_layout.json",
   "keyframe_rule_file": "configs/memer/ts02_keyframe_rules.json",
-  "instruction_source": "meta/tasks.parquet (preserve the per-episode target-independent drawer search order)",
+  "instruction_source": "meta/tasks.parquet (original generic TS02 task; expert drawer order remains hidden)",
   "episode_indices": [
     7, 8, 9, 18, 20, 21, 23, 24, 26, 27,
     36, 38, 39, 40, 49, 50, 54, 55, 59, 60,

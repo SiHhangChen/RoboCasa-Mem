@@ -93,12 +93,52 @@ def test_wa02_plan_produces_seven_task_semantic_labels() -> None:
     assert labeled["keyframes"] == [2, 6, 10, 13, 17, 21, 22]
 
 
+def test_wa02_cold_first_plan_keeps_temperature_labels_correct() -> None:
+    root = Path(__file__).resolve().parents[2]
+    config = load_config(root / "configs" / "memer" / "wa02_subtasks.json")
+    names = build_stage_names(
+        "cup_B",
+        "cup_A",
+        {"cup_A": "slot_2", "cup_B": "slot_1"},
+        "cup_A",
+        ("cold", "hot"),
+    )
+    record = {
+        "task_id": "WA-02",
+        "seed": 8,
+        "requested_service_side": "left",
+        "keyframes": [2, 6, 10, 13, 17, 21, 22],
+        "stages": [
+            {"name": name, "end_frame": index + 1}
+            for index, name in enumerate(names)
+        ],
+    }
+
+    labeled = label_episode(record, config, recorded_total=26)
+
+    assert [
+        labeled["subtask_order"][index]
+        for index in labeled["subtask_indices"]
+    ] == [
+        *(["pick up the first cup"] * 3),
+        *(["fill the held cup with cold water"] * 4),
+        *(["place the held cup on the dining table to the left of the sink"] * 4),
+        *(["return to the starting counter and pick up the remaining cup"] * 3),
+        *(["fill the held cup with hot water"] * 4),
+        *(["place the held cup on the dining table to the left of the sink"] * 4),
+        *(["pick up the cup from the left side of the dining table"] * 4),
+    ]
+
+
 def test_wa02_instruction_exposes_only_requested_temperature() -> None:
     instruction = build_task_instruction("cold")
 
-    assert "Pick up the first cup" in instruction
-    assert "pick up the remaining cup" in instruction
-    assert "pick up the cold-water cup" in instruction
+    assert instruction == (
+        "Fill two identical cups with hot and cold water, stage both cups, "
+        "then take the cold-water cup."
+    )
+    assert "first cup" not in instruction
+    assert "remaining cup" not in instruction
     assert "left side" not in instruction
     assert "right side" not in instruction
     assert "cup_A" not in instruction

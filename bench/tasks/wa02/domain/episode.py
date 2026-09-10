@@ -105,6 +105,11 @@ def resolve_episode_plan(*, seed: int, **values: Any) -> EpisodePlan:
             "the execution sequence is seed-balanced"
         )
 
+    if "fill_order" in values:
+        raise ValueError(
+            "WA-02 no longer supports fill_order overrides; "
+            "the execution sequence is seed-balanced"
+        )
     balanced = balanced_axes_for_seed(seed)
     configured_hot = values.get("hot_cup_id")
     hot_cup = (
