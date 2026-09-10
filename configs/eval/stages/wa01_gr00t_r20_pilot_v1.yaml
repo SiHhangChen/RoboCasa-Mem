@@ -13,9 +13,6 @@ stages:
   - id: two_cups_ready
     source: expert_prefix
     model_step_budget: 2000
-  - id: selection
-    source: expert_prefix
-    model_step_budget: 1000
   - id: success
     source: expert_prefix
     model_step_budget: 1000

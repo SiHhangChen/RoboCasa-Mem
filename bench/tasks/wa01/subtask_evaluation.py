@@ -54,15 +54,15 @@ class WA01OracleSubtaskScheduler:
             ),
             # The final prompt is resolved from the privileged cup-to-slot
             # assignment once both cups are ready.
-            _SubtaskSpec("success", ""),
+            _SubtaskSpec("selection", ""),
         )
         self._prompts = tuple(spec.label for spec in self._specs)
         state = evaluate_initialized_runtime(self.runtime)
         if state.failure_code:
             self._failed = True
             self._failure_reason = str(state.failure_code)
-        # The sugared coffee is unknown at reset for unmarked episodes.  The
-        # final left/right prompt is resolved at the ready -> selection handoff.
+        # The sugared coffee is unknown at reset. The final left/right prompt
+        # is resolved at the ready -> selection handoff.
 
     @property
     def current_subtask(self) -> str:
@@ -134,7 +134,7 @@ class WA01OracleSubtaskScheduler:
             return event
 
         self._index += 1
-        if self.current_subtask == "success":
+        if self.current_subtask == "selection":
             # Re-resolve at handoff time so the target is based on the actual
             # detected sugared cup, while the slot mapping remains privileged.
             self._prompts = (*self._prompts[:-1], self._selection_prompt(state))

@@ -49,10 +49,8 @@ def _environment(
     resources: Mapping[str, Any],
 ) -> Mapping[str, Any]:
     del config, scene, resources
-    return {
-        "sugar_target_mode": plan.sugar_target_mode,
-        "target_sugared_coffee_id": plan.target_sugared_coffee_id,
-    }
+    del plan
+    return {}
 
 
 def _initialize(descriptor: Any, env: Any, observation: Mapping[str, Any]):
@@ -75,10 +73,7 @@ def _initialize(descriptor: Any, env: Any, observation: Mapping[str, Any]):
         nav_config=descriptor.navigation,
         seed=descriptor.scene.scene_seed,
     )
-    evaluator = WA01Evaluator(
-        sugar_target_mode=descriptor.episode_plan.sugar_target_mode,
-        target_sugared_coffee_id=descriptor.episode_plan.target_sugared_coffee_id,
-    )
+    evaluator = WA01Evaluator()
     evaluator.reset(env.evaluation_snapshot())
     env._wa01_evaluator = evaluator
     return (
@@ -97,10 +92,7 @@ _ADAPTER = TaskRuntimeAdapter(
     plan=standard_plan(resolve_episode_plan),
     actions=_actions,
     navigation=manual_station_navigation(build_navigation_config),
-    prompt=lambda plan, variant: resolve_prompt_spec(
-        sugar_target_mode=plan.sugar_target_mode,
-        variant=variant,
-    ),
+    prompt=lambda plan, variant: resolve_prompt_spec(variant=variant),
     environment=_environment,
     initialize=_initialize,
     diagnostics=diagnostics_for_runtime,

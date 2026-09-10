@@ -16,17 +16,13 @@ from bench.evaluation.report_profiles import WA01_REPORT_PROFILE
 from bench.tasks.wa01.domain.contracts import COFFEE_IDS
 
 
-STAGE_ORDER = ("sugar", "one_ready", "ready", "selection", "correct", "success")
+STAGE_ORDER = ("sugar", "one_ready", "ready", "selection")
 STAGE_PREREQUISITES: dict[str, str | None] = {
     "sugar": None,
     "one_ready": "sugar",
     "ready": "one_ready",
     "selection": "ready",
-    "correct": "selection",
-    "success": "correct",
 }
-_PHYSICAL_STAGES = ("sugar", "one_ready", "ready", "selection")
-_DERIVED_STAGES = ("correct", "success")
 
 TASK_EVALUATOR_METADATA_KEY = "task_evaluator"
 REPORT_STAGE_ORDER = WA01_REPORT_PROFILE.stage_ids
@@ -36,7 +32,7 @@ _REPORT_STAGE_SOURCES = {
     "sugar_added": "sugar",
     "one_cup_ready": "one_ready",
     "two_cups_ready": "ready",
-    "success": "success",
+    "success": "selection",
 }
 
 
@@ -47,18 +43,6 @@ def _coffee_id(value: str | None) -> str | None:
     if normalized not in COFFEE_IDS:
         raise ValueError(f"invalid WA-01 coffee id: {value!r}")
     return normalized
-
-
-def _configuration(mode: str, target: str | None) -> tuple[str, str | None]:
-    normalized_mode = str(mode).strip().lower()
-    if normalized_mode not in {"unmarked", "marked"}:
-        raise ValueError(f"unsupported WA-01 sugar target mode: {mode!r}")
-    normalized_target = _coffee_id(target)
-    if normalized_mode == "marked" and normalized_target is None:
-        raise ValueError("marked WA-01 evaluation requires a target coffee")
-    if normalized_mode == "unmarked" and normalized_target is not None:
-        raise ValueError("unmarked WA-01 evaluation cannot define a target coffee")
-    return normalized_mode, normalized_target
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,8 +56,6 @@ class WA01EvaluationSnapshot:
     """
 
     step_id: int
-    sugar_target_mode: str
-    target_sugared_coffee_id: str | None
     sugar_delivery_coffee_id: str | None
     coffee_on_dining_counter: Mapping[str, bool] = field(default_factory=dict)
     coffee_upright: Mapping[str, bool] = field(default_factory=dict)
@@ -81,13 +63,7 @@ class WA01EvaluationSnapshot:
     details: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        mode, target = _configuration(
-            self.sugar_target_mode,
-            self.target_sugared_coffee_id,
-        )
         object.__setattr__(self, "step_id", int(self.step_id))
-        object.__setattr__(self, "sugar_target_mode", mode)
-        object.__setattr__(self, "target_sugared_coffee_id", target)
         object.__setattr__(
             self,
             "sugar_delivery_coffee_id",
@@ -125,12 +101,6 @@ class WA01EvaluationSnapshot:
         )
 
     @property
-    def sugar_assignment_correct(self) -> bool | None:
-        if self.sugar_target_mode == "unmarked":
-            return None
-        return self.sugar_delivery_coffee_id == self.target_sugared_coffee_id
-
-    @property
     def correct_selection(self) -> bool:
         return bool(
             self.selected_coffee_id is not None
@@ -145,10 +115,6 @@ class WA01EvaluationSnapshot:
             "one_ready": self.one_ready,
             "ready": self.ready,
             "selection": self.selected_coffee_id is not None,
-            "correct": self.correct_selection,
-            "success": bool(
-                self.correct_selection and self.sugar_assignment_correct is not False
-            ),
         }
 
 
@@ -195,8 +161,8 @@ class WA01EvalResult:
         sugar = dict(payload.get("sugar") or {})
         sugar["consumed"] = qualified["sugar"]
         selection = dict(payload.get("selection") or {})
-        selection["observed_correct"] = observed["correct"]
-        selection["correct"] = qualified["correct"]
+        selection["observed_correct"] = bool(selection.get("correct", False))
+        selection["correct"] = qualified["selection"]
         coffee_pair = dict(payload.get("coffee_pair") or {})
         coffee_pair["detected_together_before_selection"] = coffee_pair.get(
             "together_before_selection",
@@ -212,7 +178,7 @@ class WA01EvalResult:
                 "success_checks": {
                     "sugar_consumed": qualified["sugar"],
                     "cups_together_before_selection": qualified["ready"],
-                    "correct_sugared_selection": qualified["correct"],
+                    "correct_sugared_selection": qualified["selection"],
                 },
                 "sugar": sugar,
                 "selection": selection,
@@ -228,18 +194,12 @@ class WA01EvalResult:
                 },
             }
         )
-        assignment = sugar.get("assignment_correct")
-        if assignment is not None:
-            payload["success_checks"]["sugar_assignment_correct"] = bool(assignment)
         return payload
 
     def to_report_stages(self) -> dict[str, Any]:
         """Project the detailed evaluator onto the public WA-01 funnel."""
 
-        valid_sugar = bool(
-            self.stages["sugar"].qualified
-            and self.failure_code != "wrong_sugar_assignment"
-        )
+        valid_sugar = bool(self.stages["sugar"].qualified)
         passed = {
             "sugar_added": valid_sugar,
             "one_cup_ready": bool(
@@ -278,11 +238,7 @@ class _MutableStage:
 class WA01Evaluator:
     """Strict, idempotent, history-aware WA-01 stage evaluator."""
 
-    def __init__(self, *, sugar_target_mode: str, target_sugared_coffee_id: str | None) -> None:
-        self.sugar_target_mode, self.target_sugared_coffee_id = _configuration(
-            sugar_target_mode,
-            target_sugared_coffee_id,
-        )
+    def __init__(self) -> None:
         self._stages = {name: _MutableStage() for name in STAGE_ORDER}
         self._rejected: dict[str, list[dict[str, Any]]] = {name: [] for name in STAGE_ORDER}
         self._previous_raw: dict[str, bool] = {name: False for name in STAGE_ORDER}
@@ -290,7 +246,6 @@ class WA01Evaluator:
         self._cached_result: WA01EvalResult | None = None
 
     def reset(self, snapshot: WA01EvaluationSnapshot) -> WA01EvalResult:
-        self._validate_configuration(snapshot)
         self._stages = {name: _MutableStage() for name in STAGE_ORDER}
         self._rejected = {name: [] for name in STAGE_ORDER}
         raw = snapshot.raw_stage_values()
@@ -304,7 +259,6 @@ class WA01Evaluator:
         return self._cached_result
 
     def observe(self, snapshot: WA01EvaluationSnapshot) -> WA01EvalResult:
-        self._validate_configuration(snapshot)
         if self._last_step_id is None:
             return self.reset(snapshot)
         if snapshot.step_id == self._last_step_id:
@@ -318,41 +272,24 @@ class WA01Evaluator:
 
         raw = snapshot.raw_stage_values()
         qualified_before = {name: self._stages[name].qualified for name in STAGE_ORDER}
-        newly_qualified: set[str] = set()
-
         for name, value in raw.items():
             if value:
                 self._mark_observed(name, snapshot.step_id)
 
-        for name in _PHYSICAL_STAGES:
+        for name in STAGE_ORDER:
             if not raw[name] or self._previous_raw[name] or self._stages[name].qualified:
                 continue
             prerequisite = STAGE_PREREQUISITES[name]
-            if prerequisite is None or qualified_before[prerequisite]:
-                self._qualify(name, snapshot.step_id)
-                newly_qualified.add(name)
-            else:
+            if prerequisite is not None and not qualified_before[prerequisite]:
                 self._reject(
                     name,
                     snapshot.step_id,
                     f"prerequisite_not_qualified:{prerequisite}",
                 )
-
-        # Correctness and final success are derived from a valid selection and
-        # may therefore be committed in the same control step as that event.
-        if raw["correct"] and not self._stages["correct"].qualified:
-            if qualified_before["selection"] or "selection" in newly_qualified:
-                self._qualify("correct", snapshot.step_id)
-                newly_qualified.add("correct")
-            elif not self._previous_raw["correct"]:
-                self._reject("correct", snapshot.step_id, "prerequisite_not_qualified:selection")
-
-        if raw["success"] and not self._stages["success"].qualified:
-            if qualified_before["correct"] or "correct" in newly_qualified:
-                self._qualify("success", snapshot.step_id)
-                newly_qualified.add("success")
-            elif not self._previous_raw["success"]:
-                self._reject("success", snapshot.step_id, "prerequisite_not_qualified:correct")
+            elif name == "selection" and not snapshot.correct_selection:
+                self._reject(name, snapshot.step_id, "wrong_coffee_selected")
+            else:
+                self._qualify(name, snapshot.step_id)
 
         self._previous_raw = raw
         self._last_step_id = snapshot.step_id
@@ -363,13 +300,6 @@ class WA01Evaluator:
         if self._cached_result is None:
             raise RuntimeError("WA-01 evaluator has not been reset")
         return self._cached_result
-
-    def _validate_configuration(self, snapshot: WA01EvaluationSnapshot) -> None:
-        if (
-            snapshot.sugar_target_mode != self.sugar_target_mode
-            or snapshot.target_sugared_coffee_id != self.target_sugared_coffee_id
-        ):
-            raise ValueError("WA-01 evaluation snapshot configuration changed within an episode")
 
     def _mark_observed(self, name: str, step_id: int) -> None:
         stage = self._stages[name]
@@ -418,17 +348,14 @@ class WA01Evaluator:
 
     def _build_result(self, snapshot: WA01EvaluationSnapshot) -> WA01EvalResult:
         stages = {name: self._stage_result(name) for name in STAGE_ORDER}
-        assignment = snapshot.sugar_assignment_correct
         failure_code: str | None = None
-        if stages["sugar"].qualified and assignment is False:
-            failure_code = "wrong_sugar_assignment"
-        elif (
-            stages["selection"].qualified
-            and snapshot.selected_coffee_id != snapshot.sugar_delivery_coffee_id
-        ):
-            failure_code = "wrong_coffee_selected"
-        elif stages["selection"].observed and not stages["selection"].qualified:
-            failure_code = "selection_before_ready"
+        selection = stages["selection"]
+        if selection.observed and not selection.qualified:
+            failure_code = (
+                "wrong_coffee_selected"
+                if selection.reason == "wrong_coffee_selected"
+                else "selection_before_ready"
+            )
 
         details = dict(snapshot.details)
         evaluation = dict(details.get("evaluation") or {})
@@ -439,7 +366,7 @@ class WA01Evaluator:
                 "stage_order": list(STAGE_ORDER),
                 "stage_prerequisites": dict(STAGE_PREREQUISITES),
                 "qualification_policy": "rising_edge_after_prerequisite",
-                "same_step_derived_stages": list(_DERIVED_STAGES),
+                "same_step_derived_stages": [],
                 "raw_stage_checks": snapshot.raw_stage_values(),
                 "rejected_stage_observations": {
                     name: list(values) for name, values in self._rejected.items() if values
@@ -447,13 +374,9 @@ class WA01Evaluator:
             }
         )
         details["evaluation"] = evaluation
-        if "sugar" in details:
-            sugar = dict(details["sugar"] or {})
-            sugar["assignment_correct"] = assignment
-            details["sugar"] = sugar
         return WA01EvalResult(
-            success=stages["success"].qualified,
-            terminal=stages["success"].qualified,
+            success=selection.qualified,
+            terminal=selection.qualified,
             failure_code=failure_code,
             stages=stages,
             details=details,

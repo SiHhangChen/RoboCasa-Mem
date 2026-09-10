@@ -288,8 +288,6 @@ def verify_cups_ready_for_selection(controller: Any, **kwargs: Any) -> dict[str,
         "cups_together": bool(env.cups_together),
         "sugar_consumed": bool(env.sugar_consumed),
     }
-    if env.sugar_target_mode == "marked":
-        checks["sugar_assignment_correct"] = bool(env.sugar_assignment_correct)
     if all(checks.values()):
         env.record_cups_together_before_selection()
     checks["cups_together_before_selection_recorded"] = bool(
@@ -322,8 +320,6 @@ def apply_sugar_delivery_event(
     checks = {
         "sugar_consumed": bool(env.sugar_consumed),
     }
-    if env.sugar_target_mode == "marked":
-        checks["sugar_assignment_correct"] = bool(env.sugar_assignment_correct)
     passed = all(checks.values())
     return {
         "primitive": "record_sugar_delivery",

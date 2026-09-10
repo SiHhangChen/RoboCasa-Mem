@@ -59,12 +59,10 @@ def test_expert_prefix_round_trip_preserves_explicit_stage_order(tmp_path) -> No
             "one_ready": 4,
             "ready": 6,
             "selection": 8,
-            "correct": 8,
-            "success": 8,
         },
         actions=np.zeros((9, 13), dtype=np.float32),
         success=True,
-        stage_order=("sugar", "one_ready", "ready", "selection", "correct", "success"),
+        stage_order=("sugar", "one_ready", "ready", "selection"),
     )
 
     write_expert_prefix(tmp_path, artifact)

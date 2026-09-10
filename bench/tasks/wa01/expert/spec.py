@@ -9,7 +9,7 @@ from __future__ import annotations
 from bench.execution.contracts import ExpertPlan
 from bench.execution.plan_builder import finish_plan, navigate, operate
 from bench.tasks.contracts import ExpertPlanInputs
-from bench.tasks.wa01.domain.episode import target_sugared_coffee_for_seed
+from bench.tasks.wa01.domain.episode import sugared_coffee_for_seed
 from bench.tasks.wa01.domain.geometry import dining_region_config_summary
 
 
@@ -20,14 +20,9 @@ def build_expert_plan(inputs: ExpertPlanInputs) -> ExpertPlan:
     facts = dict(episode.facts)
     actions = inputs.action_config
     first, second = (str(v) for v in facts["delivery_order"])
-    sugar_target_mode = str(facts.get("sugar_target_mode", "unmarked"))
-    if sugar_target_mode == "marked":
-        sugared = str(facts["target_sugared_coffee_id"])
-    else:
-        # Select the sugared cup independently from delivery order. The
-        # seed-owned choice keeps demonstrations reproducible while allowing
-        # both sugared-first and sugared-second episodes.
-        sugared = target_sugared_coffee_for_seed(episode.seed)
+    # Select the sugared cup independently from delivery order. The seed-owned
+    # choice keeps demonstrations reproducible while allowing both orders.
+    sugared = sugared_coffee_for_seed(episode.seed)
     slots = dict(facts["final_slot_assignment"])
     sugar = str(getattr(inputs.scene, "sugar_name", "sugar_cube"))
 
@@ -90,8 +85,6 @@ def build_expert_plan(inputs: ExpertPlanInputs) -> ExpertPlan:
         operate("select", sugared, name="select_sugared_coffee"),
     ]
     return finish_plan(episode, stages, metadata={
-        "sugar_target_mode": sugar_target_mode,
-        "target_sugared_coffee_id": facts.get("target_sugared_coffee_id"),
         "sugared_coffee_id": sugared,
         "delivery_order": [first, second],
         "final_slot_assignment": slots,

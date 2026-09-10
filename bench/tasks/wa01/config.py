@@ -32,30 +32,14 @@ from bench.tasks.wa01.domain.geometry import (
 PACKAGE_ROOT = Path(__file__).resolve().parent
 DEFAULT_TASK_CONFIG_FILE = PACKAGE_ROOT / "resources" / "task.yaml"
 DEFAULT_INITIAL_STATION_ID = "coffee_machine_station"
-SUGAR_TARGET_MODES = frozenset({"unmarked", "marked"})
 
 
 def resolve_task_options(values: Mapping[str, Any] | None) -> dict[str, Any]:
-    """Validate the optional WA-01 compatibility mode used by evaluation."""
+    """Reject task-specific overrides; WA-01 has one canonical task mode."""
 
     options = dict(values or {})
-    _reject_unknown(
-        options,
-        {"sugar_target_mode", "target_sugared_coffee_id"},
-        "WA-01 task options",
-    )
-    resolved: dict[str, Any] = {}
-    if "sugar_target_mode" in options:
-        mode = str(options["sugar_target_mode"]).strip().lower()
-        if mode not in SUGAR_TARGET_MODES:
-            raise ValueError(f"unsupported WA-01 sugar_target_mode: {mode!r}")
-        resolved["sugar_target_mode"] = mode
-    if "target_sugared_coffee_id" in options:
-        target = str(options["target_sugared_coffee_id"])
-        if target not in COFFEE_IDS:
-            raise ValueError(f"invalid WA-01 target coffee id: {target!r}")
-        resolved["target_sugared_coffee_id"] = target
-    return resolved
+    _reject_unknown(options, set(), "task options")
+    return {}
 
 
 def load_task_config(path: str | Path = DEFAULT_TASK_CONFIG_FILE) -> TaskConfig:

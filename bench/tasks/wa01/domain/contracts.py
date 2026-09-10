@@ -95,8 +95,6 @@ class EpisodePlan:
     """保存一个 seed 在整条轨迹中不可再改变的任务决策。"""
 
     seed: int
-    sugar_target_mode: str
-    target_sugared_coffee_id: str | None
     delivery_order: tuple[str, str]
     final_slot_assignment: Mapping[str, str]
     max_horizon: int

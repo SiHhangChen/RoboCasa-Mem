@@ -16,7 +16,13 @@ Package layout version: `membench.task_package/v1`.
 
 The reporting funnel is:
 
-`sugar -> one_ready -> ready -> selection -> correct -> success`
+`sugar -> one_ready -> ready -> selection`
+
+`selection` is qualified only when the robot selects the coffee that actually
+received the sugar. It is also the final success verdict. The public reporting
+funnel exposes the same four events as
+`sugar_added -> one_cup_ready -> two_cups_ready -> success`, where public
+`success` maps directly to internal `selection`.
 
 Each stage exposes both `observed` and `qualified`. `observed` only means that
 the underlying detector saw the condition. A stage becomes `qualified` only

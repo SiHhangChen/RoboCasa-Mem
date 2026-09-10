@@ -33,11 +33,46 @@ class _Runtime:
 def test_wa01_oracle_scheduler_switches_prompts(monkeypatch):
     states = iter(
         [
-            _State(stages={"sugar": False, "one_ready": False, "ready": False, "success": False}),
-            _State(stages={"sugar": True, "one_ready": False, "ready": False, "success": False}),
-            _State(stages={"sugar": True, "one_ready": True, "ready": False, "success": False}),
-            _State(stages={"sugar": True, "one_ready": True, "ready": True, "success": False}),
-            _State(stages={"sugar": True, "one_ready": True, "ready": True, "success": True}),
+            _State(
+                stages={
+                    "sugar": False,
+                    "one_ready": False,
+                    "ready": False,
+                    "selection": False,
+                }
+            ),
+            _State(
+                stages={
+                    "sugar": True,
+                    "one_ready": False,
+                    "ready": False,
+                    "selection": False,
+                }
+            ),
+            _State(
+                stages={
+                    "sugar": True,
+                    "one_ready": True,
+                    "ready": False,
+                    "selection": False,
+                }
+            ),
+            _State(
+                stages={
+                    "sugar": True,
+                    "one_ready": True,
+                    "ready": True,
+                    "selection": False,
+                }
+            ),
+            _State(
+                stages={
+                    "sugar": True,
+                    "one_ready": True,
+                    "ready": True,
+                    "selection": True,
+                }
+            ),
         ]
     )
     monkeypatch.setattr(
@@ -63,7 +98,7 @@ def test_wa01_oracle_scheduler_switches_prompts(monkeypatch):
 
     runtime.env.timestep = 300
     event = scheduler.after_step(runtime, {})
-    assert event.current_subtask == "success"
+    assert event.current_subtask == "selection"
     assert event.prompt == "pick up the coffee cup in the left dining placement zone"
 
     runtime.env.timestep = 400

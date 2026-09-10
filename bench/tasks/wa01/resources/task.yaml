@@ -19,7 +19,6 @@ scene:
   sugar_name: sugar_cube
 
 episode:
-  sugar_target_mode: unmarked
   first_delivery_coffee: null
   max_horizon: 5000
 

@@ -65,7 +65,7 @@ def test_prefix_summary_reports_missing_and_invalid_seeds() -> None:
     assert summary["missing_seeds"] == [3]
 
 
-def test_prefix_summary_supports_targets_sharing_one_prefix_boundary() -> None:
+def test_prefix_summary_uses_selection_as_wa01_success_boundary() -> None:
     artifact = ExpertPrefixArtifact(
         task_id="WA-01",
         seed=1,
@@ -76,11 +76,10 @@ def test_prefix_summary_supports_targets_sharing_one_prefix_boundary() -> None:
             "one_ready": 30,
             "ready": 50,
             "selection": 65,
-            "success": 65,
         },
         actions=np.zeros((66, 13), dtype=np.float32),
         success=True,
-        stage_order=("sugar", "one_ready", "ready", "selection", "success"),
+        stage_order=("sugar", "one_ready", "ready", "selection"),
     )
 
     summary = summarize_expert_prefixes(
@@ -89,19 +88,16 @@ def test_prefix_summary_supports_targets_sharing_one_prefix_boundary() -> None:
             "sugar_added",
             "one_cup_ready",
             "two_cups_ready",
-            "selection",
             "success",
         ),
         stage_segments={
             "sugar_added": (None, "sugar"),
             "one_cup_ready": ("sugar", "one_ready"),
             "two_cups_ready": ("one_ready", "ready"),
-            "selection": ("ready", "selection"),
-            "success": ("ready", "success"),
+            "success": ("ready", "selection"),
         },
         expected_seeds=(1,),
     )
 
-    assert summary["stages"]["selection"]["p95_higher"] == 15
     assert summary["stages"]["success"]["p95_higher"] == 15
     assert summary["recommended_budgets"]["success"] == 30

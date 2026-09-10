@@ -8,7 +8,7 @@ from bench.tasks.contracts import EpisodeRequest, ExpertPlanInputs
 from bench.tasks.wa01.execution.handlers import build_stage_handlers
 from bench.tasks.wa01.domain.episode import (
     resolve_episode_plan,
-    target_sugared_coffee_for_seed,
+    sugared_coffee_for_seed,
 )
 from bench.tasks.wa01.domain.semantics import (
     SemanticState,
@@ -71,23 +71,39 @@ def test_wa01_limits_gripper_force_only_during_sugar_transfer(
     assert applied_limits == [5.0, 20.0]
 
 
-def test_wa01_prompt_allows_either_unmarked_coffee() -> None:
+def test_wa01_prompt_allows_either_coffee() -> None:
     prompt = resolve_prompt_spec(variant="memory")
 
-    assert "either coffee" in prompt.initial_prompt
-    assert "either coffee" in prompt.policy_prompt
+    assert prompt.initial_prompt == (
+        "Two identical coffees are already prepared. Add one sugar cube to either "
+        "coffee, place both cups on the dining counter, then identify the sugared "
+        "coffee."
+    )
+    assert prompt.policy_prompt == (
+        "Start at the coffee machine with two identical prepared coffees. Add one "
+        "sugar cube to either coffee, carry both coffees to the dining counter, and "
+        "identify the coffee you sugared."
+    )
     assert "mark" not in prompt.initial_prompt.casefold()
     assert "mark" not in prompt.policy_prompt.casefold()
 
 
-def test_wa01_episode_has_no_preassigned_sugar_target() -> None:
+def test_wa01_episode_has_one_canonical_mode() -> None:
     plan = resolve_episode_plan(seed=17)
     episode = resolve_episode(EpisodeRequest(task_id="WA-01", seed=17))
 
-    assert plan.sugar_target_mode == "unmarked"
-    assert plan.target_sugared_coffee_id is None
-    assert episode.facts["sugar_target_mode"] == "unmarked"
-    assert episode.facts["target_sugared_coffee_id"] is None
+    assert not hasattr(plan, "sugar_target_mode")
+    assert "sugar_target_mode" not in episode.facts
+    assert "target_sugared_coffee_id" not in episode.facts
+
+    with pytest.raises(ValueError, match="unknown WA-01 task options"):
+        resolve_episode(
+            EpisodeRequest(
+                task_id="WA-01",
+                seed=17,
+                options={"sugar_target_mode": "marked"},
+            )
+        )
 
 
 def test_wa01_expert_sugar_choice_is_independent_of_delivery_order() -> None:
@@ -102,7 +118,7 @@ def test_wa01_expert_sugar_choice_is_independent_of_delivery_order() -> None:
         sugared = str(expert.metadata["sugared_coffee_id"])
         delivery_order = tuple(str(value) for value in episode.facts["delivery_order"])
 
-        assert sugared == target_sugared_coffee_for_seed(seed)
+        assert sugared == sugared_coffee_for_seed(seed)
         observed_positions.add("first" if sugared == delivery_order[0] else "second")
 
     assert observed_positions == {"first", "second"}
@@ -152,53 +168,3 @@ def test_wa01_accepts_either_delivery_and_requires_selecting_that_coffee() -> No
             "cups_together_before_selection": True,
             "correct_sugared_selection": True,
         }
-
-
-def test_wa01_marked_compatibility_restores_old_prompt_and_target() -> None:
-    seed = 17
-    episode = resolve_episode(
-        EpisodeRequest(
-            task_id="WA-01",
-            seed=seed,
-            options={"sugar_target_mode": "marked"},
-        )
-    )
-    descriptor = resolve_builtin_task_plugin("WA-01").load_runtime_api().build_descriptor(
-        episode,
-        False,
-    )
-
-    target = target_sugared_coffee_for_seed(seed)
-    assert episode.facts["sugar_target_mode"] == "marked"
-    assert episode.facts["target_sugared_coffee_id"] == target
-    assert "temporarily marked" in episode.public["prompt"]
-    assert descriptor.environment.env_kwargs == {
-        "sugar_target_mode": "marked",
-        "target_sugared_coffee_id": target,
-    }
-
-
-def test_wa01_marked_compatibility_requires_the_marked_coffee() -> None:
-    incorrect = SemanticState(
-        sugar_target_mode="marked",
-        target_sugared_coffee_id="coffee_A",
-    )
-    record_sugar_delivery(incorrect, "coffee_B")
-    latch_cups_together(incorrect, currently_together=True)
-    record_selection(incorrect, "coffee_B")
-
-    incorrect_report = evaluate_success(incorrect)
-    assert not incorrect_report.success
-    assert incorrect_report.checks()["sugar_assignment_correct"] is False
-
-    correct = SemanticState(
-        sugar_target_mode="marked",
-        target_sugared_coffee_id="coffee_A",
-    )
-    record_sugar_delivery(correct, "coffee_A")
-    latch_cups_together(correct, currently_together=True)
-    record_selection(correct, "coffee_A")
-
-    correct_report = evaluate_success(correct)
-    assert correct_report.success
-    assert correct_report.checks()["sugar_assignment_correct"] is True

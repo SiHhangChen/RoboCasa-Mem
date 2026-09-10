@@ -18,7 +18,6 @@ TARGET_STAGE_ORDER = (
     "sugar_added",
     "one_cup_ready",
     "two_cups_ready",
-    "selection",
     "success",
 )
 CAPTURE_STAGE_ORDER = EVALUATOR_STAGE_ORDER
@@ -27,21 +26,12 @@ _EVALUATOR_STAGE_BY_TARGET = {
     "sugar_added": "sugar",
     "one_cup_ready": "one_ready",
     "two_cups_ready": "ready",
-    "selection": "selection",
-    "success": "success",
+    "success": "selection",
 }
 _TARGET_PATHS = {
     "sugar_added": ("sugar_added",),
     "one_cup_ready": ("sugar_added", "one_cup_ready"),
     "two_cups_ready": ("sugar_added", "one_cup_ready", "two_cups_ready"),
-    "selection": (
-        "sugar_added",
-        "one_cup_ready",
-        "two_cups_ready",
-        "selection",
-    ),
-    # A selection and its correctness are observed on the same simulator step.
-    # Both targets therefore begin after two_cups_ready, in independent episodes.
     "success": (
         "sugar_added",
         "one_cup_ready",
@@ -53,7 +43,6 @@ _PREFIX_STAGE_BY_TARGET = {
     "sugar_added": None,
     "one_cup_ready": "sugar",
     "two_cups_ready": "one_ready",
-    "selection": "ready",
     "success": "ready",
 }
 
@@ -61,7 +50,6 @@ DEFAULT_STAGE_BUDGETS = {
     "sugar_added": 1500,
     "one_cup_ready": 2000,
     "two_cups_ready": 2000,
-    "selection": 1000,
     "success": 1000,
 }
 
@@ -113,12 +101,9 @@ def _completion(stage_id: str):
     return lambda state: stage_completed(state, stage_id)
 
 
-def _failure_predicate(target_stage: str):
+def _failure_predicate(_target_stage: str):
     def failed(state: WA01EvalResult) -> bool:
-        failure = state.failure_code
-        if target_stage == "selection" and failure == "wrong_coffee_selected":
-            return False
-        return bool(failure)
+        return bool(state.failure_code)
 
     return failed
 

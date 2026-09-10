@@ -13,11 +13,16 @@ def test_builtin_stage_integrations_cover_ts02_wa01_and_wa05() -> None:
     wa05 = get_stage_evaluation_integration("WA-05")
 
     assert ts02.target_stage_ids[0] == "one_drawer_checked"
-    assert wa01.target_stage_ids[0] == "sugar_added"
+    assert wa01.target_stage_ids == (
+        "sugar_added",
+        "one_cup_ready",
+        "two_cups_ready",
+        "success",
+    )
     assert wa05.target_stage_ids == ("cup_filled", "cup_staged", "success")
 
 
-def test_wa01_selection_and_success_replay_the_same_ready_prefix() -> None:
+def test_wa01_success_replays_ready_prefix_and_completes_on_selection() -> None:
     integration = get_stage_evaluation_integration("WA-01")
     artifact = ExpertPrefixArtifact(
         task_id="WA-01",
@@ -29,18 +34,15 @@ def test_wa01_selection_and_success_replay_the_same_ready_prefix() -> None:
             "one_ready": 4,
             "ready": 6,
             "selection": 8,
-            "correct": 8,
-            "success": 8,
         },
         actions=np.arange(9 * 13, dtype=np.float32).reshape(9, 13),
         success=True,
-        stage_order=("sugar", "one_ready", "ready", "selection", "correct", "success"),
+        stage_order=("sugar", "one_ready", "ready", "selection"),
     )
 
-    selection = integration.prefix_actions(artifact, "selection")
     success = integration.prefix_actions(artifact, "success")
-    np.testing.assert_array_equal(selection, artifact.actions[:6])
     np.testing.assert_array_equal(success, artifact.actions[:6])
+    assert integration.completion_stage_by_target["success"] == "selection"
 
 
 def test_stage_integration_rejects_mismatched_suite_order() -> None:

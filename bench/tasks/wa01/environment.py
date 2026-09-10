@@ -34,7 +34,6 @@ SUGAR_PLATE_XML = f"{assets_root}/objects/objaverse/plate/plate_3/model.xml"
 SUGAR_CUBE_XML = f"{assets_root}/objects/lightwheel/sugar_cube/SugarCube003/model.xml"
 COFFEE_MUG_OBJECT_SCALE = (0.75, 0.75, 0.85)
 NORMAL_COFFEE_RGBA = (0.65, 0.45, 0.25, 0.8)
-TARGET_MARKER_RGBA = (0.20, 0.85, 0.25, 0.95)
 OVERHEAD_CABINET_FIXTURES = ("cab_1_left_group", "cab_2_left_group")
 MIN_FINAL_CUP_XY_SEPARATION = 0.20
 SUGAR_RELEASE_DISTANCE = 0.15
@@ -50,8 +49,6 @@ class WA01SortSugaredAndUnsugaredCoffee(Kitchen):
         self,
         minimum_cup_xy_separation: float = MIN_FINAL_CUP_XY_SEPARATION,
         cup_upright_threshold_deg: float = 15.0,
-        sugar_target_mode: str = "unmarked",
-        target_sugared_coffee_id: str | None = None,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -59,14 +56,7 @@ class WA01SortSugaredAndUnsugaredCoffee(Kitchen):
 
         self.minimum_cup_xy_separation = float(minimum_cup_xy_separation)
         self.cup_upright_threshold_deg = float(cup_upright_threshold_deg)
-        self._semantic_state = SemanticState(
-            sugar_target_mode=sugar_target_mode,
-            target_sugared_coffee_id=target_sugared_coffee_id,
-        )
-        self._configured_sugar_target_mode = self._semantic_state.sugar_target_mode
-        self._configured_target_sugared_coffee_id = (
-            self._semantic_state.target_sugared_coffee_id
-        )
+        self._semantic_state = SemanticState()
         super().__init__(*args, **kwargs)
 
     # Scene construction -------------------------------------------------
@@ -144,10 +134,7 @@ class WA01SortSugaredAndUnsugaredCoffee(Kitchen):
         self._last_task_event_timestep = -1
         super()._setup_scene()
         self.coffee_machine._turned_on = False
-        self._semantic_state = SemanticState(
-            sugar_target_mode=self._configured_sugar_target_mode,
-            target_sugared_coffee_id=self._configured_target_sugared_coffee_id,
-        )
+        self._semantic_state = SemanticState()
         default_regions = DiningPlacementRegionConfig()
         self.dining_region_config = dining_region_config_summary(default_regions)
         self.dining_regions_by_slot = compute_dining_regions(default_regions)
@@ -171,9 +158,8 @@ class WA01SortSugaredAndUnsugaredCoffee(Kitchen):
             "selection_armed": False,
             "selection": None,
         }
-        self._set_target_coffee_marker_visibility(
-            self.sugar_target_mode == "marked"
-        )
+        for coffee_id in COFFEE_IDS:
+            self._set_coffee_liquid_visual(coffee_id, visible=True)
 
     def _get_obj_cfgs(self) -> list[dict[str, Any]]:
         """定义两只同款杯子、糖碟和糖块的 RoboCasa 物品配置。"""
@@ -228,18 +214,6 @@ class WA01SortSugaredAndUnsugaredCoffee(Kitchen):
     # Semantic events ----------------------------------------------------
 
     @property
-    def sugar_target_mode(self) -> str:
-        """返回当前 episode 使用的 unmarked 或 marked 模式。"""
-
-        return self._semantic_state.sugar_target_mode
-
-    @property
-    def target_sugared_coffee_id(self) -> str | None:
-        """返回 marked 模式的目标杯；unmarked 模式返回 None。"""
-
-        return self._semantic_state.target_sugared_coffee_id
-
-    @property
     def sugar_consumed(self) -> bool:
         """返回糖块是否已经被语义事件消费。"""
 
@@ -274,13 +248,6 @@ class WA01SortSugaredAndUnsugaredCoffee(Kitchen):
         """返回最终选择是否指向实际加糖杯。"""
 
         return evaluate_success(self._semantic_state).correct_sugared_selection
-
-    @property
-    def sugar_assignment_correct(self) -> bool:
-        """返回 marked 目标是否满足；unmarked 模式不施加该约束。"""
-
-        value = evaluate_success(self._semantic_state).sugar_assignment_correct
-        return True if value is None else bool(value)
 
     def record_sugar_delivery(self, coffee_id: str) -> None:
         """记录糖投递到任意一杯咖啡的事件，并隐藏糖块。"""
@@ -399,16 +366,9 @@ class WA01SortSugaredAndUnsugaredCoffee(Kitchen):
         from bench.tasks.wa01.prompts import resolve_prompt_spec
 
         metadata = super().get_ep_meta()
-        prompt = resolve_prompt_spec(
-            sugar_target_mode=self.sugar_target_mode,
-            variant="memory",
-        )
+        prompt = resolve_prompt_spec(variant="memory")
         metadata["lang"] = prompt.policy_prompt
         metadata["initial_prompt"] = prompt.initial_prompt
-        if self.target_sugared_coffee_id is not None:
-            metadata.setdefault("refs", {})["target_sugared_coffee_id"] = (
-                self.target_sugared_coffee_id
-            )
         return metadata
 
     # Authoritative task result -----------------------------------------
@@ -456,12 +416,9 @@ class WA01SortSugaredAndUnsugaredCoffee(Kitchen):
         }
         details: dict[str, object] = {
             "sugar": {
-                "target_mode": self.sugar_target_mode,
-                "target_coffee_id": self.target_sugared_coffee_id,
                 "consumed": self.sugar_consumed,
                 "sugared_coffee_id": self.sugared_coffee_id,
                 "unsugared_coffee_id": self.unsugared_coffee_id,
-                "assignment_correct": report.sugar_assignment_correct,
             },
             **{
                 coffee_id: {
@@ -502,8 +459,6 @@ class WA01SortSugaredAndUnsugaredCoffee(Kitchen):
         }
         return WA01EvaluationSnapshot(
             step_id=int(getattr(self, "timestep", 0)),
-            sugar_target_mode=self.sugar_target_mode,
-            target_sugared_coffee_id=self.target_sugared_coffee_id,
             sugar_delivery_coffee_id=self.sugared_coffee_id,
             coffee_on_dining_counter=on_counter,
             coffee_upright=upright,
@@ -562,7 +517,7 @@ class WA01SortSugaredAndUnsugaredCoffee(Kitchen):
             }
 
     def _commit_sugar_delivery(self, coffee_id: str, *, source: str) -> bool:
-        """提交一次投糖事件；marked 仅在这里额外撤销绿色提示。"""
+        """提交一次投糖事件并隐藏已消费的糖块。"""
 
         self._validate_coffee_id(coffee_id)
         if not record_sugar_delivery(self._semantic_state, coffee_id):
@@ -572,8 +527,6 @@ class WA01SortSugaredAndUnsugaredCoffee(Kitchen):
             "source": str(source),
         }
         self._hide_consumed_sugar_cube()
-        if self.sugar_target_mode == "marked":
-            self._set_target_coffee_marker_visibility(False)
         return True
 
     def _physically_delivered_sugar_coffee_id(self) -> str | None:
@@ -727,23 +680,6 @@ class WA01SortSugaredAndUnsugaredCoffee(Kitchen):
         qpos[:3] = np.asarray([10.0, 10.0, -1.0], dtype=float)
         self.sim.data.set_joint_qpos(obj.joints[0], qpos)
         self.sim.forward()
-
-    def _set_target_coffee_marker_visibility(self, visible: bool) -> None:
-        """仅在 marked 模式下给目标杯显示旧版绿色液体提示。"""
-
-        show_marker = bool(
-            visible
-            and self.sugar_target_mode == "marked"
-            and self.target_sugared_coffee_id is not None
-        )
-        self.target_marker_visible = show_marker
-        for coffee_id in COFFEE_IDS:
-            rgba = (
-                TARGET_MARKER_RGBA
-                if show_marker and coffee_id == self.target_sugared_coffee_id
-                else NORMAL_COFFEE_RGBA
-            )
-            self._set_coffee_liquid_visual(coffee_id, visible=True, rgba=rgba)
 
     def _set_coffee_liquid_visual(
         self,

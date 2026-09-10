@@ -30,7 +30,7 @@ MIN_INITIAL_CUP_SEPARATION = 0.14
 MAX_INITIAL_CUP_SAMPLING_ATTEMPTS = 1024
 
 
-def target_sugared_coffee_for_seed(seed: int) -> str:
+def sugared_coffee_for_seed(seed: int) -> str:
     """根据 seed 确定性选择 expert 要加糖的杯子。"""
 
     rng = np.random.default_rng(np.random.SeedSequence([int(seed), 0x57413033]))
@@ -138,32 +138,14 @@ def resolve_scene_config(*, seed: int, env_split: str, **values: Any) -> SceneCo
 
 
 def resolve_episode_plan(*, seed: int, **values: Any) -> EpisodePlan:
-    """一次性解析加糖模式、运送顺序和最终槽位。"""
+    """一次性解析运送顺序和最终槽位。"""
 
-    mode = str(values.get("sugar_target_mode", "unmarked")).strip().lower()
-    if mode not in {"unmarked", "marked"}:
-        raise ValueError(f"unsupported WA-01 sugar_target_mode: {mode!r}")
-    configured_target = values.get("target_sugared_coffee_id")
-    if mode == "marked":
-        target = (
-            target_sugared_coffee_for_seed(seed)
-            if configured_target is None
-            else validate_coffee_id(configured_target)
-        )
-    else:
-        if configured_target is not None:
-            raise ValueError(
-                "target_sugared_coffee_id is only valid when sugar_target_mode='marked'"
-            )
-        target = None
     seeded_order = delivery_order_for_seed(seed)
     configured_first = values.get("first_delivery_coffee")
     first = seeded_order[0] if configured_first is None else validate_coffee_id(configured_first)
     second = "coffee_B" if first == "coffee_A" else "coffee_A"
     return EpisodePlan(
         seed=int(seed),
-        sugar_target_mode=mode,
-        target_sugared_coffee_id=target,
         delivery_order=(first, second),
         final_slot_assignment=final_slot_assignment_for_seed(seed),
         max_horizon=int(values.get("max_horizon", 5000)),
@@ -182,6 +164,6 @@ __all__ = [
     "resolve_episode_plan",
     "resolve_scene_config",
     "resolve_task_definition",
-    "target_sugared_coffee_for_seed",
+    "sugared_coffee_for_seed",
     "validate_coffee_id",
 ]

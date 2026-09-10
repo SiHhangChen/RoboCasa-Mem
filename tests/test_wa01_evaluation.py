@@ -21,8 +21,6 @@ def _snapshot(
     sugar: str | None = None,
     ready: tuple[str, ...] = (),
     selected: str | None = None,
-    mode: str = "unmarked",
-    target: str | None = None,
 ) -> WA01EvaluationSnapshot:
     on_counter = {
         coffee_id: coffee_id in ready for coffee_id in ("coffee_A", "coffee_B")
@@ -30,8 +28,6 @@ def _snapshot(
     upright = dict(on_counter)
     return WA01EvaluationSnapshot(
         step_id=step,
-        sugar_target_mode=mode,
-        target_sugared_coffee_id=target,
         sugar_delivery_coffee_id=sugar,
         coffee_on_dining_counter=on_counter,
         coffee_upright=upright,
@@ -39,7 +35,6 @@ def _snapshot(
         details={
             "sugar": {
                 "sugared_coffee_id": sugar,
-                "assignment_correct": None,
             },
             "coffee_pair": {"together_before_selection": len(ready) == 2},
             "selection": {
@@ -50,12 +45,9 @@ def _snapshot(
     )
 
 
-def _evaluator(*, mode: str = "unmarked", target: str | None = None) -> WA01Evaluator:
-    evaluator = WA01Evaluator(
-        sugar_target_mode=mode,
-        target_sugared_coffee_id=target,
-    )
-    evaluator.reset(_snapshot(0, mode=mode, target=target))
+def _evaluator() -> WA01Evaluator:
+    evaluator = WA01Evaluator()
+    evaluator.reset(_snapshot(0))
     return evaluator
 
 
@@ -84,8 +76,6 @@ def test_wa01_evaluator_qualifies_the_ordered_stage_funnel() -> None:
         "one_ready": 2,
         "ready": 3,
         "selection": 4,
-        "correct": 4,
-        "success": 4,
     }
     report = result.to_report_stages()
     assert report["order"] == [
@@ -129,8 +119,6 @@ def test_wa01_evaluator_rejects_skipped_stages_and_duplicate_queries() -> None:
     assert jumped.stages["selection"].observed
     assert jumped.stages["selection"].invalidated
     assert jumped.stages["selection"].reason == "prerequisite_not_qualified:ready"
-    assert jumped.stages["correct"].observed
-    assert jumped.stages["success"].observed
     assert not any(stage.qualified for name, stage in jumped.stages.items() if name != "sugar")
     assert not jumped.success
     assert jumped.failure_code == "selection_before_ready"
@@ -160,7 +148,7 @@ def test_wa01_evaluator_can_recover_only_after_a_new_ordered_observation() -> No
     ]
 
 
-def test_wa01_evaluator_reports_wrong_selection_without_qualifying_correct() -> None:
+def test_wa01_evaluator_rejects_wrong_selection_as_final_failure() -> None:
     evaluator = _evaluator()
     both = ("coffee_A", "coffee_B")
 
@@ -171,46 +159,15 @@ def test_wa01_evaluator_reports_wrong_selection_without_qualifying_correct() -> 
         _snapshot(4, sugar="coffee_A", ready=both, selected="coffee_B")
     )
 
-    assert result.stages["selection"].qualified
-    assert not result.stages["correct"].qualified
+    assert result.stages["selection"].observed
+    assert not result.stages["selection"].qualified
+    assert result.stages["selection"].reason == "wrong_coffee_selected"
     assert not result.success
     assert result.failure_code == "wrong_coffee_selected"
-
-
-def test_wa01_marked_mode_keeps_assignment_separate_from_selection_correctness() -> None:
-    evaluator = _evaluator(mode="marked", target="coffee_A")
-    both = ("coffee_A", "coffee_B")
-
-    evaluator.observe(_snapshot(1, sugar="coffee_B", mode="marked", target="coffee_A"))
-    evaluator.observe(
-        _snapshot(
-            2,
-            sugar="coffee_B",
-            ready=("coffee_A",),
-            mode="marked",
-            target="coffee_A",
-        )
-    )
-    evaluator.observe(
-        _snapshot(3, sugar="coffee_B", ready=both, mode="marked", target="coffee_A")
-    )
-    result = evaluator.observe(
-        _snapshot(
-            4,
-            sugar="coffee_B",
-            ready=both,
-            selected="coffee_B",
-            mode="marked",
-            target="coffee_A",
-        )
-    )
-
-    assert result.stages["correct"].qualified
-    assert not result.stages["success"].qualified
-    assert result.failure_code == "wrong_sugar_assignment"
-    assert result.to_diagnostics()["success_checks"]["sugar_assignment_correct"] is False
-    report = result.to_report_stages()
-    assert not any(stage["passed"] for stage in report["stages"].values())
+    diagnostics = result.to_diagnostics()
+    assert diagnostics["selection"]["observed_correct"] is False
+    assert diagnostics["selection"]["correct"] is False
+    assert diagnostics["success_checks"]["correct_sugared_selection"] is False
 
 
 def test_wa01_runtime_callbacks_share_one_evaluator_result() -> None:

@@ -21,8 +21,6 @@ def _snapshot(
     }
     return WA01EvaluationSnapshot(
         step_id=step,
-        sugar_target_mode="unmarked",
-        target_sugared_coffee_id=None,
         sugar_delivery_coffee_id=sugar,
         coffee_on_dining_counter=on_counter,
         coffee_upright=on_counter,
@@ -31,10 +29,7 @@ def _snapshot(
 
 
 def _ready_evaluator() -> WA01Evaluator:
-    evaluator = WA01Evaluator(
-        sugar_target_mode="unmarked",
-        target_sugared_coffee_id=None,
-    )
+    evaluator = WA01Evaluator()
     evaluator.reset(_snapshot(0))
     evaluator.observe(_snapshot(1, sugar="coffee_A"))
     evaluator.observe(_snapshot(2, sugar="coffee_A", ready=("coffee_A",)))
@@ -60,35 +55,26 @@ def test_wa01_stage_specs_reuse_authoritative_evaluator() -> None:
         "sugar_added",
         "one_cup_ready",
         "two_cups_ready",
-        "selection",
         "success",
     )
     assert stage_completed(ready, "two_cups_ready")
-    assert stage_completed(success, "selection")
     assert stage_completed(success, "success")
+    assert STAGE_EVALUATION.completion_stage_by_target["success"] == "selection"
 
 
-def test_wa01_selection_and_success_use_independent_paths_from_ready() -> None:
-    selection = build_stage_specs(target_stage="selection")
+def test_wa01_success_uses_selection_directly_from_ready() -> None:
     success = build_stage_specs(target_stage="success")
 
-    assert tuple(spec.id for spec in selection) == (
-        "sugar_added",
-        "one_cup_ready",
-        "two_cups_ready",
-        "selection",
-    )
     assert tuple(spec.id for spec in success) == (
         "sugar_added",
         "one_cup_ready",
         "two_cups_ready",
         "success",
     )
-    assert STAGE_EVALUATION.prefix_stage_by_target["selection"] == "ready"
     assert STAGE_EVALUATION.prefix_stage_by_target["success"] == "ready"
 
 
-def test_wa01_wrong_selection_completes_selection_but_fails_success() -> None:
+def test_wa01_wrong_selection_fails_success() -> None:
     evaluator = _ready_evaluator()
     wrong = evaluator.observe(
         _snapshot(
@@ -99,9 +85,6 @@ def test_wa01_wrong_selection_completes_selection_but_fails_success() -> None:
         )
     )
 
-    selection = build_stage_specs(target_stage="selection")[-1]
     success = build_stage_specs(target_stage="success")[-1]
-    assert selection.completion_predicate(wrong)
-    assert not selection.failure_predicate(wrong)
     assert not success.completion_predicate(wrong)
     assert success.failure_predicate(wrong)
