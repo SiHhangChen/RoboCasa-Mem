@@ -25,11 +25,8 @@ from bench.tasks.wr03.domain.episode import resolve_episode_plan
 PACKAGE_ROOT = Path(__file__).resolve().parent
 DEFAULT_TASK_CONFIG_FILE = PACKAGE_ROOT / "resources" / "task.yaml"
 _RESOURCE_NAMES = {
-    "item_grasp_pose",
     "lower_door_grasp_pose",
-    "lower_preinsert_pose",
     "lower_retrieval_prepose",
-    "lower_release_pose",
     "manual_base_path",
     "planner_script",
     "stations",
@@ -62,6 +59,11 @@ def load_task_config(path: str | Path = DEFAULT_TASK_CONFIG_FILE) -> TaskConfig:
     initial = _mapping(payload, "initial_state", config_path)
     _reject_unknown(initial, {"robot_base", "robot_torso", "cabinets", "objects"}, "initial_state fields")
     robot_base = _mapping(initial, "robot_base", config_path)
+    _reject_unknown(
+        robot_base,
+        {"mode", "xy", "yaw", "sampling_radius_m"},
+        "robot_base fields",
+    )
     robot_torso = _mapping(initial, "robot_torso", config_path)
     torso_height = _finite(robot_torso.get("height_m"), "robot_torso.height_m")
     if not 0.0 <= torso_height <= 0.34:
@@ -110,6 +112,7 @@ def resolve_robot_base_config(
     mode: str | RobotBaseMode = RobotBaseMode.EXPLICIT_POSE,
     xy: Sequence[float] | None = None,
     yaw: float | None = None,
+    sampling_radius_m: float = 0.0,
 ) -> RobotBaseConfig:
     raw = mode.value if isinstance(mode, RobotBaseMode) else str(mode).strip().lower()
     try:
@@ -117,15 +120,25 @@ def resolve_robot_base_config(
     except ValueError as exc:
         raise ValueError(f"unsupported WR-03 robot-base mode: {raw!r}") from exc
     if resolved is RobotBaseMode.PRESERVE_RESET_POSE:
-        if xy is not None or yaw is not None:
-            raise ValueError("preserve_reset_pose does not accept xy or yaw")
+        if xy is not None or yaw is not None or float(sampling_radius_m) != 0.0:
+            raise ValueError(
+                "preserve_reset_pose does not accept xy, yaw, or sampling_radius_m"
+            )
         return RobotBaseConfig(resolved)
     if xy is None or isinstance(xy, (str, bytes)) or len(xy) != 2 or yaw is None:
         raise ValueError("explicit_pose requires robot_base.xy and robot_base.yaw")
+    radius = float(sampling_radius_m)
+    if not isfinite(radius) or radius < 0.0:
+        raise ValueError("robot_base.sampling_radius_m must be non-negative")
     values = (float(xy[0]), float(xy[1]), float(yaw))
     if not all(isfinite(value) for value in values):
         raise ValueError("WR-03 explicit robot base pose must be finite")
-    return RobotBaseConfig(resolved, xy=values[:2], yaw=values[2])
+    return RobotBaseConfig(
+        resolved,
+        xy=values[:2],
+        yaw=values[2],
+        sampling_radius_m=radius,
+    )
 
 
 def resolve_action_config(*, operations: Mapping[str, Any]) -> ActionConfig:

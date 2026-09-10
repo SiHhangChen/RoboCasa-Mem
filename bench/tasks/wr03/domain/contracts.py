@@ -10,7 +10,7 @@ from typing import Any
 
 
 TASK_ID = "WR-03"
-TASK_REVISION = "WR03-v2"
+TASK_REVISION = "WR03-v3"
 PARENT_TASK_ID = "WR-01"
 ENV_NAME = "WR03StoreAndRetrieveRememberedCan"
 DISPLAY_NAME = "Store and retrieve remembered can"
@@ -29,6 +29,7 @@ class RobotBaseConfig:
     mode: RobotBaseMode
     xy: tuple[float, float] | None = None
     yaw: float | None = None
+    sampling_radius_m: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -98,17 +99,21 @@ class RunContext:
 
 @dataclass(frozen=True)
 class EpisodePlan:
-    """Private expert-demo decisions frozen before runtime construction.
-
-    ``demo_storage_level`` balances generated demonstrations. It is not an
-    unannounced success target: the semantic state latches the level that was
-    actually verified during storage.
-    """
+    """Private reset relation and independent close order for one episode."""
 
     seed: int
-    demo_storage_level: str
-    placement_pair_seed: int
+    stored_level: str
+    close_order: tuple[str, str]
     max_horizon: int
+
+    @property
+    def demo_storage_level(self) -> str:
+        """Legacy alias for the initial hidden cabinet level."""
+        return self.stored_level
+
+    @property
+    def placement_pair_seed(self) -> int:
+        return self.seed // 2
 
 
 __all__ = [

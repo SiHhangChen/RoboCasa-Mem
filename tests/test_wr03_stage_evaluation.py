@@ -9,16 +9,16 @@ from bench.tasks.wr03.stage_evaluation import build_stage_specs, stage_completed
 from scripts.eval.build_wr03_dataset_prefixes import handoff_step_for_subtask
 
 
-def test_wr03_open_cabinet_replays_the_hidden_storage_prefix() -> None:
+def test_wr03_open_cabinet_replays_the_canonical_reset_prefix() -> None:
     integration = get_stage_evaluation_integration("WR-03")
 
     assert integration.target_stage_ids == (
-        "storage_hidden",
+        "canonical_reset",
         "open_remembered_cabinet",
     )
     assert integration.prefix_stage_by_target == {
-        "storage_hidden": None,
-        "open_remembered_cabinet": "storage_hidden",
+        "canonical_reset": None,
+        "open_remembered_cabinet": "canonical_reset",
     }
     assert tuple(
         spec.id

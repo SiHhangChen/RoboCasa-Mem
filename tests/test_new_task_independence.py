@@ -119,11 +119,8 @@ def test_composite_tasks_own_local_copied_resources() -> None:
 
     wr03 = importlib.import_module("bench.tasks.wr03.config").load_task_config()
     for name in (
-        "item_grasp_pose",
         "lower_door_grasp_pose",
-        "lower_preinsert_pose",
         "lower_retrieval_prepose",
-        "lower_release_pose",
         "upper_door_grasp_pose",
     ):
         assert wr03.path(wr03.resources[name]).is_relative_to(ROOT / "bench/tasks/wr03")

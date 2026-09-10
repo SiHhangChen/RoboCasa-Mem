@@ -24,7 +24,7 @@ EXPERT_PLAN_VERSION = "membench.expert_plan/v2"
 EXPECTED_STAGE_COUNT = 20
 EPISODE_DIR_PATTERN = re.compile(r"^seed_(\d{6})_attempt_00$")
 STEP_KEYS = frozenset({"steps", "executed_steps", "release_settle_steps"})
-NAVIGATE_STAGE_INDICES = frozenset({0, 3, 7, 10, 14, 18})
+NAVIGATE_STAGE_INDICES = frozenset({0, 1, 4, 7, 10, 14, 17})
 
 
 def _require(condition: bool, message: str) -> None:
@@ -81,34 +81,26 @@ def count_recorded_steps(
     return total, fields
 
 
-def build_stage_names(storage_level: str) -> list[str]:
+def build_stage_names(storage_level: str, close_order: Sequence[str] = ("lower", "upper")) -> list[str]:
     """Rebuild the canonical 20-stage WR03 expert plan."""
     _require(
         storage_level in {"lower", "upper"},
         f"invalid WR03 storage level: {storage_level!r}",
     )
-    return [
-        "navigate_to_visible_can",
-        "pick_can_for_storage",
-        "return_with_can_for_transport",
-        f"navigate_can_to_{storage_level}_cabinet",
-        f"place_can_in_{storage_level}_cabinet",
-        f"verify_can_stored_in_{storage_level}_cabinet",
-        "return_after_can_stored",
-        "navigate_to_upper_door_for_closing",
-        "close_upper_cabinet_after_storage",
-        "return_after_closing_upper_cabinet",
-        "navigate_to_lower_door_for_closing",
-        "close_lower_cabinet_after_storage",
-        "return_after_closing_lower_cabinet",
-        "latch_hidden_can_location",
-        f"navigate_to_{storage_level}_door_for_retrieval",
-        "open_remembered_cabinet",
-        "verify_remembered_cabinet_open",
-        "return_after_opening_remembered_cabinet",
-        f"navigate_to_{storage_level}_storage_station_for_retrieval",
-        "retrieve_same_can_from_cabinet",
-    ]
+    order = tuple(str(value) for value in close_order)
+    _require(len(order) == 2 and set(order) == {"lower", "upper"}, "invalid WR03 close order")
+    names = ["observe_open_cabinets"]
+    for index, level in enumerate(order, start=1):
+        names.extend([f"navigate_to_door_{index}", f"close_door_{index}", f"return_after_door_{index}"])
+    names.extend([
+        "navigate_to_neutral_reset", "canonical_memory_reset", "latch_memory_handoff",
+        "navigate_to_remembered_cabinet", "open_remembered_cabinet",
+        "verify_remembered_cabinet", "return_after_opening_cabinet",
+        "navigate_to_can", "retrieve_can",
+        "return_with_can", "navigate_to_initial_table", "place_can_on_table",
+        "verify_final_table_placement",
+    ])
+    return names
 
 
 def _episode_seed(episode_dir: Path) -> int:
@@ -139,7 +131,7 @@ def _expert_storage_level(episode: Mapping[str, Any], *, seed: int) -> str:
         f"seed {seed}: missing expert plan metadata",
     )
     assert isinstance(plan_metadata, Mapping)
-    level = str(plan_metadata.get("demo_storage_level", ""))
+    level = str(plan_metadata.get("stored_level", plan_metadata.get("demo_storage_level", "")))
     _require(level in {"lower", "upper"}, f"seed {seed}: invalid expert storage level")
 
     resolved = metadata.get("resolved_episode")
@@ -151,7 +143,7 @@ def _expert_storage_level(episode: Mapping[str, Any], *, seed: int) -> str:
     _require(isinstance(facts, Mapping), f"seed {seed}: missing resolved facts")
     assert isinstance(facts, Mapping)
     _require(
-        facts.get("demo_storage_level") == level,
+        facts.get("stored_level", facts.get("demo_storage_level")) == level,
         f"seed {seed}: resolved and expert storage levels differ",
     )
     return level
@@ -242,7 +234,9 @@ def build_boundary_record(episode_dir: Path) -> dict[str, Any]:
         observed_level == expert_level,
         f"seed {seed}: observed level {observed_level!r} != expert level {expert_level!r}",
     )
-    stage_names = build_stage_names(observed_level)
+    facts = (episode.get("metadata") or {}).get("resolved_episode", {}).get("facts", {})
+    close_order = tuple(str(value) for value in facts.get("close_order", ("lower", "upper")))
+    stage_names = build_stage_names(observed_level, close_order)
 
     cumulative = 0
     output_stages: list[dict[str, Any]] = []
@@ -294,6 +288,7 @@ def build_boundary_record(episode_dir: Path) -> dict[str, Any]:
         "success": True,
         "expert_plan_version": EXPERT_PLAN_VERSION,
         "stored_level": observed_level,
+        "close_order": list(close_order),
         "total_frames": cumulative,
         "recorded_total_frames": recorded_total,
         "step_field_totals": field_totals,

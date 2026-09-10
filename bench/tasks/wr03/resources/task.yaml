@@ -3,7 +3,7 @@ schema_version: 1
 task:
   id: WR-03
   display_name: Store and retrieve remembered can
-  description: Store one can in either cabinet, close both doors, then retrieve the can from memory.
+  description: Observe the pre-filled open cabinet, close both doors, reset to neutral, then retrieve the can from memory.
   success_conditions:
     - can_storage_verified
     - both_doors_closed_after_storage
@@ -23,14 +23,19 @@ scene:
   scene_seed: 0
 
 episode:
-  demo_storage_level: null
+  stored_level: null
+  close_order: null
   max_horizon: 8000
 
 initial_state:
   robot_base:
     mode: explicit_pose
-    xy: [5.02932556192431, -1.055131030504015]
-    yaw: 1.5699444333353034
+    # Start at the sampled table/item station. The cabinet-front canonical
+    # circle is used later for pre-close staging and the memory handoff.
+    xy: [5.216, -1.055]
+    yaw: 1.571
+    # Sample the initial table station inside a 10 cm diameter disk.
+    sampling_radius_m: 0.05
   robot_torso:
     height_m: 0.20
   cabinets:
@@ -54,10 +59,7 @@ sensors:
 
 resources:
   planner_script: ../../../execution/planning/mplib_planner.py
-  item_grasp_pose: calibration/can_side_grasp.json
-  lower_preinsert_pose: calibration/lower_preinsert.json
   lower_retrieval_prepose: calibration/lower_retrieval_prepose.json
-  lower_release_pose: calibration/lower_release.json
   lower_door_grasp_pose: calibration/lower_door_grasp.json
   upper_door_grasp_pose: calibration/upper_door_grasp.json
   stations: station/stations.json
@@ -76,14 +78,14 @@ navigation:
   manual_base_path_yaw_tolerance: 0.08
   # Carrying motion is acceleration-limited so the physical finger contacts,
   # rather than an attachment, retain the can during base transport.
-  base_profile_v_max: 0.45
-  base_profile_a_max: 0.80
-  base_profile_a_dec: 0.80
-  base_profile_v_min: 0.12
-  base_profile_w_max: 0.70
-  base_profile_alpha_max: 1.20
-  base_profile_alpha_dec: 1.20
-  base_profile_w_min: 0.10
+  base_profile_v_max: 0.75
+  base_profile_a_max: 1.30
+  base_profile_a_dec: 1.50
+  base_profile_v_min: 0.15
+  base_profile_w_max: 0.75
+  base_profile_alpha_max: 1.50
+  base_profile_alpha_dec: 1.30
+  base_profile_w_min: 0.08
   use_station_astar_paths: false
   station_nav_use_docking: false
   station_nav_dock_standoff: 0.0
@@ -182,7 +184,7 @@ semantics:
   physical_event_dwell_steps: 3
 
 recording:
-  record_depth: true
+  record_depth: false
   depth_dtype: uint16
   depth_scale: 0.001
   action_schema: membench.pandaomron_hybrid13.v2

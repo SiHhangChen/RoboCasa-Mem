@@ -8,6 +8,7 @@ import numpy as np
 
 from bench.execution.navigation.base_motion import set_base_pose_kinematic
 from bench.runtime.contracts import InitializationReport
+from bench.execution.sampling.circle_sampling import sample_uniform_disk
 from bench.tasks.wr03.domain.contracts import (
     CABINET_LEVELS,
     CAN_ID,
@@ -22,6 +23,7 @@ def apply_robot_base_initial_state(
     obs: dict[str, Any],
     *,
     config: RobotBaseConfig,
+    seed: int = 0,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     if config.mode is RobotBaseMode.PRESERVE_RESET_POSE:
         return obs, _base_summary(obs, enabled=False, mode=config.mode.value)
@@ -29,7 +31,18 @@ def apply_robot_base_initial_state(
         raise ValueError(f"unsupported WR-03 base mode: {config.mode!r}")
     if config.xy is None or config.yaw is None:
         raise ValueError("explicit WR-03 base pose is incomplete")
-    target_xy = np.asarray(config.xy, dtype=float)
+    center_xy = np.asarray(config.xy, dtype=float)
+    radius = float(getattr(config, "sampling_radius_m", 0.0))
+    target_xy = (
+        sample_uniform_disk(
+            center_xy,
+            radius,
+            seed=int(seed),
+            salt=0x57523349,
+        )
+        if radius > 0.0
+        else center_xy
+    )
     reset_xy = np.asarray(obs["robot0_base_pos"][:2], dtype=float)
     updated = set_base_pose_kinematic(
         env, target_xy=target_xy, target_yaw=float(config.yaw)
@@ -39,6 +52,18 @@ def apply_robot_base_initial_state(
         "reset_base_xy": reset_xy.tolist(),
         "target_xy": target_xy.tolist(),
         "target_yaw": float(config.yaw),
+        "sampled_xy": target_xy.tolist(),
+        "sampling_region": (
+            {
+                "shape": "disk",
+                "center_xy": center_xy.tolist(),
+                "radius_m": radius,
+                "seed": int(seed),
+                "salt": 0x57523349,
+            }
+            if radius > 0.0
+            else None
+        ),
     })
     return updated, summary
 
@@ -106,9 +131,12 @@ def initialize_episode_state(
     episode: EpisodePlan,
     cabinets: dict[str, Any],
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Install the private demo route while preserving the sampled can pose."""
+    """Place the can in its sampled cabinet at reset; no storage action is recorded."""
 
-    env.configure_episode(demo_storage_level=episode.demo_storage_level)
+    env.configure_episode(
+        demo_storage_level=episode.stored_level,
+        close_order=episode.close_order,
+    )
     env.configure_canonical_physics()
     position = np.asarray(env.get_object_world_position(CAN_ID), dtype=float).reshape(-1)
     quat_xyzw = np.asarray(
@@ -122,6 +150,12 @@ def initialize_episode_state(
     ):
         raise ValueError(f"invalid WR-03 sampled pose for {CAN_ID!r}")
 
+    env._table_target_position = position.copy()
+    quat_xyzw = np.asarray(env.get_object_world_quaternion_xyzw(CAN_ID), dtype=float).reshape(-1)
+    target = np.asarray(env.cabinet_for_level(episode.stored_level).interior_pose(), dtype=float)
+    env.set_object_pose(CAN_ID, target, quat_xyzw)
+    position = target
+
     initial_fraction = float(cabinets.get("open_fraction", 1.0))
     doors_initially_open = bool(cabinets.get("doors_initially_open", True))
     if not doors_initially_open:
@@ -129,24 +163,24 @@ def initialize_episode_state(
     for level in CABINET_LEVELS:
         env.set_level_door_open_fraction(level, initial_fraction)
     env.sim.forward()
-    env.start_physical_observer()
     obs = env._get_observations(force_update=True)
     return obs, {
         "episode_seed": episode.seed,
-        "demo_storage_level": episode.demo_storage_level,
-        "placement_pair_seed": episode.placement_pair_seed,
+        "stored_level": episode.stored_level,
+        "close_order": list(episode.close_order),
         "doors_initially_open": True,
         "door_open_fraction": initial_fraction,
         "placements": {
             CAN_ID: {
                 "world_position": position.astype(float).tolist(),
                 "world_quat_xyzw": quat_xyzw.astype(float).tolist(),
-                "visible_before_storage": True,
+                "visible_before_storage": False,
             }
         },
-        "placement_mode": "paired_sampled_region",
+        "placement_mode": "reset_into_open_cabinet",
         "sampling_regions": env.item_sampling_regions(),
         "setup_recorded_in_hdf5_actions": False,
+        "storage_hidden": False,
     }
 
 
