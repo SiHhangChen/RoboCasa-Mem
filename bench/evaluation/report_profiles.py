@@ -115,7 +115,9 @@ WA01_REPORT_PROFILE = _profile(
     "sugar_added",
     "one_cup_ready",
     "two_cups_ready",
+    "select",
     "success",
+    version=2,
 )
 WA02_REPORT_PROFILE = _profile(
     "WA-02",
@@ -132,7 +134,9 @@ WA03_REPORT_PROFILE = _profile(
     "one_cup_ready",
     "two_cups_ready",
     "three_cups_ready",
+    "select",
     "success",
+    version=2,
 )
 WA05_REPORT_PROFILE = _profile(
     "WA-05",

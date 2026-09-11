@@ -13,12 +13,14 @@ from bench.tasks.wa03.evaluation import (
     report_stages_for_runtime,
     success_for_runtime,
 )
+from bench.tasks.wa03.stage_evaluation import CAPTURE_STAGE_ORDER
+from bench.tasks.wa03.stage_evaluation import build_stage_specs
 
 COFFEES = ("coffee_A", "coffee_B", "coffee_C")
 
 
 def _slot_map(ready: tuple[str, ...]) -> dict[str, str | None]:
-    """Map each cup to a distinct dining slot when ready, else None."""
+    """Provide diagnostic slot values for cups listed as ready."""
 
     slots = ("left", "center", "right")
     return {coffee_id: (slots[index] if coffee_id in ready else None) for index, coffee_id in enumerate(COFFEES)}
@@ -96,6 +98,7 @@ def test_wa03_evaluator_qualifies_the_ordered_stage_funnel() -> None:
         "one_cup_ready",
         "two_cups_ready",
         "three_cups_ready",
+        "select",
         "success",
     ]
     assert {
@@ -106,25 +109,27 @@ def test_wa03_evaluator_qualifies_the_ordered_stage_funnel() -> None:
         "one_cup_ready": 2,
         "two_cups_ready": 3,
         "three_cups_ready": 4,
+        "select": 5,
         "success": 5,
     }
     assert validate_report_stages(
         report,
         expected_task_id="WA-03",
-        expected_profile_id="WA-03/report-v1",
+        expected_profile_id="WA-03/report-v2",
         expected_success=True,
     ) == report
 
 
-def test_wa03_ready_requires_three_cups_each_in_its_own_region() -> None:
+def test_wa03_ready_does_not_require_cups_in_planned_regions() -> None:
     evaluator = _evaluator()
     evaluator.observe(_snapshot(1, sugar="coffee_A"))
     evaluator.observe(_snapshot(2, sugar="coffee_A", ready=("coffee_A",)))
     evaluator.observe(_snapshot(3, sugar="coffee_A", ready=("coffee_A", "coffee_B")))
 
     # The robot carries one cup at a time, so one_ready and two_ready qualified
-    # on earlier steps.  Now all three cups are on the counter and upright, but
-    # coffee_B shares coffee_A's region while center is empty: not ready.
+    # on earlier steps.  All three cups are on the counter and upright, but
+    # none of them is assigned to a dining region.  This still qualifies:
+    # sampled/planned regions are not an evaluation condition.
     snapshot = WA03EvaluationSnapshot(
         step_id=4,
         sugar_target_mode="unmarked",
@@ -132,17 +137,17 @@ def test_wa03_ready_requires_three_cups_each_in_its_own_region() -> None:
         sugar_delivery_coffee_id="coffee_A",
         coffee_on_dining_counter={coffee_id: True for coffee_id in COFFEES},
         coffee_upright={coffee_id: True for coffee_id in COFFEES},
-        coffee_in_dining_region={"coffee_A": "left", "coffee_B": "left", "coffee_C": "right"},
+        coffee_in_dining_region={"coffee_A": None, "coffee_B": None, "coffee_C": None},
         selected_coffee_id=None,
     )
-    assert not snapshot.ready
+    assert snapshot.ready
     result = evaluator.observe(snapshot)
     assert result.stages["one_ready"].qualified
     assert result.stages["two_ready"].qualified
-    assert not result.stages["ready"].qualified
+    assert result.stages["ready"].qualified
 
 
-def test_wa03_two_ready_qualifies_before_all_three_are_in_regions() -> None:
+def test_wa03_two_ready_qualifies_before_all_three_are_on_counter() -> None:
     evaluator = _evaluator()
 
     evaluator.observe(_snapshot(1, sugar="coffee_A"))
@@ -152,6 +157,21 @@ def test_wa03_two_ready_qualifies_before_all_three_are_in_regions() -> None:
     assert result.stages["one_ready"].qualified
     assert result.stages["two_ready"].qualified
     assert not result.stages["ready"].qualified
+
+
+def test_wa03_ready_without_selection_does_not_pass_select_or_success() -> None:
+    evaluator = _evaluator()
+    evaluator.observe(_snapshot(1, sugar="coffee_A"))
+    evaluator.observe(_snapshot(2, sugar="coffee_A", ready=("coffee_A",)))
+    evaluator.observe(_snapshot(3, sugar="coffee_A", ready=("coffee_A", "coffee_B")))
+    result = evaluator.observe(_snapshot(4, sugar="coffee_A", ready=COFFEES))
+
+    assert result.stages["ready"].qualified
+    assert not result.stages["selection"].qualified
+    assert not result.stages["success"].qualified
+    report = result.to_report_stages()
+    assert report["stages"]["select"]["passed"] is False
+    assert report["stages"]["success"]["passed"] is False
 
 
 def test_wa03_evaluator_rejects_skipped_stages_and_duplicate_queries() -> None:
@@ -219,6 +239,7 @@ def test_wa03_evaluator_reports_wrong_selection_without_qualifying_correct() -> 
     )
     assert result.stages["selection"].qualified
     assert not result.stages["correct"].qualified
+    assert not result.stages["success"].qualified
     assert not result.success
     assert result.failure_code == "wrong_coffee_selected"
 
@@ -265,6 +286,7 @@ def test_wa03_marked_mode_keeps_assignment_separate_from_selection_correctness()
         "one_cup_ready": True,
         "two_cups_ready": True,
         "three_cups_ready": True,
+        "select": True,
         "success": False,
     }
 
@@ -297,5 +319,35 @@ def test_wa03_runtime_callbacks_share_one_evaluator_result() -> None:
 def test_wa03_runtime_registers_public_report_stages() -> None:
     from bench.tasks.wa03 import runtime
 
-    assert runtime.TASK_RUNTIME_API.report_stage_profile_id == "WA-03/report-v1"
+    assert runtime.TASK_RUNTIME_API.report_stage_profile_id == "WA-03/report-v2"
     assert callable(runtime.TASK_RUNTIME_API.report_stages)
+
+
+def test_wa03_capture_keeps_one_selection_boundary_for_select_and_success() -> None:
+    assert CAPTURE_STAGE_ORDER == (
+        "sugar",
+        "one_ready",
+        "two_ready",
+        "ready",
+        "selection",
+        "correct",
+        "success",
+    )
+
+
+def test_wa03_wrong_selection_passes_select_but_fails_success_target() -> None:
+    evaluator = _evaluator()
+    evaluator.observe(_snapshot(1, sugar="coffee_A"))
+    evaluator.observe(_snapshot(2, sugar="coffee_A", ready=("coffee_A",)))
+    evaluator.observe(_snapshot(3, sugar="coffee_A", ready=("coffee_A", "coffee_B")))
+    evaluator.observe(_snapshot(4, sugar="coffee_A", ready=COFFEES))
+    wrong = evaluator.observe(
+        _snapshot(5, sugar="coffee_A", ready=COFFEES, selected="coffee_B")
+    )
+
+    select_spec = build_stage_specs(target_stage="select")[-1]
+    success_spec = build_stage_specs(target_stage="success")[-1]
+    assert select_spec.completion_predicate(wrong)
+    assert not select_spec.failure_predicate(wrong)
+    assert not success_spec.completion_predicate(wrong)
+    assert success_spec.failure_predicate(wrong)

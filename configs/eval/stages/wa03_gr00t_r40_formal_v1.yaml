@@ -15,6 +15,9 @@ stages:
   - id: three_cups_ready
     source: expert_prefix
     model_step_budget: 2200
+  - id: select
+    source: expert_prefix
+    model_step_budget: 1600
   - id: success
     source: expert_prefix
     model_step_budget: 1600

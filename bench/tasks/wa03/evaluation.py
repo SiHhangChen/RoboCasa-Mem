@@ -6,11 +6,11 @@ and the final verdict.  In particular, a stage that is merely observable is
 not necessarily a stage that is qualified for reporting.
 
 WA-03 extends WA-01 to three identical coffee cups: the robot sugars any one
-cup, carries all three cups into parallel dining regions (left/center/right,
-one cup each), and must finally select the cup it sugared.  The ``ready``
-stage therefore requires not only the cups to be on the dining counter and
-upright but also that each of the three dining regions is occupied by exactly
-one distinct cup.
+cup, carries all three cups to the dining counter, and must finally select the
+cup it sugared.  Placement regions are useful for expert recording and
+diagnostics, but are deliberately not part of the policy evaluation contract.
+The ``ready`` stage therefore only requires all three cups to be on the dining
+counter and upright.
 """
 
 from __future__ import annotations
@@ -45,6 +45,7 @@ _REPORT_STAGE_SOURCES = {
     "one_cup_ready": "one_ready",
     "two_cups_ready": "two_ready",
     "three_cups_ready": "ready",
+    "select": "selection",
     "success": "success",
 }
 
@@ -79,9 +80,10 @@ class WA03EvaluationSnapshot:
     evaluator's state; the evaluator records them only when their event first
     appears after the required predecessor stage.
 
-    ``coffee_in_dining_region`` maps each coffee to the one dining slot whose
-    region currently contains that cup's center.  A cup in no region maps to
-    None; the ``ready`` stage requires every coffee to occupy its own slot.
+    ``coffee_in_dining_region`` maps each coffee to the dining slot whose region
+    currently contains that cup's center.  A cup in no region maps to None.
+    This is retained for diagnostics; placement-region membership is not used
+    by the ``ready`` stage.
     """
 
     step_id: int
@@ -150,16 +152,16 @@ class WA03EvaluationSnapshot:
 
     @property
     def ready(self) -> bool:
-        """All three cups are placed, upright, and each in its own dining region."""
+        """All three cups are placed on the counter and upright.
 
-        if not all(
+        The sampled/planned left-center-right regions belong to the expert
+        placement contract and diagnostic payload, not to policy success.
+        """
+
+        return all(
             self.coffee_on_dining_counter[coffee_id] and self.coffee_upright[coffee_id]
             for coffee_id in COFFEE_IDS
-        ):
-            return False
-        slots = [self.coffee_in_dining_region[coffee_id] for coffee_id in COFFEE_IDS]
-        occupied = [slot for slot in slots if slot is not None]
-        return len(occupied) == len(COFFEE_IDS) and len(set(occupied)) == len(occupied)
+        )
 
     @property
     def sugar_assignment_correct(self) -> bool | None:
@@ -233,6 +235,8 @@ class WA03EvalResult:
         sugar = dict(payload.get("sugar") or {})
         sugar["consumed"] = qualified["sugar"]
         selection = dict(payload.get("selection") or {})
+        selection["observed"] = observed["selection"]
+        selection["selected"] = qualified["selection"]
         selection["observed_correct"] = observed["correct"]
         selection["correct"] = qualified["correct"]
         coffee_set = dict(payload.get("coffee_set") or {})
@@ -279,6 +283,7 @@ class WA03EvalResult:
             "one_cup_ready": bool(self.stages["one_ready"].qualified),
             "two_cups_ready": bool(self.stages["two_ready"].qualified),
             "three_cups_ready": bool(self.stages["ready"].qualified),
+            "select": bool(self.stages["selection"].qualified),
             "success": bool(self.success),
         }
         stages = {}
@@ -369,6 +374,9 @@ class WA03Evaluator:
                     f"prerequisite_not_qualified:{prerequisite}",
                 )
 
+        if "selection" in newly_qualified and not snapshot.correct_selection:
+            self._reject("success", snapshot.step_id, "wrong_coffee_selected")
+
         # Correctness and final success are derived from a valid selection and
         # may therefore be committed in the same control step as that event.
         if raw["correct"] and not self._stages["correct"].qualified:
@@ -377,6 +385,9 @@ class WA03Evaluator:
                 newly_qualified.add("correct")
             elif not self._previous_raw["correct"]:
                 self._reject("correct", snapshot.step_id, "prerequisite_not_qualified:selection")
+
+        if "correct" in newly_qualified and snapshot.sugar_assignment_correct is False:
+            self._reject("success", snapshot.step_id, "wrong_sugar_assignment")
 
         if raw["success"] and not self._stages["success"].qualified:
             if qualified_before["correct"] or "correct" in newly_qualified:

@@ -76,12 +76,14 @@ def test_wa01_evaluator_qualifies_the_ordered_stage_funnel() -> None:
         "one_ready": 2,
         "ready": 3,
         "selection": 4,
+        "success": 4,
     }
     report = result.to_report_stages()
     assert report["order"] == [
         "sugar_added",
         "one_cup_ready",
         "two_cups_ready",
+        "select",
         "success",
     ]
     assert {
@@ -91,12 +93,13 @@ def test_wa01_evaluator_qualifies_the_ordered_stage_funnel() -> None:
         "sugar_added": 1,
         "one_cup_ready": 2,
         "two_cups_ready": 3,
+        "select": 4,
         "success": 4,
     }
     assert validate_report_stages(
         report,
         expected_task_id="WA-01",
-        expected_profile_id="WA-01/report-v1",
+        expected_profile_id="WA-01/report-v2",
         expected_success=True,
     ) == report
 
@@ -148,7 +151,7 @@ def test_wa01_evaluator_can_recover_only_after_a_new_ordered_observation() -> No
     ]
 
 
-def test_wa01_evaluator_rejects_wrong_selection_as_final_failure() -> None:
+def test_wa01_evaluator_reports_wrong_selection_as_select_only() -> None:
     evaluator = _evaluator()
     both = ("coffee_A", "coffee_B")
 
@@ -160,14 +163,31 @@ def test_wa01_evaluator_rejects_wrong_selection_as_final_failure() -> None:
     )
 
     assert result.stages["selection"].observed
-    assert not result.stages["selection"].qualified
-    assert result.stages["selection"].reason == "wrong_coffee_selected"
+    assert result.stages["selection"].qualified
+    assert not result.stages["success"].qualified
+    assert result.stages["selection"].reason is None
     assert not result.success
     assert result.failure_code == "wrong_coffee_selected"
     diagnostics = result.to_diagnostics()
     assert diagnostics["selection"]["observed_correct"] is False
     assert diagnostics["selection"]["correct"] is False
     assert diagnostics["success_checks"]["correct_sugared_selection"] is False
+
+
+def test_wa01_ready_without_selection_does_not_pass_select_or_success() -> None:
+    evaluator = _evaluator()
+    both = ("coffee_A", "coffee_B")
+
+    evaluator.observe(_snapshot(1, sugar="coffee_A"))
+    evaluator.observe(_snapshot(2, sugar="coffee_A", ready=("coffee_A",)))
+    result = evaluator.observe(_snapshot(3, sugar="coffee_A", ready=both))
+
+    assert result.stages["ready"].qualified
+    assert not result.stages["selection"].qualified
+    assert not result.stages["success"].qualified
+    report = result.to_report_stages()
+    assert report["stages"]["select"]["passed"] is False
+    assert report["stages"]["success"]["passed"] is False
 
 
 def test_wa01_runtime_callbacks_share_one_evaluator_result() -> None:
@@ -198,5 +218,5 @@ def test_wa01_runtime_callbacks_share_one_evaluator_result() -> None:
 def test_wa01_runtime_registers_public_report_stages() -> None:
     from bench.tasks.wa01 import runtime
 
-    assert runtime.TASK_RUNTIME_API.report_stage_profile_id == "WA-01/report-v1"
+    assert runtime.TASK_RUNTIME_API.report_stage_profile_id == "WA-01/report-v2"
     assert callable(runtime.TASK_RUNTIME_API.report_stages)

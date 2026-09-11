@@ -60,6 +60,7 @@ def test_wa01_pi05_pilot_stage_suite_declares_public_funnel() -> None:
         "sugar_added",
         "one_cup_ready",
         "two_cups_ready",
+        "select",
         "success",
     )
 
@@ -75,6 +76,7 @@ def test_wa01_gr00t_pilot_stage_suite_uses_r20_and_shared_seeds() -> None:
         "sugar_added",
         "one_cup_ready",
         "two_cups_ready",
+        "select",
         "success",
     )
 

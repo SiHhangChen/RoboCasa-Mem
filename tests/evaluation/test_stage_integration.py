@@ -17,6 +17,7 @@ def test_builtin_stage_integrations_cover_ts02_wa01_and_wa05() -> None:
         "sugar_added",
         "one_cup_ready",
         "two_cups_ready",
+        "select",
         "success",
     )
     assert wa05.target_stage_ids == ("cup_filled", "cup_staged", "success")
@@ -42,7 +43,8 @@ def test_wa01_success_replays_ready_prefix_and_completes_on_selection() -> None:
 
     success = integration.prefix_actions(artifact, "success")
     np.testing.assert_array_equal(success, artifact.actions[:6])
-    assert integration.completion_stage_by_target["success"] == "selection"
+    assert integration.completion_stage_by_target["select"] == "selection"
+    assert integration.completion_stage_by_target["success"] == "success"
 
 
 def test_stage_integration_rejects_mismatched_suite_order() -> None:

@@ -68,7 +68,7 @@ def test_wa03_shared_physical_events_latch_ready_then_selection() -> None:
 def test_wa03_ready_state_does_not_depend_on_extra_pairwise_margin() -> None:
     env = _bare_wa03_environment()
     env.is_coffee_cup_correctly_placed_on_dining_counter = lambda _coffee_id: True
-    env._are_all_dining_regions_occupied = lambda: True
+    env._are_all_dining_regions_occupied = lambda: False
     env._cup_pairwise_xy_distances = lambda: {"coffee_A:coffee_C": 0.085}
     env.minimum_cup_xy_separation = 0.10
 

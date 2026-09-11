@@ -184,7 +184,7 @@ def test_frozen_profile_catalog_covers_all_report_tasks() -> None:
             frozenset(),
         ),
         "WA-01": (
-            ("sugar_added", "one_cup_ready", "two_cups_ready", "success"),
+            ("sugar_added", "one_cup_ready", "two_cups_ready", "select", "success"),
             frozenset(),
         ),
         "WA-02": (
@@ -203,6 +203,7 @@ def test_frozen_profile_catalog_covers_all_report_tasks() -> None:
                 "one_cup_ready",
                 "two_cups_ready",
                 "three_cups_ready",
+                "select",
                 "success",
             ),
             frozenset(),
@@ -277,7 +278,7 @@ def test_frozen_profile_catalog_covers_all_report_tasks() -> None:
     assert {profile.task_id for profile in REPORT_STAGE_PROFILES} == set(expected)
     for task_id, (stage_ids, conditional_stage_ids) in expected.items():
         profile = get_report_stage_profile(task_id)
-        expected_version = {"WA-02": 2, "WR-07": 3, "WR-08": 2}.get(task_id, 1)
+        expected_version = {"WA-01": 2, "WA-02": 2, "WA-03": 2, "WR-07": 3, "WR-08": 2}.get(task_id, 1)
         assert profile.profile_id == f"{task_id}/report-v{expected_version}"
         assert profile.stage_ids == stage_ids
         assert profile.conditional_stage_ids == conditional_stage_ids

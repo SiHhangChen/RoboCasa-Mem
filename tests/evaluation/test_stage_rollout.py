@@ -9,10 +9,70 @@ from bench.evaluation.stage_rollout import (
     FunctionalStageTask,
     StageSpec,
     StageEvaluationResult,
+    StageTracker,
     aggregate_stage_results,
     macro_stage_sr,
     evaluate_stage,
 )
+
+
+def test_stage_tracker_can_handoff_before_event_sharing_stage() -> None:
+    tracker = StageTracker(
+        (
+            StageSpec("ready", lambda state: state["ready"]),
+            StageSpec(
+                "select",
+                lambda state: state["select"],
+                expert_prefix_required=False,
+            ),
+            StageSpec("success", lambda state: state["success"]),
+        )
+    )
+    tracker.reset({"ready": False, "select": False, "success": False})
+    tracker.update({"ready": True, "select": False, "success": False})
+
+    assert tracker.prefix_completed("success") is True
+    assert tracker.target_already_completed("select") is False
+
+
+def test_event_sharing_stage_and_target_complete_on_one_model_transition() -> None:
+    state = {"ready": False, "select": False, "success": False}
+
+    def step(action: list[int]) -> dict[str, object]:
+        if action == [0]:
+            state["ready"] = True
+        else:
+            state["select"] = True
+            state["success"] = True
+        return {"observation": dict(state)}
+
+    task = FunctionalStageTask(
+        task_id="TEST",
+        instruction="remember the target",
+        stage_specs=(
+            StageSpec("ready", lambda value: value["ready"]),
+            StageSpec(
+                "select",
+                lambda value: value["select"],
+                expert_prefix_required=False,
+            ),
+            StageSpec(
+                "success",
+                lambda value: value["success"],
+                model_step_budget=1,
+            ),
+        ),
+        reset_fn=lambda seed: state.update(ready=False, select=False, success=False),
+        observe_fn=lambda: dict(state),
+        privileged_state_fn=lambda: dict(state),
+        step_fn=step,
+    )
+
+    result = evaluate_stage(task, "success", 7, _Model([]), _Expert())
+
+    assert result.status == SUCCESS
+    assert result.expert_prefix_steps == 1
+    assert result.model_control_steps == 1
 
 
 @dataclass

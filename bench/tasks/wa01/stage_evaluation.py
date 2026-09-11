@@ -18,6 +18,7 @@ TARGET_STAGE_ORDER = (
     "sugar_added",
     "one_cup_ready",
     "two_cups_ready",
+    "select",
     "success",
 )
 CAPTURE_STAGE_ORDER = EVALUATOR_STAGE_ORDER
@@ -26,16 +27,24 @@ _EVALUATOR_STAGE_BY_TARGET = {
     "sugar_added": "sugar",
     "one_cup_ready": "one_ready",
     "two_cups_ready": "ready",
-    "success": "selection",
+    "select": "selection",
+    "success": "success",
 }
 _TARGET_PATHS = {
     "sugar_added": ("sugar_added",),
     "one_cup_ready": ("sugar_added", "one_cup_ready"),
     "two_cups_ready": ("sugar_added", "one_cup_ready", "two_cups_ready"),
+    "select": (
+        "sugar_added",
+        "one_cup_ready",
+        "two_cups_ready",
+        "select",
+    ),
     "success": (
         "sugar_added",
         "one_cup_ready",
         "two_cups_ready",
+        "select",
         "success",
     ),
 }
@@ -43,6 +52,9 @@ _PREFIX_STAGE_BY_TARGET = {
     "sugar_added": None,
     "one_cup_ready": "sugar",
     "two_cups_ready": "one_ready",
+    "select": "ready",
+    # Success consumes the select result.  It intentionally starts from the
+    # ready prefix so a policy that never selects cannot pass this stage.
     "success": "ready",
 }
 
@@ -50,6 +62,7 @@ DEFAULT_STAGE_BUDGETS = {
     "sugar_added": 1500,
     "one_cup_ready": 2000,
     "two_cups_ready": 2000,
+    "select": 1000,
     "success": 1000,
 }
 
@@ -77,6 +90,9 @@ def build_stage_specs(
             completion_predicate=_completion(stage_id),
             failure_predicate=failure_predicate,
             model_step_budget=configured[stage_id],
+            expert_prefix_required=not (
+                target == "success" and stage_id == "select"
+            ),
         )
         for stage_id in path
     )
@@ -101,9 +117,25 @@ def _completion(stage_id: str):
     return lambda state: stage_completed(state, stage_id)
 
 
-def _failure_predicate(_target_stage: str):
+def _failure_predicate(target_stage: str):
+    """Build the target-aware failure predicate.
+
+    ``select`` is intentionally a standalone stage: a physically valid
+    selection qualifies it even when the selected cup is wrong.  The
+    correctness failure is consumed by the following ``success`` stage.
+    Earlier stages (and the success target) still fail on every evaluator
+    failure code.
+    """
+
+    ignore_wrong_selection = str(target_stage) == "select"
+
     def failed(state: WA01EvalResult) -> bool:
-        return bool(state.failure_code)
+        if not state.failure_code:
+            return False
+        return not (
+            ignore_wrong_selection
+            and state.failure_code == "wrong_coffee_selected"
+        )
 
     return failed
 

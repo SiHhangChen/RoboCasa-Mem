@@ -731,14 +731,17 @@ class WA03SortSugaredAndUnsugaredCoffee(Kitchen):
         )
 
     def _are_cups_correctly_arranged(self) -> bool:
-        """判断三杯是否分别进入独立区域、接触餐桌并保持直立。"""
+        """判断三杯是否都接触餐桌并保持直立。
+
+        Placement-region occupancy is retained as a diagnostic and expert
+        recording check, but is intentionally excluded from policy evaluation.
+        """
 
         return bool(
             all(
                 self.is_coffee_cup_correctly_placed_on_dining_counter(coffee_id)
                 for coffee_id in COFFEE_IDS
             )
-            and self._are_all_dining_regions_occupied()
         )
 
     def _cup_pairwise_xy_distances(self) -> dict[str, float]:

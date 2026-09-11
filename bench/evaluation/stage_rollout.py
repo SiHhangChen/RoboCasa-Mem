@@ -45,6 +45,10 @@ class StageSpec:
     entry_predicate: Predicate | None = None
     model_step_budget: int = 1
     success_hold_steps: int = 1
+    # Most stages in a target path must be completed by the recorded expert
+    # prefix before model handoff.  A derived/event-sharing stage can opt out
+    # while remaining in the path so it is evaluated on the model transition.
+    expert_prefix_required: bool = True
 
     def __post_init__(self) -> None:
         if not str(self.id).strip():
@@ -62,6 +66,7 @@ class StageSpec:
         object.__setattr__(self, "id", str(self.id))
         object.__setattr__(self, "model_step_budget", int(self.model_step_budget))
         object.__setattr__(self, "success_hold_steps", int(self.success_hold_steps))
+        object.__setattr__(self, "expert_prefix_required", bool(self.expert_prefix_required))
 
 
 class StageTask(Protocol):
@@ -192,7 +197,10 @@ class StageTracker:
         index = self._index(target_stage)
         if index == 0:
             return True
-        if not all(self._completed[stage.id] for stage in self.stages[:index]):
+        required_prefix = [
+            stage for stage in self.stages[:index] if stage.expert_prefix_required
+        ]
+        if not all(self._completed[stage.id] for stage in required_prefix):
             return False
         entry = self.stages[index].entry_predicate
         return entry is None or bool(entry(self._last_state))

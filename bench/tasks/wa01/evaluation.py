@@ -16,13 +16,16 @@ from bench.evaluation.report_profiles import WA01_REPORT_PROFILE
 from bench.tasks.wa01.domain.contracts import COFFEE_IDS
 
 
-STAGE_ORDER = ("sugar", "one_ready", "ready", "selection")
+STAGE_ORDER = ("sugar", "one_ready", "ready", "selection", "success")
 STAGE_PREREQUISITES: dict[str, str | None] = {
     "sugar": None,
     "one_ready": "sugar",
     "ready": "one_ready",
     "selection": "ready",
+    "success": "selection",
 }
+_PHYSICAL_STAGES = ("sugar", "one_ready", "ready", "selection")
+_DERIVED_STAGES = ("success",)
 
 TASK_EVALUATOR_METADATA_KEY = "task_evaluator"
 REPORT_STAGE_ORDER = WA01_REPORT_PROFILE.stage_ids
@@ -32,7 +35,8 @@ _REPORT_STAGE_SOURCES = {
     "sugar_added": "sugar",
     "one_cup_ready": "one_ready",
     "two_cups_ready": "ready",
-    "success": "selection",
+    "select": "selection",
+    "success": "success",
 }
 
 
@@ -115,6 +119,7 @@ class WA01EvaluationSnapshot:
             "one_ready": self.one_ready,
             "ready": self.ready,
             "selection": self.selected_coffee_id is not None,
+            "success": self.correct_selection,
         }
 
 
@@ -161,8 +166,10 @@ class WA01EvalResult:
         sugar = dict(payload.get("sugar") or {})
         sugar["consumed"] = qualified["sugar"]
         selection = dict(payload.get("selection") or {})
-        selection["observed_correct"] = bool(selection.get("correct", False))
-        selection["correct"] = qualified["selection"]
+        selection["observed"] = observed["selection"]
+        selection["selected"] = qualified["selection"]
+        selection["observed_correct"] = observed["success"]
+        selection["correct"] = qualified["success"]
         coffee_pair = dict(payload.get("coffee_pair") or {})
         coffee_pair["detected_together_before_selection"] = coffee_pair.get(
             "together_before_selection",
@@ -178,7 +185,7 @@ class WA01EvalResult:
                 "success_checks": {
                     "sugar_consumed": qualified["sugar"],
                     "cups_together_before_selection": qualified["ready"],
-                    "correct_sugared_selection": qualified["selection"],
+                    "correct_sugared_selection": qualified["success"],
                 },
                 "sugar": sugar,
                 "selection": selection,
@@ -208,6 +215,7 @@ class WA01EvalResult:
             "two_cups_ready": bool(
                 valid_sugar and self.stages["ready"].qualified
             ),
+            "select": bool(self.stages["selection"].qualified),
             "success": bool(self.success),
         }
         stages = {}
@@ -272,11 +280,12 @@ class WA01Evaluator:
 
         raw = snapshot.raw_stage_values()
         qualified_before = {name: self._stages[name].qualified for name in STAGE_ORDER}
+        newly_qualified: set[str] = set()
         for name, value in raw.items():
             if value:
                 self._mark_observed(name, snapshot.step_id)
 
-        for name in STAGE_ORDER:
+        for name in _PHYSICAL_STAGES:
             if not raw[name] or self._previous_raw[name] or self._stages[name].qualified:
                 continue
             prerequisite = STAGE_PREREQUISITES[name]
@@ -286,10 +295,25 @@ class WA01Evaluator:
                     snapshot.step_id,
                     f"prerequisite_not_qualified:{prerequisite}",
                 )
-            elif name == "selection" and not snapshot.correct_selection:
-                self._reject(name, snapshot.step_id, "wrong_coffee_selected")
             else:
                 self._qualify(name, snapshot.step_id)
+                newly_qualified.add(name)
+
+        if "selection" in newly_qualified and not snapshot.correct_selection:
+            self._reject("success", snapshot.step_id, "wrong_coffee_selected")
+
+        # Correctness is derived from the selection event and may be committed
+        # in the same control step as that event.
+        if raw["success"] and not self._stages["success"].qualified:
+            if qualified_before["selection"] or "selection" in newly_qualified:
+                self._qualify("success", snapshot.step_id)
+                newly_qualified.add("success")
+            elif not self._previous_raw["success"]:
+                self._reject(
+                    "success",
+                    snapshot.step_id,
+                    "prerequisite_not_qualified:selection",
+                )
 
         self._previous_raw = raw
         self._last_step_id = snapshot.step_id
@@ -352,10 +376,10 @@ class WA01Evaluator:
         selection = stages["selection"]
         if selection.observed and not selection.qualified:
             failure_code = (
-                "wrong_coffee_selected"
-                if selection.reason == "wrong_coffee_selected"
-                else "selection_before_ready"
+                "selection_before_ready"
             )
+        elif selection.qualified and snapshot.selected_coffee_id != snapshot.sugar_delivery_coffee_id:
+            failure_code = "wrong_coffee_selected"
 
         details = dict(snapshot.details)
         evaluation = dict(details.get("evaluation") or {})
@@ -366,7 +390,7 @@ class WA01Evaluator:
                 "stage_order": list(STAGE_ORDER),
                 "stage_prerequisites": dict(STAGE_PREREQUISITES),
                 "qualification_policy": "rising_edge_after_prerequisite",
-                "same_step_derived_stages": [],
+                "same_step_derived_stages": list(_DERIVED_STAGES),
                 "raw_stage_checks": snapshot.raw_stage_values(),
                 "rejected_stage_observations": {
                     name: list(values) for name, values in self._rejected.items() if values
@@ -375,8 +399,8 @@ class WA01Evaluator:
         )
         details["evaluation"] = evaluation
         return WA01EvalResult(
-            success=selection.qualified,
-            terminal=selection.qualified,
+            success=stages["success"].qualified,
+            terminal=stages["success"].qualified,
             failure_code=failure_code,
             stages=stages,
             details=details,
