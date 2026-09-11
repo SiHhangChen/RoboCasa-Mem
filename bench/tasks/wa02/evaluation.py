@@ -83,6 +83,23 @@ class WA02EvaluationSnapshot:
     staged_slot_by_cup: Mapping[str, str] = field(default_factory=dict)
     final_taken_cup_id: str | None = None
     details: Mapping[str, Any] = field(default_factory=dict)
+    # Policy evaluation intentionally mirrors WA-01: readiness is derived
+    # from the physical counter-contact and upright predicates only.  The
+    # service-slot map above remains recording metadata and is not required
+    # when these physical observations are supplied.
+    cup_on_counter: Mapping[str, bool] = field(default_factory=dict)
+    cup_upright: Mapping[str, bool] = field(default_factory=dict)
+    physically_ready_by_cup: Mapping[str, bool] = field(default_factory=dict)
+
+    _physical_readiness_provided: bool = field(
+        init=False, repr=False, compare=False
+    )
+    _physical_ready_map_provided: bool = field(
+        init=False, repr=False, compare=False
+    )
+    _counter_upright_provided: bool = field(
+        init=False, repr=False, compare=False
+    )
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "step_id", int(self.step_id))
@@ -112,17 +129,75 @@ class WA02EvaluationSnapshot:
             for cup, temp in self.filled_temperature_by_cup.items()
         }
         object.__setattr__(self, "filled_temperature_by_cup", fills)
+        physical_ready_map_provided = bool(self.physically_ready_by_cup)
+        counter_upright_provided = bool(self.cup_on_counter or self.cup_upright)
+        readiness_provided = bool(
+            counter_upright_provided or physical_ready_map_provided
+        )
         staged = {
             _cup(cup): str(slot) for cup, slot in self.staged_slot_by_cup.items()
         }
-        if any(slot not in SERVICE_SLOTS for slot in staged.values()):
+        # ``staged_slot_by_cup`` is recording metadata.  Do not reject a policy
+        # snapshot because an old recorder emitted a duplicate or unknown slot;
+        # readiness is sourced from the physical predicates below.  Preserve
+        # validation for slot-only legacy snapshots, where this map is the only
+        # available readiness source.  The expert recording handler performs
+        # strict slot validation before it commits live metadata.
+        if not readiness_provided and any(
+            slot not in SERVICE_SLOTS for slot in staged.values()
+        ):
             raise ValueError("invalid WA-02 service slot in staged_slot_by_cup")
         object.__setattr__(self, "staged_slot_by_cup", staged)
+        for name in ("cup_on_counter", "cup_upright", "physically_ready_by_cup"):
+            values = getattr(self, name)
+            unknown = set(values) - set(CUP_IDS)
+            if unknown:
+                raise ValueError(
+                    f"unknown WA-02 cup ids in {name}: {sorted(unknown)}"
+                )
+            object.__setattr__(
+                self,
+                name,
+                {cup: bool(values.get(cup, False)) for cup in CUP_IDS},
+            )
+        object.__setattr__(self, "_physical_readiness_provided", readiness_provided)
+        object.__setattr__(
+            self, "_physical_ready_map_provided", physical_ready_map_provided
+        )
+        object.__setattr__(
+            self, "_counter_upright_provided", counter_upright_provided
+        )
         final = (
             None if self.final_taken_cup_id is None else _cup(self.final_taken_cup_id)
         )
         object.__setattr__(self, "final_taken_cup_id", final)
         object.__setattr__(self, "details", dict(self.details or {}))
+
+    @property
+    def has_physical_readiness(self) -> bool:
+        """Whether this snapshot carries the slot-independent ready signal."""
+
+        return bool(self._physical_readiness_provided)
+
+    @property
+    def ready_by_cup(self) -> dict[str, bool]:
+        """Return one physical readiness bit per cup.
+
+        New runtime snapshots use ``counter contact + upright``.  A composed
+        ``physically_ready_by_cup`` map is accepted as an equivalent physical
+        observation.  Slot-only snapshots are retained solely for compatibility
+        with old serialized artifacts; the live environment always supplies
+        physical readiness and therefore never uses this fallback.
+        """
+
+        if self._counter_upright_provided:
+            return {
+                cup: bool(self.cup_on_counter[cup] and self.cup_upright[cup])
+                for cup in CUP_IDS
+            }
+        if self._physical_ready_map_provided:
+            return dict(self.physically_ready_by_cup)
+        return {cup: cup in self.staged_slot_by_cup for cup in CUP_IDS}
 
     def cup_for_temperature(self, temperature: str) -> str | None:
         temp = _temperature(temperature)
@@ -167,6 +242,11 @@ class WA02EvalResult:
         stages = {name: value.to_dict() for name, value in self.stages.items()}
         qualified = {name: bool(value["qualified"]) for name, value in stages.items()}
         observed = {name: bool(value["observed"]) for name, value in stages.items()}
+        service = dict(payload.get("service") or {})
+        service.setdefault("placement_rule", "counter_contact_and_upright")
+        service["evaluation_readiness_policy"] = "counter_contact_and_upright"
+        service["service_slot_assignment_required_for_evaluation"] = False
+        service["evaluation_ready"] = bool(qualified.get("second_cup_ready", False))
         payload.update(
             {
                 "success": bool(self.success),
@@ -183,6 +263,7 @@ class WA02EvalResult:
                     name: value["qualified_step"] for name, value in stages.items()
                 },
                 "success_checks": dict(qualified),
+                "service": service,
             }
         )
         return payload
@@ -289,7 +370,13 @@ class WA02Evaluator:
                 self._reject(name, snapshot.step_id, f"prerequisite_not_qualified:{prerequisite}")
                 continue
             if not correct[name]:
-                self._reject(name, snapshot.step_id, self._incorrect_reason(name))
+                self._reject(
+                    name,
+                    snapshot.step_id,
+                    self._incorrect_reason(
+                        name, legacy_staging=not snapshot.has_physical_readiness
+                    ),
+                )
                 continue
             self._qualify(name, snapshot.step_id)
             newly_qualified.add(name)
@@ -333,27 +420,43 @@ class WA02Evaluator:
         first_temp = snapshot.filled_temperature_by_cup.get(first or "")
         second_temp = snapshot.filled_temperature_by_cup.get(second or "")
         staged = dict(snapshot.staged_slot_by_cup)
-        both_slots_used = bool(
+        ready_by_cup = snapshot.ready_by_cup
+        first_ready = bool(first is not None and ready_by_cup.get(first, False))
+        both_cups_ready = bool(
             first is not None
             and second is not None
-            and first in staged
-            and second in staged
-            and set(staged.values()) == set(SERVICE_SLOTS)
+            and ready_by_cup.get(first, False)
+            and ready_by_cup.get(second, False)
         )
+        second_ready_observed = both_cups_ready
+        # Old snapshot fixtures only carried staged_slot_by_cup.  Keep their
+        # historical validation semantics without making live evaluation
+        # depend on slot identity.
+        if not snapshot.has_physical_readiness:
+            both_slots_used = bool(
+                first is not None
+                and second is not None
+                and first in staged
+                and second in staged
+                and set(staged.values()) == set(SERVICE_SLOTS)
+            )
+            first_ready = bool(first is not None and first in staged)
+            second_ready_observed = bool(second is not None and second in staged)
+            both_cups_ready = both_slots_used
         requested_cup = snapshot.cup_for_temperature(self.requested_temperature)
         raw = {
             "first_cup_pick": first is not None and first in snapshot.pickup_step_by_cup,
             "first_cup_fill": first is not None and first in snapshot.filled_temperature_by_cup,
-            "first_cup_ready": first is not None and first in staged,
+            "first_cup_ready": first_ready,
             "second_cup_pick": second is not None and second in snapshot.pickup_step_by_cup,
             "second_cup_fill": second is not None and second in snapshot.filled_temperature_by_cup,
-            "second_cup_ready": second is not None and second in staged,
+            "second_cup_ready": second_ready_observed,
             "selection_success": snapshot.final_taken_cup_id is not None,
         }
         correct = {
             "first_cup_pick": raw["first_cup_pick"],
             "first_cup_fill": raw["first_cup_fill"],
-            "first_cup_ready": bool(first is not None and staged.get(first) in SERVICE_SLOTS),
+            "first_cup_ready": first_ready,
             "second_cup_pick": raw["second_cup_pick"],
             "second_cup_fill": bool(
                 raw["second_cup_fill"]
@@ -361,7 +464,7 @@ class WA02Evaluator:
                 and second_temp is not None
                 and first_temp != second_temp
             ),
-            "second_cup_ready": both_slots_used,
+            "second_cup_ready": both_cups_ready,
             "selection_success": bool(
                 requested_cup is not None
                 and snapshot.final_taken_cup_id == requested_cup
@@ -369,13 +472,17 @@ class WA02Evaluator:
         }
         return raw, correct
 
-    def _incorrect_reason(self, name: str) -> str:
+    def _incorrect_reason(self, name: str, *, legacy_staging: bool = False) -> str:
         if name == "second_cup_fill":
             return "duplicate_fill_temperature"
         if name == "first_cup_fill":
             return "invalid_fill_temperature"
         if name in {"first_cup_ready", "second_cup_ready"}:
-            return "invalid_service_staging"
+            return (
+                "invalid_service_staging"
+                if legacy_staging
+                else "counter_contact_and_upright_not_verified"
+            )
         if name == "selection_success":
             return "wrong_cup_selected"
         return "physical_condition_not_verified"
@@ -444,6 +551,9 @@ class WA02Evaluator:
                 "qualification_policy": (
                     "rising_edge_after_prerequisite_and_dynamic_temperature_binding"
                 ),
+                "readiness_policy": "counter_contact_and_upright",
+                "service_slot_assignment_required_for_evaluation": False,
+                "physical_readiness_by_cup": snapshot.ready_by_cup,
                 "stage_bindings": {
                     "binding_source": "physical_events",
                     "first_cup_id": self.first_cup_id,
@@ -458,6 +568,8 @@ class WA02Evaluator:
                     "requested_cup_id": snapshot.cup_for_temperature(
                         self.requested_temperature
                     ),
+                    # Retained as recording metadata only.  It is deliberately
+                    # not consulted by ``_stage_values``.
                     "service_slot_by_cup": dict(snapshot.staged_slot_by_cup),
                 },
                 "demonstration_temperature_order": (

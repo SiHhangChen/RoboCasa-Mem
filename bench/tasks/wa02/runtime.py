@@ -62,6 +62,13 @@ def _environment(config: Any, scene: Any, plan: Any, resources: Mapping[str, Any
 
 
 def _initialize(descriptor: Any, env: Any, observation: Mapping[str, Any]):
+    episode = getattr(descriptor, "episode", None)
+    # Evaluation rollouts intentionally relax placement to the WA-01 physical
+    # readiness predicate.  Expert/recording runs keep strict service-region
+    # staging, including when an evaluator is attached for diagnostics.
+    env.require_service_region_for_staging = (
+        getattr(episode, "split", None) != "evaluation"
+    )
     initial_objects = dict(descriptor.config.initial_state.objects)
     enabled = bool(initial_objects.pop("enabled", True))
     updated, objects = apply_sampled_initial_object_regions(env, settings=initial_objects, enabled=enabled)

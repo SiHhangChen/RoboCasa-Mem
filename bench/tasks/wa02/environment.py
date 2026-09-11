@@ -99,6 +99,10 @@ class WA02ServeHotColdWaterCups(Kitchen):
         )
         self.service_threshold = float(service_threshold)
         self.cup_upright_threshold_deg = float(cup_upright_threshold_deg)
+        # Expert recording keeps the original service-region requirement.
+        # The evaluation split overrides this to False in runtime
+        # initialization, reducing readiness to counter contact + upright.
+        self.require_service_region_for_staging = True
         self._cup_placement_seed = int(cup_placement_seed)
         self.gripper_force_limit = float(gripper_force_limit)
         self.gripper_pad_friction = tuple(
@@ -168,6 +172,9 @@ class WA02ServeHotColdWaterCups(Kitchen):
         self._staging_detected_at: dict[str, np.ndarray | None] = {
             cup: None for cup in CUP_IDS
         }
+        # Slot-independent readiness used only by learned-policy evaluation.
+        # Recording/expert staging continues to use the planned service slots.
+        self._cups_ready_before_final_pick_for_evaluation: bool = False
         self._physical_event_diagnostics: dict[str, Any] = {
             "pickup_detected_by_cup": {},
             "grasp_detected_by_cup": {},
@@ -494,6 +501,20 @@ class WA02ServeHotColdWaterCups(Kitchen):
 
     def record_verified_staging(self, cup_id: str, slot: str) -> bool:
         applied = record_verified_staging(self._semantic_state, cup_id, slot)
+        if applied:
+            cup = str(cup_id)
+            resolved_slot = str(slot)
+            try:
+                self._staging_detected_at[cup] = np.asarray(
+                    self.object_position(cup), dtype=float
+                ).copy()
+            except Exception:
+                pass
+            diagnostics = getattr(self, "_physical_event_diagnostics", None)
+            if isinstance(diagnostics, dict):
+                diagnostics.setdefault("staging_detected_by_cup", {})[
+                    cup
+                ] = resolved_slot
         return bool(
             applied
             or self._semantic_state.staged_slot_by_cup.get(str(cup_id)) == str(slot)
@@ -565,6 +586,12 @@ class WA02ServeHotColdWaterCups(Kitchen):
         return bool(tilt <= self.cup_upright_threshold_deg)
 
     def cup_is_at_service_slot(self, cup_id: str, slot: str) -> bool:
+        """Return the strict slot predicate used by recording/expert actions.
+
+        Learned-policy evaluation must call
+        :meth:`cup_is_physically_ready_for_evaluation` instead.
+        """
+
         target = self.service_slot_position(slot)
         distance = float(np.linalg.norm(self.object_position(cup_id)[:2] - target[:2]))
         try:
@@ -576,6 +603,52 @@ class WA02ServeHotColdWaterCups(Kitchen):
             and self.cup_is_in_service_region(cup_id, slot)
             and contact
             and self.cup_is_upright(str(cup_id))
+        )
+
+    def cup_is_physically_ready_for_evaluation(self, cup_id: str) -> bool:
+        """Return WA-02 policy readiness: counter contact and upright.
+
+        This deliberately omits service-region membership, slot distance, and
+        slot assignment.  Those constraints remain part of the recording and
+        expert-placement path (``cup_is_at_service_slot``).
+        """
+
+        cup = str(cup_id)
+        if cup not in CUP_IDS:
+            return False
+        try:
+            contact = bool(OU.check_obj_fixture_contact(self, cup, self.counter))
+        except Exception:
+            contact = False
+        try:
+            upright = bool(self.cup_is_upright(cup))
+        except Exception:
+            upright = False
+        return bool(contact and upright)
+
+    def physically_ready_by_cup_for_evaluation(self) -> dict[str, bool]:
+        """Return slot-independent physical readiness for every cup."""
+
+        return {
+            cup: self.cup_is_physically_ready_for_evaluation(cup)
+            for cup in CUP_IDS
+        }
+
+    def are_cups_physically_ready_for_evaluation(self) -> bool:
+        """Whether both cups currently satisfy counter contact + upright."""
+
+        ready = self.physically_ready_by_cup_for_evaluation()
+        return bool(all(ready.values()))
+
+    def _requires_strict_service_staging(self) -> bool:
+        """Return whether this runtime is in recording/expert staging mode."""
+
+        return bool(
+            getattr(
+                self,
+                "require_service_region_for_staging",
+                getattr(self, "_wa02_evaluator", None) is None,
+            )
         )
 
     def cup_is_in_service_region(self, cup_id: str, slot: str) -> bool:
@@ -726,6 +799,15 @@ class WA02ServeHotColdWaterCups(Kitchen):
             slot: np.asarray(position, dtype=float).tolist()
             for slot, position in self.service_slot_poses.items()
         }
+        physically_staged = (
+            self.are_cups_physically_staged()
+            if self._requires_strict_service_staging()
+            else bool(
+                set(self._semantic_state.staged_slot_by_cup) == set(CUP_IDS)
+                and set(self._semantic_state.staged_slot_by_cup.values())
+                == set(SERVICE_SLOTS)
+            )
+        )
         return {
             "success": report.success,
             "success_checks": report.checks(),
@@ -765,8 +847,15 @@ class WA02ServeHotColdWaterCups(Kitchen):
             "service": {
                 "slot_positions_world": slots,
                 "placement_regions": deepcopy(self.service_slot_regions),
+                "placement_rule": (
+                    "service_region"
+                    if self._requires_strict_service_staging()
+                    else "counter_contact_and_upright"
+                ),
                 "recorded_slot_by_cup": dict(self._semantic_state.staged_slot_by_cup),
-                "physically_staged": self.are_cups_physically_staged(),
+                "physically_staged": physically_staged,
+                "physically_ready_by_cup": self.physically_ready_by_cup_for_evaluation(),
+                "physically_ready_for_evaluation": self.are_cups_physically_ready_for_evaluation(),
                 "staged_before_final_pick": self._semantic_state.cups_staged_before_final_pick,
             },
             "selection": {"final_taken_cup_id": self._semantic_state.final_taken_cup_id},
@@ -778,6 +867,23 @@ class WA02ServeHotColdWaterCups(Kitchen):
         self.update_state()
         plan = self.episode_plan
         details = self.task_diagnostics_fallback()
+        cup_on_counter: dict[str, bool] = {}
+        cup_upright: dict[str, bool] = {}
+        for cup in CUP_IDS:
+            try:
+                cup_on_counter[cup] = bool(
+                    OU.check_obj_fixture_contact(self, cup, self.counter)
+                )
+            except Exception:
+                cup_on_counter[cup] = False
+            try:
+                cup_upright[cup] = bool(self.cup_is_upright(cup))
+            except Exception:
+                cup_upright[cup] = False
+        physical_ready = {
+            cup: bool(cup_on_counter[cup] and cup_upright[cup])
+            for cup in CUP_IDS
+        }
         return WA02EvaluationSnapshot(
             step_id=int(getattr(self, "timestep", 0)),
             requested_temperature=plan.requested_temperature,
@@ -791,6 +897,9 @@ class WA02ServeHotColdWaterCups(Kitchen):
                 self._semantic_state.filled_temperature_by_cup
             ),
             staged_slot_by_cup=dict(self._semantic_state.staged_slot_by_cup),
+            cup_on_counter=cup_on_counter,
+            cup_upright=cup_upright,
+            physically_ready_by_cup=physical_ready,
             final_taken_cup_id=self._semantic_state.final_taken_cup_id,
             details=details,
         )
@@ -809,6 +918,17 @@ class WA02ServeHotColdWaterCups(Kitchen):
             self._semantic_state, self._semantic_state.requested_temperature
         )
         actual_fills = list(self._semantic_state.filled_temperature_by_cup.items())
+        # A learned-policy snapshot must not query service-slot geometry as an
+        # implicit readiness signal.  The explicit staging-mode flag retains
+        # strict geometry diagnostics for recording runs.
+        if self._requires_strict_service_staging():
+            physically_staged = self.are_cups_physically_staged()
+        else:
+            physically_staged = bool(
+                set(self._semantic_state.staged_slot_by_cup) == set(CUP_IDS)
+                and set(self._semantic_state.staged_slot_by_cup.values())
+                == set(SERVICE_SLOTS)
+            )
         return {
             "success_checks_legacy": report.checks(),
             "physical_events": dict(self._physical_event_diagnostics),
@@ -852,8 +972,15 @@ class WA02ServeHotColdWaterCups(Kitchen):
             "service": {
                 "slot_positions_world": slots,
                 "placement_regions": deepcopy(self.service_slot_regions),
+                "placement_rule": (
+                    "service_region"
+                    if self._requires_strict_service_staging()
+                    else "counter_contact_and_upright"
+                ),
                 "recorded_slot_by_cup": dict(self._semantic_state.staged_slot_by_cup),
-                "physically_staged": self.are_cups_physically_staged(),
+                "physically_staged": physically_staged,
+                "physically_ready_by_cup": self.physically_ready_by_cup_for_evaluation(),
+                "physically_ready_for_evaluation": self.are_cups_physically_ready_for_evaluation(),
                 "staged_before_final_pick": self._semantic_state.cups_staged_before_final_pick,
             },
             "selection": {
@@ -1241,12 +1368,16 @@ class WA02ServeHotColdWaterCups(Kitchen):
             return False
 
     def _cup_physically_staged(self, cup_id: str, slot: str) -> bool:
-        """Return whether one cup currently rests at its planned service slot."""
+        """Return the active recording/evaluation placement predicate."""
 
         cup = str(cup_id)
-        if cup not in CUP_IDS or slot not in SERVICE_SLOTS:
+        if cup not in CUP_IDS:
             return False
         try:
+            if not self._requires_strict_service_staging():
+                return self.cup_is_physically_ready_for_evaluation(cup)
+            if slot not in SERVICE_SLOTS:
+                return False
             return bool(self.cup_is_at_service_slot(cup, slot))
         except Exception:
             return False
@@ -1263,6 +1394,7 @@ class WA02ServeHotColdWaterCups(Kitchen):
         self._selection_armed_by_cup = {cup: False for cup in CUP_IDS}
         self._selection_grasp_steps = {cup: 0 for cup in CUP_IDS}
         self._staging_detected_at = {cup: None for cup in CUP_IDS}
+        self._cups_ready_before_final_pick_for_evaluation = False
         self._physical_event_diagnostics = {
             "pickup_detected_by_cup": {},
             "grasp_detected_by_cup": {},
@@ -1284,8 +1416,10 @@ class WA02ServeHotColdWaterCups(Kitchen):
 
         * a cup is filled when it is held under the active sensor faucet with
           the water level at full;
-        * staging is recorded when a cup first reaches its planned slot;
-        * the final selection is the cup re-grasped after both cups staged.
+        * recording/expert staging is recorded when a cup first reaches its
+          planned slot, while policy readiness uses counter contact + upright;
+        * the final selection is the cup re-grasped after the corresponding
+          two-cup readiness condition has been latched.
         """
 
         if self._task_event_locked:
@@ -1361,45 +1495,77 @@ class WA02ServeHotColdWaterCups(Kitchen):
                 )[cup] = temperature
             continue
 
-        # Staging: latch whichever unique service slot the policy actually used.
-        for cup in CUP_IDS:
-            if cup in self._semantic_state.staged_slot_by_cup:
-                continue
-            slot = self.detected_service_slot(cup)
-            if slot is None:
-                continue
-            # A cup held over the target region is not yet placed. Require a
-            # release before latching the historical ready event.
-            if self._cup_physically_grasped(cup):
-                continue
-            applied = record_verified_staging(self._semantic_state, cup, slot)
-            if applied:
-                self._staging_detected_at[cup] = np.asarray(
-                    self.object_position(cup), dtype=float
-                ).copy()
-                self._physical_event_diagnostics.setdefault(
-                    "staging_detected_by_cup", {}
-                )[cup] = slot
+        # Recording/expert mode still records the unique planned service slot.
+        # Evaluation mode skips this slot detector entirely: policy readiness
+        # is defined below by counter contact + upright and must not depend on
+        # region geometry.
+        slot_event_detection_enabled = self._requires_strict_service_staging()
+        if slot_event_detection_enabled:
+            for cup in CUP_IDS:
+                if cup in self._semantic_state.staged_slot_by_cup:
+                    continue
+                slot = self.detected_service_slot(cup)
+                if slot is None:
+                    continue
+                # A cup held over the target region is not yet placed. Require a
+                # release before latching the historical ready event.
+                if self._cup_physically_grasped(cup):
+                    continue
+                applied = record_verified_staging(self._semantic_state, cup, slot)
+                if applied:
+                    self._staging_detected_at[cup] = np.asarray(
+                        self.object_position(cup), dtype=float
+                    ).copy()
+                    self._physical_event_diagnostics.setdefault(
+                        "staging_detected_by_cup", {}
+                    )[cup] = slot
 
-        # Latch the historical pre-final-pick condition.
-        latch_cups_staged(
-            self._semantic_state,
-            currently_ready=self.are_cups_physically_staged(),
+            latch_cups_staged(
+                self._semantic_state,
+                currently_ready=self.are_cups_physically_staged(),
+            )
+
+        # Learned-policy evaluation intentionally degrades staging to the
+        # WA-01 physical predicate (counter contact + upright).  Keep this
+        # latch independent from the slot-based recording event above.
+        evaluation_ready = self.physically_ready_by_cup_for_evaluation()
+        self._physical_event_diagnostics[
+            "physically_ready_by_cup"
+        ] = dict(evaluation_ready)
+        fills_complete = all(
+            cup in self._semantic_state.filled_temperature_by_cup for cup in CUP_IDS
         )
+        if (
+            not self._requires_strict_service_staging()
+            and fills_complete
+            and all(evaluation_ready.values())
+        ):
+            if not self._cups_ready_before_final_pick_for_evaluation:
+                self._physical_event_diagnostics[
+                    "cups_ready_for_evaluation_latched"
+                ] = True
+            self._cups_ready_before_final_pick_for_evaluation = True
 
-        # Final selection: after both cups are staged, wait for each cup to be
-        # released by the gripper (the placement hand-off), then the first
-        # sustained re-grasp (>= ``_selection_min_grasp_steps`` consecutive
-        # frames) is the selection.  The release gate excludes the staging
-        # hand-off itself; the sustained-frames gate excludes 1-frame transient
-        # contacts when the navigation arm passes near a staged cup.
+        # Final selection: after the relevant pre-selection readiness gate is
+        # latched (strict service staging for recording, or counter contact +
+        # upright for policy evaluation), wait for each cup to be released by
+        # the gripper.  The first sustained re-grasp (>=
+        # ``_selection_min_grasp_steps`` consecutive frames) is the selection.
+        # The release gate excludes the placement hand-off itself; the
+        # sustained-frames gate excludes 1-frame transient contacts when the
+        # navigation arm passes near a cup.
         if self._semantic_state.final_taken_cup_id is None:
-            staged = bool(
+            strict_staging_latched = bool(
                 set(self._semantic_state.staged_slot_by_cup) == set(CUP_IDS)
                 and set(self._semantic_state.staged_slot_by_cup.values())
                 == set(SERVICE_SLOTS)
             )
-            if staged:
+            ready_before_final_pick = bool(
+                strict_staging_latched
+                if self._requires_strict_service_staging()
+                else self._cups_ready_before_final_pick_for_evaluation
+            )
+            if ready_before_final_pick:
                 for cup in CUP_IDS:
                     if not self._selection_armed_by_cup[cup]:
                         # Arm once the gripper fully leaves this cup after
@@ -1422,11 +1588,19 @@ class WA02ServeHotColdWaterCups(Kitchen):
 
         # Once every event that can be committed from physics has happened, the
         # derived state is final; stop re-running the (deterministic) detectors.
+        strict_staging_latched = bool(
+            set(self._semantic_state.staged_slot_by_cup) == set(CUP_IDS)
+            and set(self._semantic_state.staged_slot_by_cup.values())
+            == set(SERVICE_SLOTS)
+        )
+        preselection_ready_latched = bool(
+            strict_staging_latched
+            if self._requires_strict_service_staging()
+            else self._cups_ready_before_final_pick_for_evaluation
+        )
         if all(
             cup in self._semantic_state.filled_temperature_by_cup for cup in CUP_IDS
-        ) and all(
-            cup in self._semantic_state.staged_slot_by_cup for cup in CUP_IDS
-        ) and self._semantic_state.final_taken_cup_id is not None:
+        ) and preselection_ready_latched and self._semantic_state.final_taken_cup_id is not None:
             self._task_event_locked = True
 
     def _sensor_stream_geometry(

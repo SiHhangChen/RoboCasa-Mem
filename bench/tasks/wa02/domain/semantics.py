@@ -77,7 +77,12 @@ def record_verified_fill(state: SemanticState, cup_id: str, temperature: str) ->
 
 
 def record_verified_staging(state: SemanticState, cup_id: str, slot: str) -> bool:
-    """Record one physically verified service-slot placement."""
+    """Record one physically verified service-slot placement.
+
+    This is the recording/expert event.  Learned-policy evaluation does not
+    need this slot assignment; it consumes the environment's physical
+    counter-contact + upright readiness snapshot instead.
+    """
 
     cup = _cup(cup_id)
     resolved_slot = str(slot)
@@ -114,7 +119,13 @@ def cup_for_temperature(state: SemanticState, temperature: str) -> str | None:
 
 
 def evaluate_success(state: SemanticState) -> SuccessReport:
-    """Compute WA-02's only authoritative final result."""
+    """Compute the strict semantic/recording success report.
+
+    Canonical learned-policy evaluation is owned by ``WA02Evaluator`` and
+    consumes the environment snapshot's counter-contact + upright readiness.
+    This domain report remains the strict fallback for recording/expert paths
+    and legacy diagnostics, where both service-slot assignments are required.
+    """
 
     hot_cup = cup_for_temperature(state, "hot")
     cold_cup = cup_for_temperature(state, "cold")

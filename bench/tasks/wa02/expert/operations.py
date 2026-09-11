@@ -9,6 +9,9 @@ from bench.tasks.wa02.execution.navigation import build_navigation_assembly
 
 
 def build_operation_handlers(descriptor: Any, env: Any, observation: dict[str, Any]) -> dict[str, Any]:
+    # Expert-prefix recording must retain the strict service-region contract
+    # even when the runtime was initialized from an evaluation-split episode.
+    env.require_service_region_for_staging = True
     navigation = build_navigation_assembly(env, observation, config=descriptor.navigation, seed=descriptor.scene.scene_seed)
     manipulation = build_manipulation_assembly(
         env,

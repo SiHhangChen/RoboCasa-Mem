@@ -26,6 +26,9 @@ def _snapshot(
     pick_steps: dict[str, int] | None = None,
     filled: dict[str, str] | None = None,
     staged: dict[str, str] | None = None,
+    physically_ready_by_cup: dict[str, bool] | None = None,
+    cup_on_counter: dict[str, bool] | None = None,
+    cup_upright: dict[str, bool] | None = None,
     selected: str | None = None,
 ) -> WA02EvaluationSnapshot:
     resolved_pick_steps = (
@@ -40,6 +43,9 @@ def _snapshot(
         pickup_step_by_cup=resolved_pick_steps,
         filled_temperature_by_cup=filled or {},
         staged_slot_by_cup=staged or {},
+        physically_ready_by_cup=physically_ready_by_cup or {},
+        cup_on_counter=cup_on_counter or {},
+        cup_upright=cup_upright or {},
         final_taken_cup_id=selected,
         details={"physical_events": {"test_step": step}},
     )
@@ -192,6 +198,71 @@ def test_wa02_evaluator_accepts_either_physical_cup_as_first() -> None:
     assert bindings["first_cup_id"] == "cup_B"
     assert bindings["second_cup_id"] == "cup_A"
     assert bindings["requested_cup_id"] == "cup_B"
+
+
+def test_wa02_policy_evaluation_ready_uses_counter_contact_and_upright_only() -> None:
+    """Policy readiness must not require a service slot or slot assignment."""
+
+    evaluator = _evaluator()
+    false_ready = {"cup_A": False, "cup_B": False}
+    snapshots = [
+        _snapshot(1, picked=("cup_A",), staged={}),
+        _snapshot(
+            2,
+            picked=("cup_A",),
+            filled={"cup_A": "hot"},
+            staged={},
+            physically_ready_by_cup=false_ready,
+        ),
+        _snapshot(
+            3,
+            picked=("cup_A",),
+            filled={"cup_A": "hot"},
+            staged={},
+            cup_on_counter={"cup_A": True},
+            cup_upright={"cup_A": True},
+        ),
+        _snapshot(
+            4,
+            picked=("cup_A", "cup_B"),
+            filled={"cup_A": "hot"},
+            staged={},
+            physically_ready_by_cup={"cup_A": True, "cup_B": False},
+        ),
+        _snapshot(
+            5,
+            picked=("cup_A", "cup_B"),
+            filled={"cup_A": "hot", "cup_B": "cold"},
+            staged={},
+            physically_ready_by_cup={"cup_A": True, "cup_B": False},
+        ),
+        _snapshot(
+            6,
+            picked=("cup_A", "cup_B"),
+            filled={"cup_A": "hot", "cup_B": "cold"},
+            # Deliberately provide unreliable slot metadata.  The physical
+            # readiness contract must ignore this metadata.
+            staged={"cup_A": "slot_1", "cup_B": "not_reliably_assigned"},
+            physically_ready_by_cup={"cup_A": True, "cup_B": True},
+        ),
+    ]
+    for snapshot in snapshots:
+        evaluator.observe(snapshot)
+
+    result = evaluator.observe(
+        _snapshot(
+            7,
+            picked=("cup_A", "cup_B"),
+            filled={"cup_A": "hot", "cup_B": "cold"},
+            staged={"cup_A": "slot_1", "cup_B": "not_reliably_assigned"},
+            physically_ready_by_cup={"cup_A": False, "cup_B": False},
+            selected="cup_A",
+        )
+    )
+
+    assert result.success
+    assert result.stages["first_cup_ready"].qualified
+    assert result.stages["second_cup_ready"].qualified
 
 
 def test_wa02_evaluator_rejects_second_pick_before_first_cup_ready() -> None:
@@ -463,6 +534,7 @@ def test_wa02_runtime_initialization_attaches_dynamic_evaluator(
         requested_temperature="cold",
     )
     descriptor = SimpleNamespace(
+        episode=SimpleNamespace(split="evaluation"),
         episode_plan=plan,
         config=SimpleNamespace(
             initial_state=SimpleNamespace(objects={}, robot_base=object())
@@ -501,7 +573,43 @@ def test_wa02_runtime_initialization_attaches_dynamic_evaluator(
     assert isinstance(evaluator, WA02Evaluator)
     assert evaluator.requested_temperature == "cold"
     assert env._wa02_evaluator is evaluator
+    assert env.require_service_region_for_staging is False
     assert updated == {"objects": True, "base": True}
+
+
+def test_wa02_expert_recording_restores_region_gate(monkeypatch: pytest.MonkeyPatch) -> None:
+    from bench.tasks.wa02.expert import operations
+
+    env = SimpleNamespace(require_service_region_for_staging=False)
+    descriptor = SimpleNamespace(
+        episode=SimpleNamespace(split="evaluation"),
+        navigation=object(),
+        scene=SimpleNamespace(scene_seed=0),
+        config=SimpleNamespace(manipulation={}),
+        resources={"planner_script": "planner.py", "cup_grasp_candidates": "grasps.json"},
+        execute=True,
+        actions=SimpleNamespace(handler_settings={}),
+    )
+    monkeypatch.setattr(
+        operations,
+        "build_navigation_assembly",
+        lambda *args, **kwargs: SimpleNamespace(controller=object()),
+    )
+    monkeypatch.setattr(
+        operations,
+        "build_manipulation_assembly",
+        lambda *args, **kwargs: SimpleNamespace(controller=SimpleNamespace()),
+    )
+    monkeypatch.setattr(
+        operations,
+        "StageRunner",
+        lambda **kwargs: SimpleNamespace(**kwargs),
+    )
+
+    parts = operations.build_operation_handlers(descriptor, env, {})
+
+    assert env.require_service_region_for_staging is True
+    assert parts["runner"] is not None
 
 
 def test_wa02_runtime_registers_public_report_stages() -> None:

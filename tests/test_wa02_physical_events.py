@@ -35,10 +35,13 @@ def _bare_environment() -> WA02ServeHotColdWaterCups:
     env._reset_physical_event_tracking()
     env.timestep = 0
     env._sensor_cup_by_temperature = {"hot": None, "cold": None}
+    env._active_sensor_faucets = set()
+    env._water_stream_intercept_trace = {}
     env.cup_fill_progress = {"cup_A": 0.0, "cup_B": 0.0}
     env.cup_temperatures = {"cup_A": None, "cup_B": None}
     env.cup_filled = {"cup_A": False, "cup_B": False}
     env.service_slot_poses = {"slot_1": [0.0, 0.0, 0.0], "slot_2": [1.0, 0.0, 0.0]}
+    env.service_slot_regions = {}
     env.cup_is_at_service_slot = lambda cup, slot: False
     env._cup_physically_staged = lambda cup, slot: False
     env.cup_is_under_sensor_faucet = lambda cup, temperature: False
@@ -121,6 +124,63 @@ def test_wa02_selection_requires_release_then_sustained_regrasp() -> None:
     env._update_task_events_from_physics()
     assert env._semantic_state.final_taken_cup_id == "cup_A"
     assert env._physical_event_diagnostics["selection_detected"] == "cup_A"
+
+
+def test_wa02_policy_readiness_does_not_commit_service_slot_events() -> None:
+    """The learned-policy path can select after contact+upright only."""
+
+    env = _bare_environment()
+    env._wa02_evaluator = object()
+    env.require_service_region_for_staging = False
+    env._semantic_state.filled_temperature_by_cup = {
+        "cup_A": "hot",
+        "cup_B": "cold",
+    }
+    env.physically_ready_by_cup_for_evaluation = lambda: {
+        "cup_A": True,
+        "cup_B": True,
+    }
+    def fail_if_slot_detected(_cup: str) -> str:
+        raise AssertionError("policy readiness must not inspect service slots")
+
+    env.detected_service_slot = fail_if_slot_detected
+    held = {"cup_A": False, "cup_B": False}
+    env._cup_physically_grasped = lambda cup: held[cup]
+    env.object_position = lambda cup: np.asarray([0.0, 0.0, 1.0])
+
+    env._update_task_events_from_physics()
+    assert env._semantic_state.staged_slot_by_cup == {}
+    assert env._cups_ready_before_final_pick_for_evaluation
+    diagnostics = env.task_diagnostics_fallback()
+    assert diagnostics["service"]["physically_staged"] is False
+
+    held["cup_A"] = True
+    env.timestep += 1
+    env._update_task_events_from_physics()
+    env.timestep += 1
+    env._update_task_events_from_physics()
+    assert env._semantic_state.final_taken_cup_id == "cup_A"
+
+
+def test_wa02_recording_readiness_keeps_strict_service_region_gate() -> None:
+    env = _bare_environment()
+    env.require_service_region_for_staging = True
+    env.physically_ready_by_cup_for_evaluation = lambda: {
+        "cup_A": True,
+        "cup_B": True,
+    }
+    env.detected_service_slot = lambda _cup: None
+    env._cup_physically_grasped = lambda _cup: False
+    env.object_position = lambda _cup: np.asarray([0.0, 0.0, 1.0])
+    env._semantic_state.filled_temperature_by_cup = {
+        "cup_A": "hot",
+        "cup_B": "cold",
+    }
+
+    env._update_task_events_from_physics()
+
+    assert not env._cups_ready_before_final_pick_for_evaluation
+    assert env._semantic_state.staged_slot_by_cup == {}
 
 
 def test_wa02_physical_event_updates_are_idempotent_within_one_step() -> None:

@@ -100,7 +100,9 @@ class EpisodePlan:
 
     ``hot_cup_id``, ``cold_cup_id``, ``requested_cup_id``, and
     ``service_slot_by_cup`` define the demonstration trajectory. Learned-policy
-    evaluation derives those bindings from physical fill and staging events.
+    evaluation derives temperature bindings from physical fill events and
+    checks placement readiness from counter contact + upright, without
+    assigning cups to service slots.
     """
 
     seed: int
