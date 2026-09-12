@@ -10,7 +10,7 @@ STEPS="${STEPS:-070000 080000 090000 100000}"
 REPLICAS="${REPLICAS:-3}"
 GPU_SLOTS="${GPU_SLOTS:-1 1 2 2 3 3 4 4 5 5 6 6}"
 BASE_PORT="${BASE_PORT:-57320}"
-STAGE_SUITE="${STAGE_SUITE:-configs/eval/stages/tm02_gr00t_r40_formal_v1.yaml}"
+STAGE_SUITE="${STAGE_SUITE:-configs/eval/stages/tm02_gr00t_r40_formal_v2.yaml}"
 LOG_DIR="${ROOT}/outputs/eval/logs"
 
 read -r -a STEP_ARR <<<"${STEPS}"
@@ -72,7 +72,7 @@ for i in "${!WORKER_STEPS[@]}"; do
     shard="${WORKER_SHARDS[i]}"
     gpu="${GPU_SLOT_ARR[i]}"
     port="$((BASE_PORT + i))"
-    eval_log="${LOG_DIR}/eval_tm02_gr00t_${step}_stage_r40_formal_v1_shard${shard}.log"
+    eval_log="${LOG_DIR}/eval_tm02_gr00t_${step}_stage_r40_formal_v2_shard${shard}.log"
     CKPT_STEP="${step}" GPU="${gpu}" RENDER_GPU="${gpu}" PORT="${port}" \
         STAGE_SUITE="${STAGE_SUITE}" STAGE_SEED_SHARD_INDEX="${shard}" \
         STAGE_SEED_SHARD_COUNT="${REPLICAS}" \

@@ -148,11 +148,11 @@ def test_report_identity_and_success_must_match_episode(
 def test_frozen_profile_catalog_covers_all_report_tasks() -> None:
     expected = {
         "TM01": (
-            ("burner_on", "one_drawer_inspected", "both_threads_completed", "success"),
+            ("burner_on", "one_drawer_inspected", "one_thread_completed", "both_threads_completed", "success"),
             frozenset(),
         ),
         "TM02": (
-            ("faucet_on", "pot_filled_and_can_retrieved", "both_threads_completed", "success"),
+            ("faucet_on", "pot_filled_and_can_retrieved", "one_thread_completed", "both_threads_completed", "success"),
             frozenset(),
         ),
         "TS01": (
@@ -277,7 +277,7 @@ def test_frozen_profile_catalog_covers_all_report_tasks() -> None:
     assert {profile.task_id for profile in REPORT_STAGE_PROFILES} == set(expected)
     for task_id, (stage_ids, conditional_stage_ids) in expected.items():
         profile = get_report_stage_profile(task_id)
-        expected_version = {"WA-01": 2, "WA-02": 2, "WA-03": 2, "WR-01": 2, "WR-03": 2, "WR-07": 4, "WR-08": 3}.get(task_id, 1)
+        expected_version = {"TM01": 2, "TM02": 2, "WA-01": 2, "WA-02": 2, "WA-03": 2, "WR-01": 2, "WR-03": 2, "WR-07": 4, "WR-08": 3}.get(task_id, 1)
         assert profile.profile_id == f"{task_id}/report-v{expected_version}"
         assert profile.stage_ids == stage_ids
         assert profile.conditional_stage_ids == conditional_stage_ids

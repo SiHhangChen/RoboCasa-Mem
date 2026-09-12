@@ -1,7 +1,7 @@
 """Authoritative TM02 benchmark evaluation state machine.
 
 The physical observer owns faucet, fill, retrieval, cabinet, and button event
-detection. This module qualifies those facts into the stable public funnel.
+detection. This module qualifies those facts into the public five-stage funnel.
 """
 
 from __future__ import annotations
@@ -18,7 +18,8 @@ STAGE_ORDER = TM02_REPORT_PROFILE.stage_ids
 STAGE_PREREQUISITES: dict[str, str | None] = {
     "faucet_on": None,
     "pot_filled_and_can_retrieved": "faucet_on",
-    "both_threads_completed": "pot_filled_and_can_retrieved",
+    "one_thread_completed": "pot_filled_and_can_retrieved",
+    "both_threads_completed": "one_thread_completed",
     "success": "both_threads_completed",
 }
 REPORT_STAGE_ORDER = STAGE_ORDER
@@ -89,6 +90,12 @@ class TM02EvaluationSnapshot:
         object.__setattr__(self, "details", dict(self.details or {}))
 
     @property
+    def one_thread_completed(self) -> bool:
+        return bool(
+            self.fill_pot_thread_completed or self.retrieve_can_thread_completed
+        )
+
+    @property
     def both_threads_completed(self) -> bool:
         return bool(
             self.fill_pot_thread_completed
@@ -99,8 +106,25 @@ class TM02EvaluationSnapshot:
         return {
             "faucet_on": self.faucet_on_completed,
             "pot_filled_and_can_retrieved": self.pot_filled_and_can_retrieved,
+            "one_thread_completed": self.one_thread_completed,
             "both_threads_completed": self.both_threads_completed,
             "success": self.domain_success,
+        }
+
+    def thread_completion(self) -> dict[str, Any]:
+        completed = {
+            StageEvent.A2.value: self.fill_pot_thread_completed,
+            StageEvent.B2.value: self.retrieve_can_thread_completed,
+        }
+        return {
+            "completed_count": sum(completed.values()),
+            **{
+                event: {
+                    "completed": passed,
+                    "completed_step": self.event_steps.get(event) if passed else None,
+                }
+                for event, passed in completed.items()
+            },
         }
 
     def evidence_step(self, stage_name: str) -> int:
@@ -109,6 +133,16 @@ class TM02EvaluationSnapshot:
             value = event_steps.get(StageEvent.A1.value)
         elif stage_name == "pot_filled_and_can_retrieved":
             value = event_steps.get(StageEvent.B1.value)
+        elif stage_name == "one_thread_completed":
+            completed_steps = [
+                event_steps[event]
+                for event, completed in (
+                    (StageEvent.A2.value, self.fill_pot_thread_completed),
+                    (StageEvent.B2.value, self.retrieve_can_thread_completed),
+                )
+                if completed and event in event_steps
+            ]
+            value = min(completed_steps) if completed_steps else None
         elif stage_name == "both_threads_completed":
             a2 = event_steps.get(StageEvent.A2.value)
             b2 = event_steps.get(StageEvent.B2.value)
@@ -347,6 +381,8 @@ class TM02Evaluator:
                 "retrieve_can_thread_completed": (
                     snapshot.retrieve_can_thread_completed
                 ),
+                "one_thread_completed": snapshot.one_thread_completed,
+                "thread_completion": snapshot.thread_completion(),
                 "completion_button_pressed": snapshot.completion_button_pressed,
                 "absorbing_failure": snapshot.absorbing_failure,
                 "domain_success": snapshot.domain_success,

@@ -2,7 +2,7 @@
 
 The physical observer owns event detection. This module consumes its semantic
 facts and the complete domain-success verdict, then exposes the stable public
-four-stage funnel.
+five-stage funnel, including either order of thread completion.
 """
 
 from __future__ import annotations
@@ -19,7 +19,8 @@ STAGE_ORDER = TM01_REPORT_PROFILE.stage_ids
 STAGE_PREREQUISITES: dict[str, str | None] = {
     "burner_on": None,
     "one_drawer_inspected": "burner_on",
-    "both_threads_completed": "one_drawer_inspected",
+    "one_thread_completed": "one_drawer_inspected",
+    "both_threads_completed": "one_thread_completed",
     "success": "both_threads_completed",
 }
 REPORT_STAGE_ORDER = STAGE_ORDER
@@ -90,6 +91,12 @@ class TM01EvaluationSnapshot:
         object.__setattr__(self, "details", dict(self.details or {}))
 
     @property
+    def one_thread_completed(self) -> bool:
+        return bool(
+            self.boiling_thread_completed or self.drawer_thread_completed
+        )
+
+    @property
     def both_threads_completed(self) -> bool:
         return bool(
             self.boiling_thread_completed and self.drawer_thread_completed
@@ -99,8 +106,25 @@ class TM01EvaluationSnapshot:
         return {
             "burner_on": self.burner_on_completed,
             "one_drawer_inspected": self.one_drawer_inspected,
+            "one_thread_completed": self.one_thread_completed,
             "both_threads_completed": self.both_threads_completed,
             "success": self.domain_success,
+        }
+
+    def thread_completion(self) -> dict[str, Any]:
+        completed = {
+            StageEvent.A2.value: self.boiling_thread_completed,
+            StageEvent.B2.value: self.drawer_thread_completed,
+        }
+        return {
+            "completed_count": sum(completed.values()),
+            **{
+                event: {
+                    "completed": passed,
+                    "completed_step": self.event_steps.get(event) if passed else None,
+                }
+                for event, passed in completed.items()
+            },
         }
 
     def evidence_step(self, stage_name: str) -> int:
@@ -109,6 +133,16 @@ class TM01EvaluationSnapshot:
             value = event_steps.get(StageEvent.A1.value)
         elif stage_name == "one_drawer_inspected":
             value = event_steps.get(StageEvent.B1.value)
+        elif stage_name == "one_thread_completed":
+            completed_steps = [
+                event_steps[event]
+                for event, completed in (
+                    (StageEvent.A2.value, self.boiling_thread_completed),
+                    (StageEvent.B2.value, self.drawer_thread_completed),
+                )
+                if completed and event in event_steps
+            ]
+            value = min(completed_steps) if completed_steps else None
         elif stage_name == "both_threads_completed":
             a2 = event_steps.get(StageEvent.A2.value)
             b2 = event_steps.get(StageEvent.B2.value)
@@ -343,6 +377,8 @@ class TM01Evaluator:
                 "one_drawer_inspected": snapshot.one_drawer_inspected,
                 "boiling_thread_completed": snapshot.boiling_thread_completed,
                 "drawer_thread_completed": snapshot.drawer_thread_completed,
+                "one_thread_completed": snapshot.one_thread_completed,
+                "thread_completion": snapshot.thread_completion(),
                 "completion_button_pressed": snapshot.completion_button_pressed,
                 "absorbing_failure": snapshot.absorbing_failure,
                 "domain_success": snapshot.domain_success,

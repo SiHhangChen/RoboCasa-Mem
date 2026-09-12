@@ -85,7 +85,7 @@ def test_a1_and_complete_drawer_cycle_qualify_first_two_stages() -> None:
     ("a2_step", "b2_step"),
     ((8, 9), (9, 8)),
 )
-def test_both_thread_orders_qualify_s3_at_later_completion_step(
+def test_both_thread_orders_qualify_s3_and_s4_at_semantic_steps(
     a2_step: int,
     b2_step: int,
 ) -> None:
@@ -110,6 +110,7 @@ def test_both_thread_orders_qualify_s3_at_later_completion_step(
 
     assert result.stages["burner_on"].qualified_step == 2
     assert result.stages["one_drawer_inspected"].qualified_step == 5
+    assert result.stages["one_thread_completed"].qualified_step == 8
     assert result.stages["both_threads_completed"].qualified
     assert result.stages["both_threads_completed"].qualified_step == 9
     assert not result.success
@@ -139,7 +140,7 @@ def test_success_uses_complete_domain_verdict_and_public_schema() -> None:
     assert result.success
     assert result.terminal
     report = result.to_report_stages()
-    assert report["profile_id"] == "TM01/report-v1"
+    assert report["profile_id"] == "TM01/report-v2"
     assert report["order"] == list(REPORT_STAGE_ORDER)
     assert report["stages"]["both_threads_completed"]["first_pass_step"] == 9
     assert report["stages"]["success"]["first_pass_step"] == 10
@@ -299,7 +300,7 @@ def test_runtime_initialization_mounts_fresh_evaluator(monkeypatch) -> None:
 
 def test_runtime_registers_evaluator_backed_callbacks() -> None:
     api = tm01_runtime.TASK_RUNTIME_API
-    assert api.report_stage_profile_id == "TM01/report-v1"
+    assert api.report_stage_profile_id == "TM01/report-v2"
     assert callable(api.report_stages)
     assert tm01_runtime._ADAPTER._diagnostics is diagnostics_for_runtime
     assert tm01_runtime._ADAPTER._success is success_for_runtime

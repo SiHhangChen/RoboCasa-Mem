@@ -165,6 +165,7 @@ _BUILTIN_INTEGRATIONS = {
     "TM02": (
         "bench.tasks.tm02.stage_evaluation:STAGE_EVALUATION",
         "bench.tasks.tm02.stage_evaluation:B1_DIAGNOSTIC_STAGE_EVALUATION",
+        "bench.tasks.tm02.stage_evaluation:LEGACY_STAGE_EVALUATION",
     ),
     "TS02": ("bench.tasks.ts02.stage_evaluation:STAGE_EVALUATION",),
     "TS04": ("bench.tasks.ts04.stage_evaluation:STAGE_EVALUATION",),

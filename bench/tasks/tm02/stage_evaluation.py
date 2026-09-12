@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from bench.evaluation.report_profiles import TM02_REPORT_PROFILE_V1
 from bench.evaluation.stage_integration import StageEvaluationIntegration
 from bench.evaluation.stage_rollout import StageSpec
 from bench.tasks.tm02.evaluation import (
@@ -15,6 +16,16 @@ from bench.tasks.tm02.evaluation import (
 
 
 DEFAULT_STAGE_BUDGETS = {
+    # 2 x P95 of each report-v2 interval in the 50-seed frozen expert set.
+    "faucet_on": 220,
+    "pot_filled_and_can_retrieved": 3144,
+    "one_thread_completed": 1644,
+    "both_threads_completed": 1594,
+    "success": 868,
+}
+
+LEGACY_STAGE_ORDER = TM02_REPORT_PROFILE_V1.stage_ids
+LEGACY_STAGE_BUDGETS = {
     "faucet_on": 800,
     "pot_filled_and_can_retrieved": 3000,
     "both_threads_completed": 1800,
@@ -59,17 +70,39 @@ def build_stage_specs(
     budgets: Mapping[str, int] | None = None,
     target_stage: str | None = None,
 ) -> tuple[StageSpec, ...]:
-    configured = dict(DEFAULT_STAGE_BUDGETS)
+    return _build_ordered_stage_specs(
+        STAGE_ORDER, DEFAULT_STAGE_BUDGETS, budgets, target_stage,
+    )
+
+
+def build_legacy_stage_specs(
+    budgets: Mapping[str, int] | None = None,
+    target_stage: str | None = None,
+) -> tuple[StageSpec, ...]:
+    """Keep explicitly selected v1 stage campaigns on their original boundaries."""
+
+    return _build_ordered_stage_specs(
+        LEGACY_STAGE_ORDER, LEGACY_STAGE_BUDGETS, budgets, target_stage,
+    )
+
+
+def _build_ordered_stage_specs(
+    order: tuple[str, ...],
+    defaults: Mapping[str, int],
+    budgets: Mapping[str, int] | None,
+    target_stage: str | None,
+) -> tuple[StageSpec, ...]:
+    configured = dict(defaults)
     configured.update({str(key): int(value) for key, value in dict(budgets or {}).items()})
-    unknown = sorted(set(configured) - set(STAGE_ORDER))
+    unknown = sorted(set(configured) - set(order))
     if unknown:
         raise ValueError(f"unknown TM02 stage budgets: {unknown}")
-    target = STAGE_ORDER[-1] if target_stage is None else str(target_stage)
+    target = order[-1] if target_stage is None else str(target_stage)
     try:
-        target_index = STAGE_ORDER.index(target)
+        target_index = order.index(target)
     except ValueError as exc:
         raise KeyError(
-            f"unknown TM02 target stage {target!r}; expected one of {STAGE_ORDER}"
+            f"unknown TM02 target stage {target!r}; expected one of {order}"
         ) from exc
     return tuple(
         StageSpec(
@@ -78,7 +111,7 @@ def build_stage_specs(
             failure_predicate=_failed,
             model_step_budget=configured[stage_id],
         )
-        for stage_id in STAGE_ORDER[: target_index + 1]
+        for stage_id in order[: target_index + 1]
     )
 
 
@@ -169,11 +202,28 @@ STAGE_EVALUATION = StageEvaluationIntegration(
     prefix_stage_by_target={
         "faucet_on": None,
         "pot_filled_and_can_retrieved": "faucet_on",
-        "both_threads_completed": "pot_filled_and_can_retrieved",
+        "one_thread_completed": "pot_filled_and_can_retrieved",
+        "both_threads_completed": "one_thread_completed",
         "success": "both_threads_completed",
     },
     completion_stage_by_target={stage_id: stage_id for stage_id in STAGE_ORDER},
     spec_builder=build_stage_specs,
+    privileged_state_builder=privileged_stage_state,
+    stage_completion_checker=stage_completed,
+)
+
+LEGACY_STAGE_EVALUATION = StageEvaluationIntegration(
+    task_id="TM02",
+    target_stage_ids=LEGACY_STAGE_ORDER,
+    capture_stage_ids=LEGACY_STAGE_ORDER,
+    prefix_stage_by_target={
+        "faucet_on": None,
+        "pot_filled_and_can_retrieved": "faucet_on",
+        "both_threads_completed": "pot_filled_and_can_retrieved",
+        "success": "both_threads_completed",
+    },
+    completion_stage_by_target={stage_id: stage_id for stage_id in LEGACY_STAGE_ORDER},
+    spec_builder=build_legacy_stage_specs,
     privileged_state_builder=privileged_stage_state,
     stage_completion_checker=stage_completed,
 )
@@ -204,8 +254,11 @@ __all__ = [
     "B1_DIAGNOSTIC_STAGE_EVALUATION",
     "B1_DIAGNOSTIC_STAGE_ORDER",
     "DEFAULT_STAGE_BUDGETS",
+    "LEGACY_STAGE_EVALUATION",
+    "LEGACY_STAGE_ORDER",
     "STAGE_EVALUATION",
     "build_b1_diagnostic_stage_specs",
+    "build_legacy_stage_specs",
     "build_stage_specs",
     "privileged_stage_state",
     "stage_completed",

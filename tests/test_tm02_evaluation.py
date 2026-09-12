@@ -85,7 +85,7 @@ def test_a1_and_combined_b1_qualify_first_two_stages() -> None:
     ("a2_step", "b2_step"),
     ((11, 12), (12, 11)),
 )
-def test_both_thread_orders_qualify_s3_at_later_completion_step(
+def test_both_thread_orders_qualify_s3_and_s4_at_semantic_steps(
     a2_step: int,
     b2_step: int,
 ) -> None:
@@ -110,6 +110,7 @@ def test_both_thread_orders_qualify_s3_at_later_completion_step(
 
     assert result.stages["faucet_on"].qualified_step == 3
     assert result.stages["pot_filled_and_can_retrieved"].qualified_step == 7
+    assert result.stages["one_thread_completed"].qualified_step == 11
     assert result.stages["both_threads_completed"].qualified
     assert result.stages["both_threads_completed"].qualified_step == 12
     assert not result.success
@@ -139,7 +140,7 @@ def test_success_uses_complete_domain_verdict_and_public_schema() -> None:
     assert result.success
     assert result.terminal
     report = result.to_report_stages()
-    assert report["profile_id"] == "TM02/report-v1"
+    assert report["profile_id"] == "TM02/report-v2"
     assert report["order"] == list(REPORT_STAGE_ORDER)
     assert report["stages"]["both_threads_completed"]["first_pass_step"] == 12
     assert report["stages"]["success"]["first_pass_step"] == 13
@@ -303,7 +304,7 @@ def test_runtime_initialization_configures_physics_and_mounts_evaluator(
 
 def test_runtime_registers_evaluator_backed_callbacks() -> None:
     api = tm02_runtime.TASK_RUNTIME_API
-    assert api.report_stage_profile_id == "TM02/report-v1"
+    assert api.report_stage_profile_id == "TM02/report-v2"
     assert callable(api.report_stages)
     assert tm02_runtime._ADAPTER._diagnostics is diagnostics_for_runtime
     assert tm02_runtime._ADAPTER._success is success_for_runtime

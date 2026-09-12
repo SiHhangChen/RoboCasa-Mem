@@ -102,11 +102,13 @@ def test_tm01_report_accepts_either_thread_completion_order(
     assert report["order"] == [
         "burner_on",
         "one_drawer_inspected",
+        "one_thread_completed",
         "both_threads_completed",
         "success",
     ]
     assert report["stages"]["burner_on"]["first_pass_step"] == 2
     assert report["stages"]["one_drawer_inspected"]["first_pass_step"] == 5
+    assert report["stages"]["one_thread_completed"]["first_pass_step"] == 8
     assert report["stages"]["both_threads_completed"]["first_pass_step"] == 9
     assert report["stages"]["success"]["first_pass_step"] == 10
     validate_report_stages(report, expected_success=True)
@@ -140,6 +142,7 @@ def test_tm02_report_combines_fill_and_retrieval_before_both_threads() -> None:
     assert report["order"] == [
         "faucet_on",
         "pot_filled_and_can_retrieved",
+        "one_thread_completed",
         "both_threads_completed",
         "success",
     ]
@@ -147,6 +150,7 @@ def test_tm02_report_combines_fill_and_retrieval_before_both_threads() -> None:
         "first_pass_step"
     ] == 7
     assert report["stages"]["both_threads_completed"]["first_pass_step"] == 12
+    assert report["stages"]["one_thread_completed"]["first_pass_step"] == 11
     validate_report_stages(report, expected_success=True)
 
 
@@ -199,7 +203,7 @@ def test_tm_report_preserves_thread_history_when_final_success_fails(
 
 
 def test_tm_runtimes_register_their_public_projectors() -> None:
-    assert tm01_runtime.TASK_RUNTIME_API.report_stage_profile_id == "TM01/report-v1"
+    assert tm01_runtime.TASK_RUNTIME_API.report_stage_profile_id == "TM01/report-v2"
     assert callable(tm01_runtime.TASK_RUNTIME_API.report_stages)
-    assert tm02_runtime.TASK_RUNTIME_API.report_stage_profile_id == "TM02/report-v1"
+    assert tm02_runtime.TASK_RUNTIME_API.report_stage_profile_id == "TM02/report-v2"
     assert callable(tm02_runtime.TASK_RUNTIME_API.report_stages)
