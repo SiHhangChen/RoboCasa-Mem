@@ -239,16 +239,16 @@ def test_frozen_profile_catalog_covers_all_report_tasks() -> None:
             frozenset(),
         ),
         "WR-07": (
-            ("item_picked", "memory_color_latched", "target_plate_matched", "success"),
+            ("item_picked", "item_placed", "target_plate_matched", "success"),
             frozenset(),
         ),
         "WR-08": (
             (
                 "one_item_picked",
-                "one_item_color_latched",
+                "one_item_placed",
                 "one_item_matched",
                 "two_items_picked",
-                "two_items_color_latched",
+                "two_items_placed",
                 "two_items_matched",
                 "success",
             ),
@@ -277,7 +277,7 @@ def test_frozen_profile_catalog_covers_all_report_tasks() -> None:
     assert {profile.task_id for profile in REPORT_STAGE_PROFILES} == set(expected)
     for task_id, (stage_ids, conditional_stage_ids) in expected.items():
         profile = get_report_stage_profile(task_id)
-        expected_version = {"WA-01": 2, "WA-02": 2, "WA-03": 2, "WR-01": 2, "WR-03": 2, "WR-07": 3, "WR-08": 2}.get(task_id, 1)
+        expected_version = {"WA-01": 2, "WA-02": 2, "WA-03": 2, "WR-01": 2, "WR-03": 2, "WR-07": 4, "WR-08": 3}.get(task_id, 1)
         assert profile.profile_id == f"{task_id}/report-v{expected_version}"
         assert profile.stage_ids == stage_ids
         assert profile.conditional_stage_ids == conditional_stage_ids

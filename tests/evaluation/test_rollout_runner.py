@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import json
 from pathlib import Path
 from typing import Any
@@ -11,7 +11,7 @@ import pytest
 from bench.evaluation.adapter import EpisodeRuntime
 from bench.evaluation.artifacts import ArtifactWriter
 from bench.evaluation.rollout import RolloutRunner
-from bench.evaluation.suite import ArtifactConfig, EvalSuiteConfig, RolloutConfig
+from bench.evaluation.suite import ArtifactConfig, EvalSuiteConfig, RolloutConfig, load_eval_suite
 from bench.policy.protocol import (
     ActionContract,
     CanonicalObservation,
@@ -373,6 +373,218 @@ def test_semantic_terminal_stops_even_when_env_done_is_ignored(tmp_path: Path):
     assert result.status == "failure"
     assert result.failure_reason == "sink_reentered_after_departure"
     assert result.env_steps == 3
+
+
+class WR07TerminalRuntime(FakeEnv):
+    def __init__(self, *, matched: bool, target_slot: str) -> None:
+        from bench.tasks.wr07.evaluation import WR07EvaluationSnapshot, WR07Evaluator
+
+        super().__init__()
+        self.matched = matched
+        self.target_slot = target_slot
+        self.evaluator = WR07Evaluator()
+        self.evaluator.reset(WR07EvaluationSnapshot(step_id=0, item_placed=True))
+
+    def step(self, action) -> RuntimeStep:
+        from bench.tasks.wr07.evaluation import WR07EvaluationSnapshot
+
+        del action
+        assert not self.evaluator.result().terminal, "action executed after WR-07 termination"
+        self.steps += 1
+        result = self.evaluator.observe(WR07EvaluationSnapshot(
+            step_id=self.steps,
+            item_picked=self.steps == 1,
+            item_placed=self.steps >= 2,
+            target_slot_attempted=self.target_slot if self.steps >= 2 else None,
+            target_color_matches=self.matched and self.steps >= 2,
+        ))
+        return RuntimeStep(
+            observation={"step": self.steps},
+            reward=float(result.success),
+            info={"success": result.success},
+            diagnostics=TaskDiagnostics(
+                success=result.success,
+                terminal=result.terminal,
+                failure_code=result.failure_code,
+                details=result.to_diagnostics(),
+                stop_execution=result.stop_execution,
+            ),
+        )
+
+
+class WR07TerminalAdapter(FakeAdapter):
+    report_stage_profile_id = "WR-07/report-v4"
+
+    def __init__(self, *, matched: bool, target_slot: str) -> None:
+        super().__init__(task_id="WR-07")
+        self.matched = matched
+        self.target_slot = target_slot
+
+    def create_episode(self, *, seed, policy_contract, suite):
+        del policy_contract, suite
+        shared = WR07TerminalRuntime(matched=self.matched, target_slot=self.target_slot)
+        return EpisodeRuntime(
+            episode_id=f"wr07-{seed}",
+            seed=seed,
+            env=shared,
+            observation={"step": 0},
+            prompt="move the carton to the matching plate",
+            metadata={"shared_runtime": shared},
+        )
+
+    def diagnostics(self, runtime):
+        return runtime.env.evaluator.result().to_diagnostics()
+
+    def report_stages(self, runtime):
+        return runtime.env.evaluator.result().to_report_stages()
+
+
+@pytest.mark.parametrize("matched", (False, True), ids=("wrong_plate", "success"))
+@pytest.mark.parametrize("action_repeat", (1, 4))
+@pytest.mark.parametrize("target_slot", ("target_left", "target_center", "target_right"))
+@pytest.mark.parametrize("stop_on_success", (False, True))
+@pytest.mark.parametrize("ignore_done", (False, True))
+def test_wr07_terminal_stops_without_executing_remaining_actions(
+    matched, action_repeat, target_slot, stop_on_success, ignore_done,
+):
+    canonical = load_eval_suite(
+        Path(__file__).resolve().parents[2] / "configs/eval/suites/wr07_v1.yaml"
+    )
+    assert canonical.rollout.stop_on_success
+    assert canonical.rollout.ignore_done
+    suite = replace(
+        canonical,
+        seeds=(1050,),
+        rollout=replace(
+            canonical.rollout, max_steps=10, replan_steps=2, action_repeat=action_repeat,
+            stop_on_success=stop_on_success, ignore_done=ignore_done,
+        ),
+        artifacts=ArtifactConfig(record_video=False),
+    )
+    result = RolloutRunner(client=FakeClient(), suite=suite).run_episode(
+        WR07TerminalAdapter(matched=matched, target_slot=target_slot), 1050,
+    )
+
+    assert result.status == ("success" if matched else "failure"), result.error
+    assert result.success is matched
+    assert result.env_steps == 3
+    assert result.success_step == (3 if matched else None)
+    assert result.failure_reason == (None if matched else "wrong_target_placement")
+    assert result.policy_calls == (2 if action_repeat == 1 else 1)
+    assert result.policy_actions_consumed == (3 if action_repeat == 1 else 1)
+    assert result.diagnostics["terminal"]
+    assert result.diagnostics["stop_execution"]
+    assert result.diagnostics["evaluation"]["terminal_step"] == 3
+    assert result.report_stages["stages"]["item_placed"]["passed"]
+    assert result.report_stages["stages"]["success"]["passed"] is matched
+
+
+class WR08TerminalRuntime(FakeEnv):
+    def __init__(self, *, wrong_item_index: int | None) -> None:
+        from bench.tasks.wr08.domain.contracts import ITEM_IDS
+        from bench.tasks.wr08.domain.episode import resolve_episode_plan
+        from bench.tasks.wr08.evaluation import WR08Evaluator
+
+        super().__init__()
+        self.items = ITEM_IDS
+        self.plan = resolve_episode_plan(seed=0)
+        self.targets = {
+            item: self.plan.target_slot_by_color[self.plan.source_color_by_item[item]]
+            for item in self.items
+        }
+        self.wrong_item = None if wrong_item_index is None else self.items[wrong_item_index]
+        self.evaluator = WR08Evaluator()
+        self.evaluator.reset(self.snapshot())
+
+    def snapshot(self):
+        from bench.tasks.wr08.domain.contracts import TARGET_SLOTS
+        from bench.tasks.wr08.evaluation import WR08EvaluationSnapshot
+
+        first, second = self.items
+        placed = {first: self.steps >= 2, second: self.steps >= 5}
+        attempts = {
+            item: next(slot for slot in TARGET_SLOTS if slot != self.targets[item])
+            if item == self.wrong_item else self.targets[item]
+            for item in self.items if placed[item]
+        }
+        return WR08EvaluationSnapshot(
+            step_id=self.steps,
+            source_slot_by_item=self.plan.source_slot_by_item,
+            source_color_by_item=self.plan.source_color_by_item,
+            target_slot_by_item=self.targets,
+            item_picked_by_item={first: self.steps == 1, second: self.steps == 4},
+            item_placed_by_item=placed,
+            item_matched_by_item={item: attempts.get(item) == self.targets[item] for item in self.items},
+            released_by_item={item: True for item in self.items},
+            target_slot_attempted_by_item=attempts,
+        )
+
+    def step(self, action) -> RuntimeStep:
+        del action
+        assert not self.evaluator.result().stop_execution, "action executed after WR-08 termination"
+        self.steps += 1
+        result = self.evaluator.observe(self.snapshot())
+        return RuntimeStep(
+            observation={"step": self.steps}, info={"success": result.success},
+            diagnostics=TaskDiagnostics(
+                success=result.success, terminal=result.terminal,
+                failure_code=result.failure_code, details=result.to_diagnostics(),
+                stop_execution=result.stop_execution,
+            ),
+        )
+
+
+class WR08TerminalAdapter(FakeAdapter):
+    report_stage_profile_id = "WR-08/report-v3"
+
+    def __init__(self, *, wrong_item_index: int | None) -> None:
+        super().__init__(task_id="WR-08")
+        self.wrong_item_index = wrong_item_index
+
+    def create_episode(self, *, seed, policy_contract, suite):
+        shared = WR08TerminalRuntime(wrong_item_index=self.wrong_item_index)
+        return EpisodeRuntime(
+            episode_id=f"wr08-{seed}", seed=seed, env=shared, observation={"step": 0},
+            prompt="move both cartons to matching plates", metadata={"shared_runtime": shared},
+        )
+
+    def diagnostics(self, runtime):
+        return runtime.env.evaluator.result().to_diagnostics()
+
+    def report_stages(self, runtime):
+        return runtime.env.evaluator.result().to_report_stages()
+
+
+@pytest.mark.parametrize("wrong_item_index", (None, 0, 1), ids=("success", "first_wrong", "second_wrong"))
+@pytest.mark.parametrize("action_repeat", (1, 4))
+@pytest.mark.parametrize("stop_on_success", (False, True))
+@pytest.mark.parametrize("ignore_done", (False, True))
+def test_wr08_stops_at_the_final_decision_even_inside_an_action_chunk(
+    wrong_item_index, action_repeat, stop_on_success, ignore_done,
+):
+    suite = load_eval_suite(
+        Path(__file__).resolve().parents[2] / "configs/eval/suites/wr08_v1.yaml"
+    )
+    suite = replace(
+        suite, seeds=(1050,), artifacts=ArtifactConfig(record_video=False),
+        rollout=replace(
+            suite.rollout, max_steps=10, replan_steps=2, action_repeat=action_repeat,
+            stop_on_success=stop_on_success, ignore_done=ignore_done,
+        ),
+    )
+    result = RolloutRunner(client=FakeClient(), suite=suite).run_episode(
+        WR08TerminalAdapter(wrong_item_index=wrong_item_index), 1050,
+    )
+    success = wrong_item_index is None
+    steps = 3 if wrong_item_index == 0 else 6
+    assert result.status == ("success" if success else "failure"), result.error
+    assert result.env_steps == steps
+    assert result.success is success
+    assert result.failure_reason == (None if success else "wrong_target_placement")
+    assert result.policy_actions_consumed == (steps + action_repeat - 1) // action_repeat
+    assert result.diagnostics["stop_execution"]
+    assert result.diagnostics["evaluation"]["terminal_step"] == steps
+    assert result.report_stages["stages"]["success"]["passed"] is success
 
 
 class SuccessThenViolationRuntime:

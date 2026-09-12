@@ -41,6 +41,7 @@ class RoboCasaEpisodeRuntime:
         self.observation = dict(initialized.observation or {})
         self._closed = False
         self._expert = bool(expert)
+        self._execution_stopped = False
 
     @property
     def initialized(self) -> Any:
@@ -64,6 +65,7 @@ class RoboCasaEpisodeRuntime:
         self._initialized = reinitialized
         self._attach_expert_runtime()
         self.observation = self._normalize_observation(reinitialized.observation)
+        self._execution_stopped = False
         return self.observation
 
     def initialize(self) -> InitializationReport:
@@ -85,6 +87,8 @@ class RoboCasaEpisodeRuntime:
     def step(self, action: Sequence[float] | Any) -> RuntimeStep:
         if self._closed:
             raise RuntimeError("cannot step a closed episode runtime")
+        if self._execution_stopped:
+            raise RuntimeError("task stopped execution; reset before stepping again")
         # The runtime is the single action boundary for policy evaluation and
         # therefore validates the exact vector that is handed to RoboSuite.
         action_value = validate_action(action)
@@ -114,11 +118,14 @@ class RoboCasaEpisodeRuntime:
         details = dict(values or {}) if isinstance(values, Mapping) else {}
         success = bool(details.get("success", self._runtime_api.check_success(self._initialized, {})))
         failure = details.get("failure_code")
+        stop_execution = bool(details.get("stop_execution", False))
+        self._execution_stopped = self._execution_stopped or stop_execution
         return TaskDiagnostics(
             success=success,
-            terminal=success or bool(details.get("terminal", False)),
+            terminal=stop_execution or success or bool(details.get("terminal", False)),
             failure_code=None if failure is None else str(failure),
             details=details,
+            stop_execution=stop_execution,
         )
 
     def close(self) -> None:

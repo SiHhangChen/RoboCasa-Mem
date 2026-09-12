@@ -81,6 +81,7 @@ class RolloutRunner:
         policy_calls = 0
         reward_sum = 0.0
         success = False
+        task_stop_execution = False
         success_step: int | None = None
         failure_reason: str | None = None
         policy_actions_returned = 0
@@ -148,6 +149,7 @@ class RolloutRunner:
                         break
                     shared_runtime = runtime.metadata.get("shared_runtime")
                     task_terminal = False
+                    task_stop_execution = False
                     task_failure_code = None
                     if shared_runtime is not None:
                         transition = shared_runtime.step(action)
@@ -158,6 +160,7 @@ class RolloutRunner:
                         if transition.diagnostics is not None:
                             task_terminal = bool(transition.diagnostics.terminal)
                             task_failure_code = transition.diagnostics.failure_code
+                            task_stop_execution = bool(transition.diagnostics.stop_execution)
                     else:
                         step_result = runtime.env.step(action)
                         observation, reward, done, info = _normalize_env_step(step_result)
@@ -178,6 +181,17 @@ class RolloutRunner:
                                 frames = adapter.build_observation(runtime).images
                             session.append_frames(frames)
                     step_success = adapter.check_success(runtime, info)
+                    # A task-owned final decision stops execution regardless of
+                    # stop_on_success / ignore_done. Do not run later subtask
+                    # handoffs, repeated actions, or the rest of the action chunk.
+                    if task_stop_execution:
+                        success = bool(step_success and not task_failure_code)
+                        if success:
+                            if success_step is None:
+                                success_step = env_steps
+                        else:
+                            failure_reason = task_failure_code or "task_terminal"
+                        break
                     # A semantic protocol violation is terminal even if this
                     # episode reached a candidate success on an earlier step.
                     # This matters for full-horizon tasks such as WR-04, where
@@ -223,7 +237,7 @@ class RolloutRunner:
                         break
                     if prompt_changed:
                         break
-                if success and self.suite.rollout.stop_on_success:
+                if task_stop_execution or (success and self.suite.rollout.stop_on_success):
                     break
                 if failure_reason is not None:
                     break

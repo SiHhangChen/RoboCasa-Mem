@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Join WR-08 recording and production-replay evidence by seed and identity.
 
-Publication requires exact expected-seed coverage, matching complete action
-streams, successful native trajectories, and all seven public report stages.
+Publication requires exact expected-seed coverage, matching executed actions,
+successful native trajectories, and all seven public report stages. A policy
+replay may end at a verified task stop before the expert's remaining actions.
 Interrupted replay attempts remain in the report but are not treated as final
 results. This command does not start simulations or alter source recordings.
 """
@@ -24,6 +25,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from bench.evaluation.artifacts import ArtifactWriter
+from bench.evaluation.report_profiles import WR08_REPORT_PROFILE
 from bench.evaluation.replay import discover_recorded_episodes, parse_seed_spec
 from bench.evaluation.summary import aggregate_episode_results
 from bench.recording.artifacts import atomic_json_commit
@@ -31,10 +33,7 @@ from bench.recording.plan import RecordingWorkItem
 from scripts.analysis.verify_wr08_native_episodes import verify
 from scripts.analysis.wr08_recording_provenance import validate_recording_provenance
 
-PUBLIC_STAGES = (
-    "one_item_picked", "one_item_color_latched", "one_item_matched",
-    "two_items_picked", "two_items_color_latched", "two_items_matched", "success",
-)
+PUBLIC_STAGES = WR08_REPORT_PROFILE.stage_ids
 
 
 def replay_evidence_errors(result, native, actions) -> list[str]:
@@ -51,14 +50,33 @@ def replay_evidence_errors(result, native, actions) -> list[str]:
     for name in ("expected_episode_identity", "current_episode_identity"):
         if replay.get(name) != native["episode_identity"]:
             errors.append(f"{name}_mismatch")
-    if result.get("env_steps") != native["steps"] or result.get("policy_actions_consumed") != native["steps"]:
+    executed = result.get("env_steps")
+    valid_count = isinstance(executed, int) and not isinstance(executed, bool) and 0 < executed <= native["steps"]
+    diagnostics = result.get("diagnostics") or {}
+    evaluation = diagnostics.get("evaluation") or {}
+    verified_stop = bool(
+        diagnostics.get("stop_execution") is True
+        and diagnostics.get("terminal") is True
+        and diagnostics.get("success") is True
+        and diagnostics.get("failure_code") is None
+        and evaluation.get("mode") == "policy_physical"
+        and evaluation.get("terminal_step") == executed
+        and result.get("success_step") == executed
+    )
+    if (
+        not valid_count
+        or result.get("policy_actions_consumed") != executed
+        or len(actions) != executed
+        or (executed != native["steps"] and not verified_stop)
+    ):
         errors.append("incomplete_action_stream")
     with h5py.File(Path(native["episode_dir"]) / "trajectory.h5", "r") as handle:
         recorded = np.asarray(handle["data/demo_1/actions"], dtype=np.float32)
-    if not np.array_equal(recorded, actions):
+    expected_actions = recorded[:executed] if valid_count else recorded
+    if not np.array_equal(expected_actions, actions):
         errors.append("replayed_actions_differ_from_recording")
     report = result.get("report_stages") or {}
-    if report.get("profile_id") != "WR-08/report-v2" or tuple(report.get("order", ())) != PUBLIC_STAGES:
+    if report.get("profile_id") != WR08_REPORT_PROFILE.profile_id or tuple(report.get("order", ())) != PUBLIC_STAGES:
         errors.append("wrong_public_report_profile")
     stages = report.get("stages", {})
     if any(stages.get(name, {}).get("passed") is not True

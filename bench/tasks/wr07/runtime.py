@@ -11,7 +11,7 @@ from bench.tasks.wr07.config import load_task_config, resolve_action_config, res
 from bench.tasks.wr07.domain.contracts import TASK_REVISION
 from bench.tasks.wr07.domain.episode import resolve_episode_plan, resolve_scene_config
 from bench.tasks.wr07.evaluation import (
-    REPORT_STAGE_PROFILE_ID, TASK_EVALUATOR_METADATA_KEY, WR07Evaluator,
+    REPORT_STAGE_PROFILE_ID, TASK_EVALUATOR_METADATA_KEY,
     diagnostics_for_runtime, report_stages_for_runtime, success_for_runtime,
 )
 from bench.tasks.wr07.execution.geometry import resolve_episode_targets
@@ -43,9 +43,7 @@ def _initialize(descriptor: Any, env: Any, observation: Mapping[str, Any]):
         objects=dict(descriptor.config.initial_state.objects),
     )
     targets = resolve_episode_targets(env, descriptor.episode_plan)
-    evaluator = WR07Evaluator()
-    evaluator.reset(env.evaluation_snapshot())
-    env._wr07_evaluator = evaluator
+    evaluator = env.reset_evaluation()
     return updated, {"setup": setup}, {TASK_EVALUATOR_METADATA_KEY: evaluator}, targets
 
 _ADAPTER = TaskRuntimeAdapter(

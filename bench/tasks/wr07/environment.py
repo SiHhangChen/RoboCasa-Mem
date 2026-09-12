@@ -105,6 +105,10 @@ class WR07MatchMilkCartonToColoredSugarPlate(Kitchen):
             raise ValueError("WR-07 plate_threshold must be positive")
         self._semantic_state = SemanticState()
         self._wr07_evaluator: WR07Evaluator | None = None
+        # Raw environments retain the recording protocol. Canonical policy
+        # runtimes explicitly switch to physical-only evaluation at startup.
+        self.require_expert_protocol = True
+        self._evaluation_initial_item_position: np.ndarray | None = None
         self._source_plate_centers: dict[str, np.ndarray] = {}
         self._target_plate_centers: dict[str, np.ndarray] = {}
         self._source_surface_z = 0.93
@@ -320,7 +324,18 @@ class WR07MatchMilkCartonToColoredSugarPlate(Kitchen):
     def latch_source_color_memory(self) -> bool:
         return latch_source_color_memory(self._semantic_state)
 
+    def reset_evaluation(self, *, expert_recording: bool = False) -> WR07Evaluator:
+        """Select the runtime path before actions, independently of data split."""
+        self.require_expert_protocol = bool(expert_recording)
+        self._evaluation_initial_item_position = self._obj_pos(ITEM_ID).copy()
+        if self._wr07_evaluator is None:
+            self._wr07_evaluator = WR07Evaluator()
+        self._wr07_evaluator.reset(self.evaluation_snapshot())
+        return self._wr07_evaluator
+
     def _update_task_state(self) -> None:
+        if not self.require_expert_protocol:
+            return
         physical = self.physical_state()
         # A held carton may still be geometrically close enough to the source
         # plate to satisfy the broad source-zone threshold.  Grasp state is
@@ -332,7 +347,100 @@ class WR07MatchMilkCartonToColoredSugarPlate(Kitchen):
             matches = self.target_plate_color_by_slot[target] == self.source_color_by_item[ITEM_ID]
             record_target_attempt(self._semantic_state, target, matches=matches)
             record_target_placement(self._semantic_state, matches=matches)
+
+    def _policy_grasp_evidence(self) -> dict[str, Any]:
+        """Read actual gripper contact and lift, without recording any events."""
+        try:
+            from bench.execution.manipulation.object_interactions import get_object_hold_status
+
+            qpos = np.asarray(
+                self.robots[0].get_gripper_joint_positions("right"), dtype=float
+            ).reshape(-1)
+            if qpos.size < 2 or not np.all(np.isfinite(qpos[:2])):
+                raise ValueError("invalid gripper joint positions")
+            hold = get_object_hold_status(self, ITEM_ID, max_end_effector_distance=0.18)
+            baseline = self._evaluation_initial_item_position
+            current = self._obj_pos(ITEM_ID)
+            lift = None if baseline is None else float(current[2] - baseline[2])
+            closed = bool(np.max(np.abs(qpos[:2])) <= 0.035)
+            contact_known = "contact" in hold["contact_and_grasp"]
+            finite = bool(hold["checks"]["finite_pose"])
+            # Release means no remaining grasp/contact, not a mandatory EEF
+            # retreat to an expert waypoint. Unknown contact fails closed.
+            released = bool(
+                finite and contact_known and not hold["checks"]["grasp_or_contact"]
+            )
+            return {
+                "picked_up": bool(closed and hold["held"] and lift is not None and lift >= 0.02),
+                "released": released,
+                "gripper_closed": closed,
+                "lift_m": lift,
+                "hold": hold,
+            }
+        except Exception as exc:
+            return {
+                "picked_up": False,
+                "released": False,
+                "reason": f"{type(exc).__name__}: {exc}",
+            }
+
+    def _policy_support_evidence(self) -> dict[str, Any]:
+        """Use tray/counter contact as placement evidence, as WA-01 does."""
+        plate_names = [self.source_plate_name(slot) for slot in SOURCE_SLOTS]
+        plate_names += [self.target_plate_name(slot) for slot in TARGET_SLOTS]
+        support = {name: False for name in plate_names}
+        try:
+            for name in plate_names:
+                support[name] = bool(
+                    self.check_contact(self.objects[ITEM_ID], self.objects[name])
+                )
+            on_counter = bool(OU.check_obj_any_counter_contact(self, ITEM_ID))
+            return {
+                "supported": bool(any(support.values()) or on_counter),
+                "plate_support": support,
+                "counter_contact": on_counter,
+            }
+        except Exception as exc:
+            return {
+                "supported": False,
+                "plate_support": {name: False for name in plate_names},
+                "counter_contact": False,
+                "reason": f"{type(exc).__name__}: {exc}",
+            }
+
+    def _policy_evaluation_snapshot(self) -> WR07EvaluationSnapshot:
+        grasp = self._policy_grasp_evidence()
+        support = self._policy_support_evidence()
+        placed = bool(grasp["released"] and support["supported"])
+        supported_targets = [
+            slot for slot in TARGET_SLOTS
+            if support["plate_support"][self.target_plate_name(slot)]
+        ]
+        observed_target = supported_targets[0] if len(supported_targets) == 1 else None
+        expected_target = self.target_slot_for_source_color()
+        return WR07EvaluationSnapshot(
+            step_id=int(getattr(self, "timestep", 0)),
+            source_slot=self.source_slot_by_item[ITEM_ID],
+            source_color=self.source_color_by_item[ITEM_ID],
+            initial_source_verified=self._semantic_state.initial_source_verified,
+            item_picked=bool(grasp["picked_up"]),
+            item_placed=placed,
+            target_slot_attempted=observed_target if placed else None,
+            target_color_matches=bool(placed and observed_target == expected_target),
+            source_color_memory_latched=self._semantic_state.source_color_memory_latched,
+            protocol_violation=self._semantic_state.protocol_violation,
+            details={
+                "target_slot": expected_target,
+                "target_color": self.target_plate_color_by_slot[expected_target],
+                "observed_target_slot": observed_target,
+                "current_item_position": self._obj_pos(ITEM_ID).tolist(),
+                "physical": {"grasp": grasp, "support": support},
+            },
+        )
+
     def evaluation_snapshot(self) -> WR07EvaluationSnapshot:
+        if not self.require_expert_protocol:
+            return self._policy_evaluation_snapshot()
         self._update_task_state()
         target_slot = self.target_slot_for_source_color()
         report = evaluate_success(self._semantic_state, self.physical_state(), target_slot=target_slot)
@@ -349,6 +457,7 @@ class WR07MatchMilkCartonToColoredSugarPlate(Kitchen):
             target_color_matches=state.target_color_matches,
             protocol_violation=state.protocol_violation,
             domain_success=report.success,
+            require_expert_protocol=True,
             details={**report.checks(), "target_slot": target_slot, "target_color": self.target_plate_color_by_slot[target_slot], "current_item_position": self._obj_pos(ITEM_ID).tolist()},
         )
 
@@ -357,7 +466,10 @@ class WR07MatchMilkCartonToColoredSugarPlate(Kitchen):
         self._update_task_state()
 
     def _check_success(self) -> bool:
-        return self.evaluation_snapshot().domain_success
+        snapshot = self.evaluation_snapshot()
+        if self._wr07_evaluator is not None:
+            return self._wr07_evaluator.observe(snapshot).success
+        return snapshot.domain_success
 
     def _success_report(self):
         return evaluate_success(self._semantic_state, self.physical_state(), target_slot=self.target_slot_for_source_color())

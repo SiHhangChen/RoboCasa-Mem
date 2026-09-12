@@ -1,4 +1,4 @@
-"""Ordered evaluation and public reporting for WR-08 color matching."""
+"""Preserve ordered WR-08 expert verification while updating public reports."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from bench.evaluation.report_stages import validate_report_stages
 from bench.tasks.wr08.domain.contracts import ITEM_IDS, TARGET_SLOTS
 from bench.tasks.wr08.domain.episode import resolve_episode_plan
 from bench.tasks.wr08.evaluation import (
-    STAGE_ORDER,
+    EXPERT_STAGE_ORDER,
     WR08EvaluationSnapshot,
     WR08Evaluator,
 )
@@ -50,6 +50,7 @@ def _snapshot(
         ),
         domain_success=success,
         protocol_violation=protocol_violation,
+        require_expert_protocol=True,
     )
 
 
@@ -84,22 +85,23 @@ def test_wr08_ordered_transport_qualifies_all_stages_and_each_partial_report(ord
         report = validate_report_stages(
             result.to_report_stages(),
             expected_task_id="WR-08",
-            expected_profile_id="WR-08/report-v2",
+            expected_profile_id="WR-08/report-v3",
             expected_success=result.success,
         )
         assert report["order"] == [
             "one_item_picked",
-            "one_item_color_latched",
+            "one_item_placed",
             "one_item_matched",
             "two_items_picked",
-            "two_items_color_latched",
+            "two_items_placed",
             "two_items_matched",
             "success",
         ]
     assert result.success
     assert result.terminal
+    assert not result.stop_execution
     assert result.failure_code is None
-    assert all(result.stages[name].qualified for name in STAGE_ORDER)
+    assert all(result.stages[name].qualified for name in EXPERT_STAGE_ORDER)
     assert result.stages["first_item_picked"].qualified_step == 1
     assert result.stages["first_item_matched"].qualified_step == 2
     assert result.stages["second_item_picked"].qualified_step == 3
@@ -117,6 +119,15 @@ def test_wr08_completed_state_present_at_reset_is_not_a_successful_history():
     result = evaluator.observe(replace(snapshot, step_id=1))
     assert not result.success
     assert result.stages["success"].reason == "present_at_reset"
+
+
+def test_wr08_recording_keeps_live_checks_after_candidate_success():
+    evaluator = _evaluator()
+    for snapshot in _ordered_snapshots():
+        result = evaluator.observe(snapshot)
+    assert result.success and not result.stop_execution
+    later = evaluator.observe(_snapshot(5, picked=ITEM_IDS, latched=ITEM_IDS))
+    assert not later.success and not later.stop_execution
 
 
 def test_wr08_second_item_cannot_be_credited_before_the_first_is_matched():

@@ -154,12 +154,18 @@ class InitializationReport:
 
 @dataclass(frozen=True, slots=True)
 class TaskDiagnostics:
-    """Task semantics after a reset or transition."""
+    """Task semantics after a reset or transition.
+
+    ``stop_execution`` is an explicit, irreversible task stop, including a
+    successful outcome. Consumers must not execute another action until reset,
+    even when ordinary success or environment-done stopping is disabled.
+    """
 
     success: bool
     terminal: bool = False
     failure_code: str | None = None
     details: Mapping[str, Any] = field(default_factory=dict)
+    stop_execution: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -178,7 +184,10 @@ class RuntimeStep:
         return bool(
             self.terminated
             or self.truncated
-            or (self.diagnostics is not None and self.diagnostics.terminal)
+            or (
+                self.diagnostics is not None
+                and (self.diagnostics.terminal or self.diagnostics.stop_execution)
+            )
         )
 
 

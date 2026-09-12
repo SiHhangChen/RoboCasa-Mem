@@ -177,21 +177,21 @@ WR06_REPORT_PROFILE = _profile(
 WR07_REPORT_PROFILE = _profile(
     "WR-07",
     "item_picked",
-    "memory_color_latched",
+    "item_placed",
     "target_plate_matched",
     "success",
-    version=3,
+    version=4,
 )
 WR08_REPORT_PROFILE = _profile(
     "WR-08",
     "one_item_picked",
-    "one_item_color_latched",
+    "one_item_placed",
     "one_item_matched",
     "two_items_picked",
-    "two_items_color_latched",
+    "two_items_placed",
     "two_items_matched",
     "success",
-    version=2,
+    version=3,
 )
 WX01_REPORT_PROFILE = _profile(
     "WX-01",

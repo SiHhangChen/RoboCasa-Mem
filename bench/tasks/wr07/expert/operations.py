@@ -10,6 +10,9 @@ from bench.tasks.wr07.execution.manipulation import build_manipulation_assembly
 from bench.tasks.wr07.execution.navigation import build_navigation_assembly
 
 def build_operation_handlers(descriptor: Any, env: Any, observation: dict[str, Any]) -> dict[str, Any]:
+    # Explicit expert attachment, including evaluation-split recordings,
+    # retains the color-memory event and strict recording protocol.
+    env.reset_evaluation(expert_recording=True)
     navigation = build_navigation_assembly(
         env, observation, nav_config=descriptor.navigation,
         seed=descriptor.episode_plan.seed,
