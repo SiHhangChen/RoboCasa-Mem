@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from bench.tasks.ts04.prompts import resolve_prompt_spec
 from scripts.annotate.apply_subtask_labels import label_episode, load_config
 from scripts.annotate.planner_to_stage_boundaries_ts04 import (
     build_search_instruction,
@@ -85,9 +86,11 @@ def test_ts04_labels_two_drawers_and_repeated_button_subtask() -> None:
     assert labeled["keyframes"] == [9, 19, 20]
 
 
-def test_ts04_search_instruction_exposes_order_without_target() -> None:
-    instruction = build_search_instruction(["cabinet_slot_1", "cabinet_slot_0"])
+def test_ts04_search_instruction_matches_order_free_policy_prompt() -> None:
+    instruction = build_search_instruction()
 
-    assert "right, then left" in instruction
-    assert "target drawer" not in instruction
-    assert "contains the cube" in instruction
+    assert instruction == resolve_prompt_spec(variant="memory").policy_prompt
+    assert "once for each drawer you inspected" in instruction
+    assert "in this order" not in instruction
+    assert "cabinet_slot_" not in instruction
+    assert all(f"{side} drawer" not in instruction for side in ("left", "right"))

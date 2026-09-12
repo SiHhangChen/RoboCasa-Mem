@@ -7,12 +7,15 @@ from bench.evaluation.expert_prefix import ExpertPrefixArtifact
 from bench.evaluation.stage_integration import get_stage_evaluation_integration
 
 
-def test_builtin_stage_integrations_cover_ts02_wa01_and_wa05() -> None:
+def test_builtin_stage_integrations_cover_ts02_ts04_wa01_and_wa05() -> None:
     ts02 = get_stage_evaluation_integration("TS02")
+    ts04 = get_stage_evaluation_integration("TS04")
     wa01 = get_stage_evaluation_integration("WA-01")
     wa05 = get_stage_evaluation_integration("WA-05")
 
     assert ts02.target_stage_ids[0] == "one_drawer_checked"
+    assert ts04.target_stage_ids == ts02.target_stage_ids
+    assert ts04.task_id == "TS04"
     assert wa01.target_stage_ids == (
         "sugar_added",
         "one_cup_ready",

@@ -104,6 +104,12 @@ class TS02EvaluationSnapshot:
             self.required_button_press_count,
             field_name="required_button_press_count",
         )
+        expected_required_count = len(history) if bool(self.target_found) else 0
+        if required_count != expected_required_count:
+            raise ValueError(
+                "TS02 required_button_press_count must be 0 before target_found "
+                "and equal the completed search length afterwards"
+            )
         if len(button_steps) > actual_count:
             raise ValueError(
                 "valid_button_press_steps cannot exceed actual_button_press_count"

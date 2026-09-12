@@ -228,6 +228,36 @@ def test_public_report_has_exactly_five_stages_and_no_extra_success() -> None:
     }
 
 
+@pytest.mark.parametrize(
+    ("checked_count", "target_found"),
+    ((0, False), (1, False), (1, True), (2, True), (3, True)),
+)
+def test_snapshot_press_requirement_matches_completed_search(
+    checked_count: int, target_found: bool,
+) -> None:
+    history = FIXTURE_NAMES[:checked_count]
+    target = history[-1] if target_found else FIXTURE_NAMES[-1]
+    required_count = checked_count if target_found else 0
+    values = {
+        "step_id": checked_count,
+        "fixture_names": FIXTURE_NAMES,
+        "target_fixture": target,
+        "completed_fixture_history": history,
+        "completed_fixture_steps": {
+            fixture: index for index, fixture in enumerate(history, start=1)
+        },
+        "target_found": target_found,
+    }
+    snapshot = TS02EvaluationSnapshot(
+        **values, required_button_press_count=required_count,
+    )
+    assert snapshot.required_button_press_count == required_count
+    with pytest.raises(ValueError, match="required_button_press_count"):
+        TS02EvaluationSnapshot(
+            **values, required_button_press_count=required_count + 1,
+        )
+
+
 def test_same_step_is_idempotent_even_if_snapshot_contents_change() -> None:
     target = FIXTURE_NAMES[0]
     evaluator = TS02Evaluator(

@@ -4,7 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from scripts.annotate.apply_subtask_labels import label_episode, load_config, match_subtask
+from bench.tasks.ts02.prompts import resolve_prompt_spec
+from scripts.annotate.apply_subtask_labels import label_episode, load_config
 from scripts.annotate.planner_to_stage_boundaries_ts02 import (
     build_search_instruction,
     build_stage_names,
@@ -87,11 +88,11 @@ def test_ts02_stage_names_use_one_repeatable_button_label(
     ]
 
 
-def test_ts02_search_instruction_exposes_order_without_target() -> None:
-    instruction = build_search_instruction(
-        ["cabinet_slot_1", "cabinet_slot_2", "cabinet_slot_0"]
-    )
+def test_ts02_search_instruction_matches_order_free_policy_prompt() -> None:
+    instruction = build_search_instruction()
 
-    assert "center, right, then left" in instruction
-    assert "target drawer" not in instruction
-    assert "contains the cube" in instruction
+    assert instruction == resolve_prompt_spec(variant="memory").policy_prompt
+    assert "once for each drawer you inspected" in instruction
+    assert "in this order" not in instruction
+    assert "cabinet_slot_" not in instruction
+    assert all(f"{side} drawer" not in instruction for side in ("left", "center", "right"))
