@@ -303,7 +303,6 @@ def verify_retrieval_door(controller: Any, level: str, **kwargs: Any) -> dict[st
     checks = {
         "door_open": env.is_door_open(level),
         "target_level": level == env.target_level,
-        "no_wrong_level_opened": not env._semantic_state.wrong_retrieval_level_opened,
     }
     return {
         "primitive": "verify_retrieval_door",

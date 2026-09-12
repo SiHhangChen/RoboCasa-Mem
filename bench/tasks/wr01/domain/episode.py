@@ -54,7 +54,7 @@ def target_item_for_seed(seed: int) -> str:
 
 
 def close_order_for_seed(seed: int) -> tuple[str, str]:
-    """Sample door-close order independently from item assignment and target."""
+    """Sample the expert's door-close order; it is not an evaluation constraint."""
     # Use a dedicated seed stream rather than the item/target streams.  The
     # affine permutation makes the first 200 release seeds exactly balanced
     # while avoiding the direct seed-parity correlation used by older drafts.
@@ -75,8 +75,8 @@ def resolve_task_definition(**values: Any) -> TaskDefinition:
         description=str(
             values.get(
                 "description",
-                "Observe two pre-filled open cabinets, close both doors, reset to "
-                "neutral, then retrieve the requested can by memory.",
+                "Observe two pre-filled open cabinets, close both doors, then "
+                "retrieve the requested can by memory.",
             )
         ),
         success_conditions=conditions,

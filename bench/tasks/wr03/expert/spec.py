@@ -1,9 +1,10 @@
-"""Canonical WR-03 v3 expert plan with reset-time cabinet storage."""
+"""WR-03 expert plan with recording-only door order and neutral reset."""
 
 from __future__ import annotations
 
 from bench.execution.plan_builder import finish_plan, navigate, operate
 from bench.tasks.contracts import ExpertPlanInputs
+from bench.tasks.wr03.domain.contracts import TASK_REVISION
 
 
 def build_expert_plan(inputs: ExpertPlanInputs):
@@ -69,7 +70,7 @@ def build_expert_plan(inputs: ExpertPlanInputs):
         operate("verify_final_placement", "red_can", name="verify_final_table_placement"),
     ])
     return finish_plan(episode, stages, metadata={
-        "task_revision": "WR03-v3",
+        "task_revision": TASK_REVISION,
         "stored_level": level,
         "close_order": list(close_order),
     })

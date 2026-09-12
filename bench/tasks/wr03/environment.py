@@ -143,7 +143,6 @@ class WR03StoreAndRetrieveRememberedCan(Kitchen):
         self._evaluation_initial_can_position: np.ndarray | None = None
         self._table_target_position: np.ndarray | None = None
         self._canonical_reset_reference: dict[str, Any] | None = None
-        self._close_order: tuple[str, str] = ("upper", "lower")
         self.level_by_item = {CAN_ID: self._demo_storage_level}
         kwargs.setdefault("obj_registries", ("objaverse", "aigen", "lightwheel"))
         super().__init__(*args, **kwargs)
@@ -254,7 +253,6 @@ class WR03StoreAndRetrieveRememberedCan(Kitchen):
         self._evaluation_initial_can_position = None
         self._table_target_position = None
         self._canonical_reset_reference = None
-        self._close_order = ("upper", "lower")
 
     # Episode and semantic events ---------------------------------------
 
@@ -272,14 +270,11 @@ class WR03StoreAndRetrieveRememberedCan(Kitchen):
         self,
         *,
         demo_storage_level: str,
-        close_order: tuple[str, str] = ("upper", "lower"),
     ) -> None:
         self._demo_storage_level = validate_level(demo_storage_level)
         self.level_by_item = {CAN_ID: self._demo_storage_level}
-        self._close_order = tuple(str(value) for value in close_order)
         self._semantic_state = SemanticState(
             stored_level=self._demo_storage_level,
-            canonical_reset_required=True,
         )
         self._physical_observer = None
         self._wr03_evaluator = None
@@ -389,9 +384,15 @@ class WR03StoreAndRetrieveRememberedCan(Kitchen):
             raise RuntimeError("WR-03 table target has not been initialized")
         return np.asarray(self._table_target_position, dtype=float).copy()
 
-    def is_can_on_table(self, *, tolerance: float = 0.12) -> bool:
+    def is_can_on_table(self) -> bool:
+        """Policy placement: touch the task counter and release the can."""
+
         try:
-            return bool(float(np.linalg.norm(self.get_object_world_position(CAN_ID) - self.table_target_position())) <= tolerance)
+            item = self.objects[CAN_ID]
+            return bool(
+                self.check_contact(item, self.counter)
+                and not self.check_contact(self.robots[0].gripper["right"], item)
+            )
         except Exception:
             return False
 
@@ -471,7 +472,6 @@ class WR03StoreAndRetrieveRememberedCan(Kitchen):
                 stored is not None and self.is_item_in_level(CAN_ID, stored)
             ),
             cabinets_closed=self.are_cabinets_closed(),
-            canonical_reset_complete=self._semantic_state.canonical_reset_complete,
         )
 
     def record_retrieval_door_open(self, level: str) -> bool:
@@ -629,7 +629,6 @@ class WR03StoreAndRetrieveRememberedCan(Kitchen):
             upper_door_closed=physical.upper_door_closed,
             lower_door_open=self.is_door_open("lower"),
             upper_door_open=self.is_door_open("upper"),
-            canonical_reset=self.is_canonical_reset(),
         )
 
     # Metadata and final predicate --------------------------------------
@@ -664,16 +663,11 @@ class WR03StoreAndRetrieveRememberedCan(Kitchen):
             "terminal": bool(
                 report.success
                 or self._semantic_state.protocol_violation
-                or self._semantic_state.wrong_retrieval_level_opened
             ),
             "failure_code": (
                 "protocol_violation"
                 if self._semantic_state.protocol_violation
-                else (
-                    "wrong_retrieval_door"
-                    if self._semantic_state.wrong_retrieval_level_opened
-                    else None
-                )
+                else None
             ),
             "success_checks": report.checks(),
         }
@@ -749,33 +743,16 @@ class WR03StoreAndRetrieveRememberedCan(Kitchen):
             "collision_policy": "all_object_collisions_enabled",
             "execution_mode": "action_only_physics",
         }
-        other_door_closed = bool(
-            physical.upper_door_closed
-            if self.stored_level == "lower"
-            else physical.lower_door_closed
-            if self.stored_level == "upper"
-            else False
-        )
         return WR03EvaluationSnapshot(
             step_id=int(getattr(self, "timestep", 0)),
-            close_order=self._close_order,
-            can_grasped=bool(grasp_evidence.get("picked_up", False)),
             stored_level=self.stored_level,
-            closed_levels_after_storage=frozenset(
-                self._semantic_state.closed_levels_after_storage
-            ),
             storage_hidden=self._semantic_state.storage_hidden,
             lower_door_closed=physical.lower_door_closed,
             upper_door_closed=physical.upper_door_closed,
             opened_level=self._semantic_state.retrieval_level_opened,
-            wrong_retrieval_level_opened=(
-                self._semantic_state.wrong_retrieval_level_opened
-            ),
             retrieved_item_id=self._semantic_state.retrieved_item_id,
             can_outside_both=physical.can_outside_both,
-            other_door_closed=other_door_closed,
             protocol_violation=self._semantic_state.protocol_violation,
-            canonical_reset=bool(self._semantic_state.canonical_reset_complete),
             final_placement_verified=bool(
                 self._semantic_state.retrieved_item_id == CAN_ID and self.is_can_on_table()
             ),

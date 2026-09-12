@@ -15,9 +15,11 @@ class SemanticState:
     target_level: str
     stored_levels_by_item: dict[str, str] = field(default_factory=dict)
     storage_hidden: bool = False
+    # Expert-recording metadata, never a policy-evaluation prerequisite.
     canonical_reset_complete: bool = False
-    canonical_reset_required: bool = False
+    # Latches opening the target cabinet after the memory barrier.
     retrieval_level_opened: str | None = None
+    # Diagnostic history only: opening the other cabinet never invalidates a run.
     wrong_retrieval_level_opened: bool = False
     retrieved_item_id: str | None = None
 
@@ -36,10 +38,8 @@ class SuccessReport:
     storage_assignment_complete: bool
     storage_was_hidden: bool
     correct_retrieval_door: bool
-    no_wrong_retrieval_door: bool
     correct_target_retrieved: bool
     distractor_still_stored: bool
-    canonical_reset_complete: bool = False
 
     @property
     def success(self) -> bool:
@@ -49,9 +49,7 @@ class SuccessReport:
         return {
             "storage_assignment_complete": self.storage_assignment_complete,
             "storage_was_hidden": self.storage_was_hidden,
-            "canonical_reset_complete": self.canonical_reset_complete,
             "correct_retrieval_door": self.correct_retrieval_door,
-            "no_wrong_retrieval_door": self.no_wrong_retrieval_door,
             "correct_target_retrieved": self.correct_target_retrieved,
             "distractor_still_stored": self.distractor_still_stored,
         }
@@ -73,32 +71,31 @@ def latch_storage_hidden(
     *,
     all_stored: bool,
     cabinets_closed: bool,
-    canonical_reset_complete: bool = False,
 ) -> bool:
     """Latch the memory barrier only after both relation facts became hidden."""
 
-    if all_stored and cabinets_closed and (
-        not state.canonical_reset_required or canonical_reset_complete
-    ):
+    if all_stored and cabinets_closed:
         state.storage_hidden = True
     return state.storage_hidden
 
 
 def mark_canonical_reset(state: SemanticState, *, valid: bool) -> bool:
+    """Record the expert's neutral handoff without changing evaluation gates."""
+
     if valid:
         state.canonical_reset_complete = True
     return state.canonical_reset_complete
 
 
 def record_retrieval_door_open(state: SemanticState, level: str) -> bool:
-    """Record the first retrieval door decision after the hidden-state barrier."""
+    """Latch target-cabinet opening independently of any other door operation."""
 
     level = _level(level)
     if not state.storage_hidden:
         return False
-    if state.retrieval_level_opened is None:
+    if level == state.target_level:
         state.retrieval_level_opened = level
-    if level != state.target_level:
+    else:
         state.wrong_retrieval_level_opened = True
     return level == state.target_level
 
@@ -117,11 +114,7 @@ def evaluate_success(state: SemanticState, physical: PhysicalState) -> SuccessRe
     return SuccessReport(
         storage_assignment_complete=assignment_complete,
         storage_was_hidden=bool(state.storage_hidden),
-        canonical_reset_complete=(
-            bool(state.canonical_reset_complete) or not state.canonical_reset_required
-        ),
         correct_retrieval_door=state.retrieval_level_opened == state.target_level,
-        no_wrong_retrieval_door=not state.wrong_retrieval_level_opened,
         correct_target_retrieved=state.retrieved_item_id == state.target_item_id,
         distractor_still_stored=bool(physical.distractor_still_stored),
     )

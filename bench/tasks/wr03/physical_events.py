@@ -10,7 +10,6 @@ from bench.tasks.wr03.domain.contracts import CABINET_LEVELS, CAN_ID
 from bench.tasks.wr03.domain.semantics import (
     SemanticState,
     latch_storage_hidden,
-    mark_canonical_reset,
     record_retrieval_door_open,
     record_retrieval_pick,
     record_storage,
@@ -27,7 +26,6 @@ class PhysicalSample:
     upper_door_closed: bool
     lower_door_open: bool
     upper_door_open: bool
-    canonical_reset: bool | None = None
 
     def can_in_level(self, level: str) -> bool:
         return self.can_in_lower if level == "lower" else self.can_in_upper
@@ -98,20 +96,16 @@ class WR03PhysicalObserver:
             levels = [
                 level for level in CABINET_LEVELS if sample.can_in_level(level)
             ]
-            if len(levels) == 1 and self._stable(f"stored:{levels[0]}", True):
-                level = levels[0]
-                if record_storage(self.state, CAN_ID, level):
+            for level in CABINET_LEVELS:
+                if self._stable(f"stored:{level}", levels == [level]) and record_storage(
+                    self.state, CAN_ID, level
+                ):
                     events.append(f"stored:{level}")
                     self._mark("stored", sample.step_id)
                     self._transition(self.CLOSE, sample.step_id)
+                    break
 
         elif self._phase == self.CLOSE:
-            if (
-                sample.canonical_reset is not None
-                and sample.canonical_reset
-                and sample.both_doors_closed
-            ):
-                mark_canonical_reset(self.state, valid=True)
             stored = self.state.stored_level
             if stored is not None and not sample.can_in_level(stored):
                 self._counts.clear()
@@ -132,9 +126,6 @@ class WR03PhysicalObserver:
                         self.state,
                         can_still_stored=True,
                         cabinets_closed=True,
-                        canonical_reset_complete=(
-                            True if sample.canonical_reset is None else sample.canonical_reset
-                        ),
                     )
                 ):
                     events.append("memory_barrier")
@@ -142,12 +133,17 @@ class WR03PhysicalObserver:
                     self._transition(self.HIDDEN, sample.step_id)
 
         elif self._phase == self.HIDDEN:
-            opened = [level for level in CABINET_LEVELS if sample.door_open(level)]
-            if len(opened) == 1 and self._stable(f"opened:{opened[0]}", True):
-                level = opened[0]
-                record_retrieval_door_open(self.state, level)
-                events.append(f"retrieval_door:{level}")
-                self._mark("retrieval_door", sample.step_id)
+            target_opened = False
+            for level in CABINET_LEVELS:
+                # Independent counters permit either opening order and both
+                # doors open, and reset on every interrupted dwell window.
+                if self._stable(f"opened:{level}", sample.door_open(level)):
+                    matched = record_retrieval_door_open(self.state, level)
+                    events.append(f"retrieval_door:{level}")
+                    if matched:
+                        self._mark("retrieval_door", sample.step_id)
+                    target_opened = target_opened or matched
+            if target_opened:
                 self._transition(self.RETRIEVE, sample.step_id)
 
         elif self._phase == self.RETRIEVE:

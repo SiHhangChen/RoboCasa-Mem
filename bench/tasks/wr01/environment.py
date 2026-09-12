@@ -194,7 +194,6 @@ class WR01RetrieveRememberedCan(Kitchen):
         self._evaluation_initial_item_positions: dict[str, np.ndarray] = {}
         self._table_target_positions: dict[str, np.ndarray] = {}
         self._canonical_reset_reference: dict[str, Any] | None = None
-        self._close_order: tuple[str, str] = ("upper", "lower")
         self.item_by_level = {"lower": "red_can", "upper": "blue_can"}
         self.level_by_item = {
             item: level for level, item in self.item_by_level.items()
@@ -312,7 +311,6 @@ class WR01RetrieveRememberedCan(Kitchen):
         self._evaluation_initial_item_positions = {}
         self._table_target_positions = {}
         self._canonical_reset_reference = None
-        self._close_order = ("upper", "lower")
         self.item_by_level = {"lower": "red_can", "upper": "blue_can"}
         self.level_by_item = {
             item: level for level, item in self.item_by_level.items()
@@ -345,7 +343,6 @@ class WR01RetrieveRememberedCan(Kitchen):
         *,
         item_by_level: Mapping[str, str],
         target_item_id: str,
-        close_order: tuple[str, str] = ("upper", "lower"),
     ) -> None:
         """Install frozen private episode facts after the environment is reset."""
 
@@ -355,12 +352,10 @@ class WR01RetrieveRememberedCan(Kitchen):
             raise ValueError(f"invalid WR-01 target item: {target!r}")
         self.item_by_level = assignment
         self.level_by_item = {item: level for level, item in assignment.items()}
-        self._close_order = tuple(str(value) for value in close_order)
         self._semantic_state = SemanticState(
             target,
             self.level_by_item[target],
             stored_levels_by_item={},
-            canonical_reset_required=True,
         )
         self._physical_observer = None
         self._wr01_evaluator = None
@@ -465,15 +460,26 @@ class WR01RetrieveRememberedCan(Kitchen):
         return mark_canonical_reset(self._semantic_state, valid=valid)
 
     def table_target_position(self, item_id: str) -> np.ndarray:
+        """Return the sampled placement point used by the expert plan."""
+
         target = self._table_target_positions.get(str(item_id))
         if target is None:
             raise KeyError(f"no WR-01 table target for {item_id!r}")
         return np.asarray(target, dtype=float).copy()
 
-    def is_item_on_table(self, item_id: str, *, tolerance: float = 0.12) -> bool:
+    def is_item_on_table(self, item_id: str) -> bool:
+        """Accept released contact anywhere on the task counter for evaluation.
+
+        The expert's sampled target, object orientation, and gripper retreat
+        distance are not policy-placement requirements.
+        """
+
         try:
-            current = self.get_object_world_position(str(item_id))
-            return bool(float(np.linalg.norm(current - self.table_target_position(str(item_id)))) <= tolerance)
+            item = self.objects[str(item_id)]
+            return bool(
+                self.check_contact(item, self.counter)
+                and not self.check_contact(self.robots[0].gripper["right"], item)
+            )
         except Exception:
             return False
 
@@ -529,7 +535,6 @@ class WR01RetrieveRememberedCan(Kitchen):
                 for item in ITEM_IDS
             ),
             cabinets_closed=self.are_cabinets_closed(),
-            canonical_reset_complete=self._semantic_state.canonical_reset_complete,
         )
 
     def record_retrieval_door_open(self, level: str) -> bool:
@@ -573,7 +578,6 @@ class WR01RetrieveRememberedCan(Kitchen):
             upper_door_closed=self.is_door_closed("upper"),
             lower_door_open=self.is_door_open("lower"),
             upper_door_open=self.is_door_open("upper"),
-            canonical_reset=self.is_canonical_reset(),
         )
 
     # Physical observation boundary -------------------------------------
@@ -732,14 +736,8 @@ class WR01RetrieveRememberedCan(Kitchen):
         return {
             **dict(snapshot.details),
             "success": report.success,
-            "terminal": bool(
-                report.success or self._semantic_state.wrong_retrieval_level_opened
-            ),
-            "failure_code": (
-                "wrong_retrieval_door"
-                if self._semantic_state.wrong_retrieval_level_opened
-                else None
-            ),
+            "terminal": bool(report.success),
+            "failure_code": None,
             "success_checks": report.checks(),
         }
 
@@ -802,19 +800,14 @@ class WR01RetrieveRememberedCan(Kitchen):
             ),
             target_item_id=self.target_item_id,
             target_level=self.target_level,
-            close_order=self._close_order,
             item_grasped=grasped,
             stored_levels_by_item=self._semantic_state.stored_levels_by_item,
             storage_hidden=bool(self._semantic_state.storage_hidden),
             upper_door_closed=self.is_door_closed("upper"),
             lower_door_closed=self.is_door_closed("lower"),
             opened_level=self._semantic_state.retrieval_level_opened,
-            wrong_retrieval_level_opened=(
-                self._semantic_state.wrong_retrieval_level_opened
-            ),
             retrieved_item_id=self._semantic_state.retrieved_item_id,
             distractor_still_stored=report.distractor_still_stored,
-            canonical_reset=bool(self._semantic_state.canonical_reset_complete),
             final_placement_verified=bool(
                 self._semantic_state.retrieved_item_id == self.target_item_id
                 and self.is_item_on_table(self.target_item_id)

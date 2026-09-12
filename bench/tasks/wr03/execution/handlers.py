@@ -301,9 +301,8 @@ def verify_and_latch_storage_hidden(controller: Any) -> dict[str, Any]:
     closed = env.are_cabinets_closed()
     latched = env.latch_storage_hidden()
     checks = {
-        "both_items_physically_stored": stored,
+        "can_physically_stored": stored,
         "both_cabinets_closed": closed,
-        "canonical_reset_complete": bool(env._semantic_state.canonical_reset_complete),
         "storage_hidden_latched": latched,
     }
     return {
@@ -322,7 +321,6 @@ def verify_retrieval_door(controller: Any, level: str, **kwargs: Any) -> dict[st
     checks = {
         "door_open": env.is_door_open(level),
         "target_level": level == env.target_level,
-        "no_wrong_level_opened": not env._semantic_state.wrong_retrieval_level_opened,
     }
     return {
         "primitive": "verify_retrieval_door",

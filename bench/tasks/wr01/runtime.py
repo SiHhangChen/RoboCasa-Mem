@@ -67,7 +67,6 @@ def _initialize(descriptor: Any, env: Any, observation: Mapping[str, Any]):
         storage_order=descriptor.episode_plan.storage_order,
         target_item_id=descriptor.episode_plan.target_item_id,
         target_level=descriptor.episode_plan.target_level,
-        close_order=descriptor.episode_plan.close_order,
     )
     evaluator.reset(env.evaluation_snapshot())
     env._wr01_evaluator = evaluator

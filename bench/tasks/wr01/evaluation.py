@@ -1,8 +1,11 @@
-"""Authoritative ordered WR-01 evaluation state machine.
+"""Authoritative WR-01 task progress with unordered cabinet operations.
 
 The simulator supplies physical grasp, cabinet occupancy, door, and retrieval
-facts. This module owns stage order, prerequisite qualification, diagnostics,
-and the final verdict for policy evaluation and recorded-action replay.
+facts. This module owns task prerequisites, diagnostics, and the final verdict
+for policy evaluation and recorded-action replay. Either cabinet may be closed
+or opened first; the target still has to be retrieved after storage was hidden.
+The non-target can must remain in its initial cabinet from reset until success;
+any observed departure is a terminal failure, even if the can is later returned.
 """
 
 from __future__ import annotations
@@ -18,15 +21,13 @@ from bench.tasks.wr01.domain.contracts import CABINET_LEVELS, ITEM_IDS
 STAGE_ORDER = (
     "close_first_door",
     "close_second_door",
-    "canonical_reset",
     "open_cabinet",
     "retrieve_item",
     "place_on_table",
 )
 STAGE_LABELS = {
-    "close_first_door": "关第一扇柜门",
-    "close_second_door": "关第二扇柜门",
-    "canonical_reset": "回到中性位",
+    "close_first_door": "关闭任意一扇柜门",
+    "close_second_door": "关闭两扇柜门",
     "open_cabinet": "开记忆柜",
     "retrieve_item": "取目标罐头",
     "place_on_table": "放回桌面",
@@ -42,7 +43,6 @@ TASK_EVALUATOR_METADATA_KEY = "task_evaluator"
 _REPORT_STAGE_SOURCES = {
     "one_can_stored": "close_first_door",
     "two_cans_stored": "close_second_door",
-    "storage_hidden": "canonical_reset",
     "correct_cabinet_opened": "open_cabinet",
     "success": "place_on_table",
 }
@@ -79,17 +79,14 @@ class WR01EvaluationSnapshot:
     storage_order: tuple[str, str]
     target_item_id: str
     target_level: str
-    close_order: tuple[str, str] = ("upper", "lower")
     item_grasped: Mapping[str, bool] = field(default_factory=dict)
     stored_levels_by_item: Mapping[str, str] = field(default_factory=dict)
     storage_hidden: bool = False
     upper_door_closed: bool = False
     lower_door_closed: bool = False
     opened_level: str | None = None
-    wrong_retrieval_level_opened: bool = False
     retrieved_item_id: str | None = None
     distractor_still_stored: bool = False
-    canonical_reset: bool = False
     final_placement_verified: bool = False
     details: Mapping[str, Any] = field(default_factory=dict)
 
@@ -100,9 +97,6 @@ class WR01EvaluationSnapshot:
         order = _storage_order(self.storage_order)
         target = _item(self.target_item_id)
         target_level = _level(self.target_level)
-        close_order = tuple(_level(value) for value in self.close_order)
-        if len(close_order) != 2 or set(close_order) != set(CABINET_LEVELS):
-            raise ValueError("WR-01 close_order must contain lower and upper")
         grasped = {
             item_id: bool(self.item_grasped.get(item_id, False))
             for item_id in ITEM_IDS
@@ -118,25 +112,18 @@ class WR01EvaluationSnapshot:
         object.__setattr__(self, "storage_order", order)
         object.__setattr__(self, "target_item_id", target)
         object.__setattr__(self, "target_level", target_level)
-        object.__setattr__(self, "close_order", close_order)
         object.__setattr__(self, "item_grasped", grasped)
         object.__setattr__(self, "stored_levels_by_item", stored)
         object.__setattr__(self, "storage_hidden", bool(self.storage_hidden))
         object.__setattr__(self, "upper_door_closed", bool(self.upper_door_closed))
         object.__setattr__(self, "lower_door_closed", bool(self.lower_door_closed))
         object.__setattr__(self, "opened_level", opened)
-        object.__setattr__(
-            self,
-            "wrong_retrieval_level_opened",
-            bool(self.wrong_retrieval_level_opened),
-        )
         object.__setattr__(self, "retrieved_item_id", retrieved)
         object.__setattr__(
             self,
             "distractor_still_stored",
             bool(self.distractor_still_stored),
         )
-        object.__setattr__(self, "canonical_reset", bool(self.canonical_reset))
         object.__setattr__(self, "final_placement_verified", bool(self.final_placement_verified))
         object.__setattr__(self, "details", dict(self.details or {}))
 
@@ -149,11 +136,17 @@ class WR01EvaluationSnapshot:
         return self.storage_order[1]
 
     @property
+    def storage_assignment_complete(self) -> bool:
+        return bool(
+            set(self.stored_levels_by_item) == set(ITEM_IDS)
+            and set(self.stored_levels_by_item.values()) == set(CABINET_LEVELS)
+        )
+
+    @property
     def correct_cabinet_opened(self) -> bool:
         return bool(
             self.storage_hidden
             and self.opened_level == self.target_level
-            and not self.wrong_retrieval_level_opened
         )
 
     @property
@@ -164,11 +157,14 @@ class WR01EvaluationSnapshot:
         )
 
     def raw_stage_values(self) -> dict[str, bool]:
+        # The legacy first/second ids count closed doors, not cabinet identities.
+        # Include storage evidence so a late observer confirmation does not
+        # force the policy to reopen and reclose already closed doors.
+        stored = self.storage_assignment_complete
         return {
-            "close_first_door": self.upper_door_closed if self.close_order[0] == "upper" else self.lower_door_closed,
-            "close_second_door": self.upper_door_closed if self.close_order[1] == "upper" else self.lower_door_closed,
-            "canonical_reset": self.canonical_reset,
-            "open_cabinet": self.opened_level is not None,
+            "close_first_door": stored and (self.upper_door_closed or self.lower_door_closed),
+            "close_second_door": stored and self.upper_door_closed and self.lower_door_closed,
+            "open_cabinet": self.correct_cabinet_opened,
             "retrieve_item": self.retrieved_item_id is not None,
             "place_on_table": self.final_placement_verified,
         }
@@ -265,7 +261,7 @@ class _MutableStage:
 
 
 class WR01Evaluator:
-    """Strict, idempotent, history-aware evaluator for the six WR-01 stages."""
+    """Evaluate the five task stages; neutral reset belongs to the expert plan."""
 
     def __init__(
         self,
@@ -273,14 +269,10 @@ class WR01Evaluator:
         storage_order: Sequence[str],
         target_item_id: str,
         target_level: str,
-        close_order: Sequence[str] = ("upper", "lower"),
     ) -> None:
         self.storage_order = _storage_order(storage_order)
         self.target_item_id = _item(target_item_id)
         self.target_level = _level(target_level)
-        self.close_order = tuple(_level(value) for value in close_order)
-        if len(self.close_order) != 2 or set(self.close_order) != set(CABINET_LEVELS):
-            raise ValueError("WR-01 close_order must contain lower and upper")
         self._stages = {name: _MutableStage() for name in STAGE_ORDER}
         self._rejected: dict[str, list[dict[str, Any]]] = {
             name: [] for name in STAGE_ORDER
@@ -294,7 +286,7 @@ class WR01Evaluator:
         self._validate_configuration(snapshot)
         self._stages = {name: _MutableStage() for name in STAGE_ORDER}
         self._rejected = {name: [] for name in STAGE_ORDER}
-        self._terminal_failure_code = None
+        self._terminal_failure_code = self._episode_validation_failure(snapshot)
         raw = snapshot.raw_stage_values()
         for name, value in raw.items():
             if value:
@@ -319,6 +311,16 @@ class WR01Evaluator:
                 f"{snapshot.step_id} < {self._last_step_id}"
             )
         if self._cached_result is not None and self._cached_result.terminal:
+            return self._cached_result
+
+        # Check episode-wide constraints on every new control step, before any
+        # stage can qualify. A departure cannot be undone by replacing the can,
+        # and it wins over target placement on the same step.
+        failure = self._episode_validation_failure(snapshot)
+        if failure is not None:
+            self._terminal_failure_code = failure
+            self._last_step_id = snapshot.step_id
+            self._cached_result = self._build_result(snapshot)
             return self._cached_result
 
         raw = snapshot.raw_stage_values()
@@ -348,7 +350,7 @@ class WR01Evaluator:
             reason = self._stage_validation_failure(name, snapshot)
             if reason is not None:
                 self._reject(name, snapshot.step_id, reason)
-                if name in {"open_cabinet", "retrieve_item"}:
+                if name == "retrieve_item":
                     self._terminal_failure_code = reason
                 continue
             self._qualify(name, snapshot.step_id)
@@ -369,31 +371,25 @@ class WR01Evaluator:
             snapshot.storage_order != self.storage_order
             or snapshot.target_item_id != self.target_item_id
             or snapshot.target_level != self.target_level
-            or snapshot.close_order != self.close_order
         ):
             raise ValueError(
                 "WR-01 evaluation snapshot configuration changed within an episode"
             )
 
     @staticmethod
+    def _episode_validation_failure(snapshot: WR01EvaluationSnapshot) -> str | None:
+        if not snapshot.distractor_still_stored:
+            return "distractor_not_stored"
+        return None
+
+    @staticmethod
     def _stage_validation_failure(
         name: str,
         snapshot: WR01EvaluationSnapshot,
     ) -> str | None:
-        if name in {"close_first_door", "close_second_door"}:
-            assigned_items = set(snapshot.stored_levels_by_item)
-            assigned_levels = set(snapshot.stored_levels_by_item.values())
-            if assigned_items != set(ITEM_IDS) or assigned_levels != set(CABINET_LEVELS):
-                return "storage_not_verified"
-        if name == "open_cabinet" and (
-            not snapshot.canonical_reset or not snapshot.correct_cabinet_opened
-        ):
-            return "wrong_retrieval_cabinet"
         if name == "retrieve_item":
             if snapshot.retrieved_item_id != snapshot.target_item_id:
                 return "wrong_item_retrieved"
-            if not snapshot.distractor_still_stored:
-                return "distractor_not_stored"
         elif name == "place_on_table":
             if not snapshot.final_placement_verified:
                 return "final_placement_not_verified"
@@ -446,7 +442,9 @@ class WR01Evaluator:
 
     def _build_result(self, snapshot: WR01EvaluationSnapshot) -> WR01EvalResult:
         stages = {name: self._stage_result(name) for name in STAGE_ORDER}
-        success = bool(stages[STAGE_ORDER[-1]].qualified)
+        success = bool(
+            stages[STAGE_ORDER[-1]].qualified and self._terminal_failure_code is None
+        )
         details = dict(snapshot.details)
         evaluation = dict(details.get("evaluation") or {})
         evaluation.update(
@@ -458,7 +456,8 @@ class WR01Evaluator:
                 "stage_prerequisites": dict(STAGE_PREREQUISITES),
                 "qualification_policy": "rising_edge_after_prerequisite",
                 "storage_order": list(self.storage_order),
-                "close_order": list(self.close_order),
+                "door_order_policy": "unordered",
+                "distractor_policy": "remain_in_initial_cabinet_until_success",
                 "stage_bindings": {
                     "first_can": self.storage_order[0],
                     "first_store_level": "lower",

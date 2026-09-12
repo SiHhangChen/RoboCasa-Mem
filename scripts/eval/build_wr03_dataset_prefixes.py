@@ -35,7 +35,7 @@ DEFAULT_SUBTASK_ROOT = Path(
     "/data/shared_workspace/chensihang/dataset/memer/pi05/"
     "wr03_200seeds_v061_subtasks_v2"
 )
-BOUNDARY_STAGE = "storage_hidden"
+BOUNDARY_STAGE = "close_second_door"
 TARGET_SUBTASK_BY_LEVEL = {"upper": 3, "lower": 4}
 
 
@@ -96,7 +96,7 @@ def main(argv: list[str] | None = None) -> int:
             task_id="WR-03",
             seed=seed,
             episode_identity=resolved.identity,
-            expert_plan_version="membench.dataset_prefix/wr03-v1",
+            expert_plan_version="membench.dataset_prefix/wr03-v2",
             stage_boundary_steps={BOUNDARY_STAGE: handoff_step},
             actions=prefix_actions,
             success=True,

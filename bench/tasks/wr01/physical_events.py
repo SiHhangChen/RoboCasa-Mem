@@ -17,7 +17,6 @@ from bench.tasks.wr01.domain.semantics import (
     SemanticState,
     evaluate_success,
     latch_storage_hidden,
-    mark_canonical_reset,
     record_retrieval_door_open,
     record_retrieval_pick,
     record_storage,
@@ -35,7 +34,6 @@ class PhysicalSample:
     upper_door_closed: bool
     lower_door_open: bool
     upper_door_open: bool
-    canonical_reset: bool | None = None
 
     def item_in_level(self, item_id: str, level: str) -> bool:
         if item_id == "red_can":
@@ -130,12 +128,6 @@ class WR01PhysicalObserver:
                 self._transition(self.CLOSE, sample.step_id)
 
         elif self._phase == self.CLOSE:
-            if (
-                sample.canonical_reset is not None
-                and sample.canonical_reset
-                and sample.both_doors_closed
-            ):
-                mark_canonical_reset(self.state, valid=True)
             for level in CABINET_LEVELS:
                 if self._stable(f"closed:{level}", sample.door_closed(level)):
                     events.append(f"closed:{level}")
@@ -152,20 +144,19 @@ class WR01PhysicalObserver:
                     for item in ITEM_IDS
                 ),
                 cabinets_closed=True,
-                canonical_reset_complete=(
-                    True if sample.canonical_reset is None else sample.canonical_reset
-                ),
             ):
                 events.append("memory_barrier")
                 self._mark("hidden", sample.step_id)
                 self._transition(self.HIDDEN, sample.step_id)
 
         elif self._phase == self.HIDDEN:
-            opened = [level for level in CABINET_LEVELS if sample.door_open(level)]
-            if len(opened) == 1 and self._stable(f"opened:{opened[0]}", True):
-                level = opened[0]
-                record_retrieval_door_open(self.state, level)
-                events.append(f"retrieval_door:{level}")
+            target_opened = False
+            for level in CABINET_LEVELS:
+                if self._stable(f"opened:{level}", sample.door_open(level)):
+                    matched = record_retrieval_door_open(self.state, level)
+                    events.append(f"retrieval_door:{level}")
+                    target_opened = target_opened or matched
+            if target_opened:
                 self._mark("retrieval_door", sample.step_id)
                 self._transition(self.RETRIEVE, sample.step_id)
 
@@ -195,7 +186,7 @@ class WR01PhysicalObserver:
     def _synchronize_phase(self, step_id: int) -> None:
         if self.state.retrieved_item_id is not None:
             target = self.COMPLETE
-        elif self.state.retrieval_level_opened is not None:
+        elif self.state.retrieval_level_opened == self.state.target_level:
             target = self.RETRIEVE
         elif self.state.storage_hidden:
             target = self.HIDDEN

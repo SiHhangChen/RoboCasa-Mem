@@ -3,16 +3,14 @@ schema_version: 1
 task:
   id: WR-03
   display_name: Store and retrieve remembered can
-  description: Observe the pre-filled open cabinet, close both doors, reset to neutral, then retrieve the can from memory.
+  description: Observe the pre-filled open cabinet, close both doors in either order, then retrieve the can from memory and release it on the table.
   success_conditions:
     - can_storage_verified
     - both_doors_closed_after_storage
     - memory_barrier_latched
     - correct_retrieval_door
-    - no_wrong_retrieval_door
     - same_can_retrieved
     - can_outside_both_cabinets
-    - other_door_remains_closed
     - no_protocol_violation
 
 scene:
@@ -24,6 +22,7 @@ scene:
 
 episode:
   stored_level: null
+  # Recording plan only; policy evaluation accepts either door order.
   close_order: null
   max_horizon: 8000
 

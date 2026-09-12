@@ -139,13 +139,12 @@ def initialize_episode_state(
 
     The reset is not an expert action: no pick/place stages are emitted and the
     relation is recorded privately for evaluation while remaining unlatched
-    until the doors and canonical neutral reset are complete.
+    until both doors are closed. Neutral reset is an expert-recording action.
     """
 
     env.configure_episode(
         item_by_level=episode.item_by_level,
         target_item_id=episode.target_item_id,
-        close_order=episode.close_order,
     )
     env.configure_canonical_physics()
     placements: dict[str, Any] = {}

@@ -63,7 +63,7 @@ def _initialize(descriptor: Any, env: Any, observation: Mapping[str, Any]):
     env.configure_canonical_reset_reference(updated)
     _configure_canonical_reset_region(env, descriptor.resources["stations"])
     env.start_physical_observer()
-    evaluator = WR03Evaluator(close_order=descriptor.episode_plan.close_order)
+    evaluator = WR03Evaluator()
     evaluator.reset(env.evaluation_snapshot())
     env._wr03_evaluator = evaluator
     return (

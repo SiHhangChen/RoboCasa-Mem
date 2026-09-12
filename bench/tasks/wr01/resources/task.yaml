@@ -4,14 +4,13 @@ schema_version: 1
 task:
   id: WR-01
   display_name: Retrieve remembered colored can
-  description: Observe the two pre-filled open cabinets, close both doors, reset to neutral, then retrieve the prompted can from memory.
+  description: Observe the two pre-filled open cabinets, close both doors, then retrieve the prompted can from memory.
   success_conditions:
     - storage_assignment_complete
     - storage_was_hidden
-    - canonical_reset_complete
     - correct_retrieval_door
-    - no_wrong_retrieval_door
     - correct_target_retrieved
+    # Episode-wide invariant: the first departure is terminal, even if reversed.
     - distractor_still_stored
 
 scene:
@@ -24,6 +23,7 @@ scene:
 episode:
   item_by_level: null
   target_item_id: null
+  # Expert recording order only; policy evaluation accepts either door first.
   close_order: null
   max_horizon: 15000
 

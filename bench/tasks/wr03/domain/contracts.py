@@ -10,7 +10,7 @@ from typing import Any
 
 
 TASK_ID = "WR-03"
-TASK_REVISION = "WR03-v3"
+TASK_REVISION = "WR03-v4"
 PARENT_TASK_ID = "WR-01"
 ENV_NAME = "WR03StoreAndRetrieveRememberedCan"
 DISPLAY_NAME = "Store and retrieve remembered can"
@@ -99,7 +99,7 @@ class RunContext:
 
 @dataclass(frozen=True)
 class EpisodePlan:
-    """Private reset relation and independent close order for one episode."""
+    """Private reset relation and recording-only close order for one episode."""
 
     seed: int
     stored_level: str

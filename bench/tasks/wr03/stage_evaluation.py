@@ -1,4 +1,4 @@
-"""WR-03 integration for the canonical-reset remembered-cabinet probe."""
+"""WR-03 remembered-cabinet probe after both doors have been closed."""
 
 from __future__ import annotations
 
@@ -10,11 +10,11 @@ from bench.evaluation.stage_rollout import StageSpec
 from bench.tasks.wr03.evaluation import WR03EvalResult, evaluate_initialized_runtime
 
 
-TARGET_STAGE_ORDER = ("canonical_reset", "open_remembered_cabinet")
+TARGET_STAGE_ORDER = ("close_second_door", "open_remembered_cabinet")
 CAPTURE_STAGE_ORDER = TARGET_STAGE_ORDER
 
 DEFAULT_STAGE_BUDGETS = {
-    "canonical_reset": 1200,
+    "close_second_door": 1200,
     "open_remembered_cabinet": 1200,
 }
 
@@ -71,8 +71,8 @@ STAGE_EVALUATION = StageEvaluationIntegration(
     target_stage_ids=TARGET_STAGE_ORDER,
     capture_stage_ids=CAPTURE_STAGE_ORDER,
     prefix_stage_by_target={
-        "canonical_reset": None,
-        "open_remembered_cabinet": "canonical_reset",
+        "close_second_door": None,
+        "open_remembered_cabinet": "close_second_door",
     },
     completion_stage_by_target={stage_id: stage_id for stage_id in TARGET_STAGE_ORDER},
     spec_builder=build_stage_specs,

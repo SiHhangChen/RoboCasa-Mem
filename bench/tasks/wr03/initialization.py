@@ -135,7 +135,6 @@ def initialize_episode_state(
 
     env.configure_episode(
         demo_storage_level=episode.stored_level,
-        close_order=episode.close_order,
     )
     env.configure_canonical_physics()
     position = np.asarray(env.get_object_world_position(CAN_ID), dtype=float).reshape(-1)

@@ -14,8 +14,8 @@ class SemanticState:
     stored_level: str | None = None
     closed_levels_after_storage: set[str] = field(default_factory=set)
     storage_hidden: bool = False
+    # Recording metadata only; never a policy evaluation prerequisite.
     canonical_reset_complete: bool = False
-    canonical_reset_required: bool = False
     retrieval_level_opened: str | None = None
     wrong_retrieval_level_opened: bool = False
     retrieved_item_id: str | None = None
@@ -47,10 +47,8 @@ class SuccessReport:
     both_doors_closed_after_storage: bool
     memory_barrier_latched: bool
     correct_retrieval_door: bool
-    no_wrong_retrieval_door: bool
     same_can_retrieved: bool
     can_outside_both_cabinets: bool
-    other_door_remains_closed: bool
     no_protocol_violation: bool
 
     @property
@@ -63,10 +61,8 @@ class SuccessReport:
             "both_doors_closed_after_storage": self.both_doors_closed_after_storage,
             "memory_barrier_latched": self.memory_barrier_latched,
             "correct_retrieval_door": self.correct_retrieval_door,
-            "no_wrong_retrieval_door": self.no_wrong_retrieval_door,
             "same_can_retrieved": self.same_can_retrieved,
             "can_outside_both_cabinets": self.can_outside_both_cabinets,
-            "other_door_remains_closed": self.other_door_remains_closed,
             "no_protocol_violation": self.no_protocol_violation,
         }
 
@@ -106,19 +102,19 @@ def latch_storage_hidden(
     *,
     can_still_stored: bool,
     cabinets_closed: bool,
-    canonical_reset_complete: bool = False,
 ) -> bool:
-    """Latch the memory barrier only after both post-storage close events."""
+    """Latch when the stored can is hidden by both currently closed doors."""
 
     ready = bool(
         state.stored_level is not None
-        and state.closed_levels_after_storage == set(CABINET_LEVELS)
         and can_still_stored
         and cabinets_closed
-        and (not state.canonical_reset_required or canonical_reset_complete)
         and not state.protocol_violation
     )
     if ready:
+        # Preserve recording acknowledgements without requiring a close dwell
+        # or a neutral base/torso pose to establish the memory barrier.
+        state.closed_levels_after_storage.update(CABINET_LEVELS)
         state.storage_hidden = True
     return state.storage_hidden
 
@@ -130,21 +126,19 @@ def mark_canonical_reset(state: SemanticState, *, valid: bool) -> bool:
 
 
 def record_retrieval_door_open(state: SemanticState, level: str) -> bool:
-    """Record every retrieval door choice; a wrong choice is absorbing."""
+    """Latch the target opening; opening the empty cabinet is diagnostic only."""
 
     resolved = _level(level)
     if not state.storage_hidden or state.stored_level is None:
         state.protocol_violation = True
         return False
-    if state.retrieval_level_opened is None:
-        state.retrieval_level_opened = resolved
     if resolved != state.stored_level:
         state.wrong_retrieval_level_opened = True
-    return bool(
-        resolved == state.stored_level
-        and not state.wrong_retrieval_level_opened
-        and not state.protocol_violation
-    )
+        return False
+    if state.protocol_violation:
+        return False
+    state.retrieval_level_opened = resolved
+    return True
 
 
 def record_retrieval_pick(
@@ -159,7 +153,6 @@ def record_retrieval_pick(
         and state.storage_hidden
         and state.stored_level is not None
         and state.retrieval_level_opened == state.stored_level
-        and not state.wrong_retrieval_level_opened
         and not state.protocol_violation
     )
     if not valid:
@@ -171,14 +164,7 @@ def record_retrieval_pick(
 
 def evaluate_success(state: SemanticState, physical: PhysicalState) -> SuccessReport:
     stored = state.stored_level
-    other_closed = False
     storage_verified = stored is not None
-    if stored is not None:
-        other_closed = (
-            physical.upper_door_closed
-            if stored == "lower"
-            else physical.lower_door_closed
-        )
     return SuccessReport(
         can_storage_verified=storage_verified,
         both_doors_closed_after_storage=(
@@ -188,10 +174,8 @@ def evaluate_success(state: SemanticState, physical: PhysicalState) -> SuccessRe
         correct_retrieval_door=(
             stored is not None and state.retrieval_level_opened == stored
         ),
-        no_wrong_retrieval_door=not state.wrong_retrieval_level_opened,
         same_can_retrieved=state.retrieved_item_id == CAN_ID,
         can_outside_both_cabinets=physical.can_outside_both,
-        other_door_remains_closed=other_closed,
         no_protocol_violation=not state.protocol_violation,
     )
 

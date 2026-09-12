@@ -5,6 +5,7 @@ from collections import Counter
 from bench.execution.contracts import OperateStage
 from bench.tasks import TaskCatalog, resolve_builtin_task_plugin
 from bench.tasks.contracts import EpisodeRequest, ExpertPlanInputs
+from bench.tasks.wr03.domain.contracts import TASK_REVISION
 from bench.tasks.wr03.domain.episode import resolve_episode_plan
 
 
@@ -50,3 +51,4 @@ def test_wr03_expert_uses_reset_storage_and_closes_in_resolved_order() -> None:
     assert names.index("retrieve_can") < names.index("place_can_on_table")
     assert plan.metadata["stored_level"] == episode.facts["stored_level"]
     assert plan.metadata["close_order"] == list(episode.facts["close_order"])
+    assert plan.metadata["task_revision"] == TASK_REVISION == "WR03-v4"

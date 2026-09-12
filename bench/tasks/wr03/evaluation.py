@@ -1,9 +1,9 @@
-"""Authoritative ordered WR-03 evaluation state machine.
+"""Authoritative WR-03 progress with unordered cabinet operations.
 
 The physical observer reconstructs stable containment, door, and retrieval
-facts.  This module owns the public evaluation contract: ordered stage
-qualification, skipped-stage diagnostics, terminal protocol failures, and the
-final full-horizon verdict.
+facts. This module owns task prerequisites, skipped-stage diagnostics, and the
+terminal verdict. Either door may be closed or opened first; neutral reset and
+the sampled table target belong only to expert recording.
 """
 
 from __future__ import annotations
@@ -19,34 +19,28 @@ from bench.tasks.wr03.domain.contracts import CAN_ID, CABINET_LEVELS
 STAGE_ORDER = (
     "close_first_door",
     "close_second_door",
-    "canonical_reset",
     "open_remembered_cabinet",
     "retrieve_can",
     "place_on_table",
 )
 STAGE_LABELS = {
-    "close_first_door": "关第一扇柜门",
-    "close_second_door": "关第二扇柜门",
-    "canonical_reset": "回到中性位",
+    "close_first_door": "关闭任意一扇柜门",
+    "close_second_door": "关闭两扇柜门",
     "open_remembered_cabinet": "打开记忆柜",
     "retrieve_can": "取回罐头",
     "place_on_table": "放回桌面",
 }
-STAGE_PREREQUISITES: dict[str, str | tuple[str, ...] | None] = {
-    "close_first_door": None,
-    "close_second_door": "close_first_door",
-    "canonical_reset": "close_second_door",
-    "open_remembered_cabinet": "canonical_reset",
-    "retrieve_can": "open_remembered_cabinet",
-    "place_on_table": "retrieve_can",
+STAGE_PREREQUISITES: dict[str, str | None] = {
+    name: None if index == 0 else STAGE_ORDER[index - 1]
+    for index, name in enumerate(STAGE_ORDER)
 }
 REPORT_STAGE_ORDER = WR03_REPORT_PROFILE.stage_ids
 REPORT_STAGE_PROFILE_ID = WR03_REPORT_PROFILE.profile_id
 TASK_EVALUATOR_METADATA_KEY = "task_evaluator"
 
 _REPORT_STAGE_SOURCES = {
-    "can_stored": "close_first_door",
-    "storage_hidden": "canonical_reset",
+    "one_door_closed": "close_first_door",
+    "both_doors_closed": "close_second_door",
     "correct_cabinet_opened": "open_remembered_cabinet",
     "success": "place_on_table",
 }
@@ -64,20 +58,14 @@ class WR03EvaluationSnapshot:
     """One read-only physical/semantic observation for the evaluator."""
 
     step_id: int
-    close_order: tuple[str, str] = ("upper", "lower")
-    can_grasped: bool = False
     stored_level: str | None = None
-    closed_levels_after_storage: frozenset[str] = frozenset()
     storage_hidden: bool = False
     lower_door_closed: bool = False
     upper_door_closed: bool = False
     opened_level: str | None = None
-    wrong_retrieval_level_opened: bool = False
     retrieved_item_id: str | None = None
     can_outside_both: bool = False
-    other_door_closed: bool = False
     protocol_violation: bool = False
-    canonical_reset: bool = False
     final_placement_verified: bool = False
     details: Mapping[str, Any] = field(default_factory=dict)
 
@@ -86,12 +74,6 @@ class WR03EvaluationSnapshot:
         if step < 0:
             raise ValueError("WR-03 evaluation step_id must be non-negative")
         stored = None if self.stored_level is None else _level(self.stored_level)
-        close_order = tuple(_level(value) for value in self.close_order)
-        if len(close_order) != 2 or set(close_order) != set(CABINET_LEVELS):
-            raise ValueError("WR-03 close_order must contain lower and upper")
-        closed_levels = frozenset(
-            _level(level) for level in (self.closed_levels_after_storage or ())
-        )
         opened = None if self.opened_level is None else _level(self.opened_level)
         retrieved = (
             None
@@ -100,29 +82,18 @@ class WR03EvaluationSnapshot:
         )
         if retrieved is not None and retrieved != CAN_ID:
             raise ValueError(f"invalid WR-03 retrieved item id: {retrieved!r}")
-        if bool(self.storage_hidden) and (
-            stored is None or closed_levels != frozenset(CABINET_LEVELS)
-        ):
-            raise ValueError(
-                "WR-03 storage_hidden requires stored can and both "
-                "post-storage door-close events"
-            )
+        if bool(self.storage_hidden) and stored is None:
+            raise ValueError("WR-03 storage_hidden requires a stored can")
         object.__setattr__(self, "step_id", step)
-        object.__setattr__(self, "close_order", close_order)
         object.__setattr__(self, "stored_level", stored)
-        object.__setattr__(self, "closed_levels_after_storage", closed_levels)
         object.__setattr__(self, "opened_level", opened)
         object.__setattr__(self, "retrieved_item_id", retrieved)
         for name in (
-            "can_grasped",
             "storage_hidden",
             "lower_door_closed",
             "upper_door_closed",
-            "wrong_retrieval_level_opened",
             "can_outside_both",
-            "other_door_closed",
             "protocol_violation",
-            "canonical_reset",
             "final_placement_verified",
         ):
             object.__setattr__(self, name, bool(getattr(self, name)))
@@ -138,26 +109,17 @@ class WR03EvaluationSnapshot:
             self.storage_hidden
             and self.stored_level is not None
             and self.opened_level == self.stored_level
-            and not self.wrong_retrieval_level_opened
-            and not self.protocol_violation
-        )
-
-    @property
-    def final_retrieval_valid(self) -> bool:
-        return bool(
-            self.retrieved_item_id == CAN_ID
-            and self.can_outside_both
-            and self.correct_cabinet_opened
-            and self.other_door_closed
             and not self.protocol_violation
         )
 
     def raw_stage_values(self) -> dict[str, bool]:
+        # First/second count currently closed doors, not sampled door identities
+        # or accumulated close events. Both doors must be closed together.
+        stored = self.stored_level is not None
         return {
-            "close_first_door": bool(self.close_order[0] in self.closed_levels_after_storage),
-            "close_second_door": bool(self.close_order[1] in self.closed_levels_after_storage),
-            "canonical_reset": self.canonical_reset,
-            "open_remembered_cabinet": self.opened_level is not None,
+            "close_first_door": stored and (self.lower_door_closed or self.upper_door_closed),
+            "close_second_door": stored and self.both_doors_closed,
+            "open_remembered_cabinet": self.correct_cabinet_opened,
             "retrieve_can": self.retrieved_item_id is not None,
             "place_on_table": self.final_placement_verified,
         }
@@ -204,6 +166,11 @@ class WR03EvalResult:
         }
         legacy_checks = dict(payload.get("success_checks") or {})
         evaluation = dict(payload.get("evaluation") or {})
+        evaluation.setdefault("raw_stage_checks", payload.get("raw_stage_checks", {}))
+        evaluation.setdefault(
+            "rejected_stage_observations",
+            payload.get("rejected_stage_observations", {}),
+        )
         evaluation.update(
             {
                 "schema_version": 1,
@@ -212,10 +179,7 @@ class WR03EvalResult:
                 "stage_labels": dict(STAGE_LABELS),
                 "stage_prerequisites": dict(STAGE_PREREQUISITES),
                 "qualification_policy": "rising_edge_after_prerequisite",
-                "raw_stage_checks": payload.get("raw_stage_checks", {}),
-                "rejected_stage_observations": payload.get(
-                    "rejected_stage_observations", {}
-                ),
+                "door_order_policy": "unordered",
             }
         )
         payload["evaluation"] = evaluation
@@ -274,12 +238,9 @@ class _MutableStage:
 
 
 class WR03Evaluator:
-    """Strict ordered evaluator backed by read-only WR-03 observations."""
+    """Five task stages; neutral reset belongs only to the expert plan."""
 
-    def __init__(self, close_order: tuple[str, str] = ("upper", "lower")) -> None:
-        self.close_order = tuple(_level(value) for value in close_order)
-        if len(self.close_order) != 2 or set(self.close_order) != set(CABINET_LEVELS):
-            raise ValueError("WR-03 close_order must contain lower and upper")
+    def __init__(self) -> None:
         self._stages = {name: _MutableStage() for name in STAGE_ORDER}
         self._rejected: dict[str, list[dict[str, Any]]] = {
             name: [] for name in STAGE_ORDER
@@ -290,11 +251,11 @@ class WR03Evaluator:
         self._cached_result: WR03EvalResult | None = None
 
     def reset(self, snapshot: WR03EvaluationSnapshot) -> WR03EvalResult:
-        if snapshot.close_order != self.close_order:
-            raise ValueError("WR-03 evaluation snapshot close_order changed")
         self._stages = {name: _MutableStage() for name in STAGE_ORDER}
         self._rejected = {name: [] for name in STAGE_ORDER}
-        self._terminal_failure_code = None
+        self._terminal_failure_code = (
+            "protocol_violation" if snapshot.protocol_violation else None
+        )
         raw = snapshot.raw_stage_values()
         for name, value in raw.items():
             if value:
@@ -306,8 +267,6 @@ class WR03Evaluator:
         return self._cached_result
 
     def observe(self, snapshot: WR03EvaluationSnapshot) -> WR03EvalResult:
-        if snapshot.close_order != self.close_order:
-            raise ValueError("WR-03 evaluation snapshot close_order changed")
         if self._last_step_id is None:
             return self.reset(snapshot)
         if snapshot.step_id == self._last_step_id:
@@ -319,12 +278,14 @@ class WR03Evaluator:
                 "WR-03 evaluation step moved backwards: "
                 f"{snapshot.step_id} < {self._last_step_id}"
             )
-        # Failure states are absorbing. A successful result is deliberately
-        # re-evaluated on later steps because WR-03 uses full-horizon final
-        # validation: opening the other door or putting the can back must revoke
-        # the final success, even though the historical stages remain qualified.
-        if self._terminal_failure_code is not None:
-            return self._cached_result or self._build_result(snapshot)
+        if self._cached_result is not None and self._cached_result.terminal:
+            return self._cached_result
+
+        if snapshot.protocol_violation:
+            self._terminal_failure_code = "protocol_violation"
+            self._last_step_id = snapshot.step_id
+            self._cached_result = self._build_result(snapshot)
+            return self._cached_result
 
         raw = snapshot.raw_stage_values()
         qualified_before = {
@@ -335,8 +296,6 @@ class WR03Evaluator:
             if value:
                 self._mark_observed(name, snapshot.step_id)
 
-        if snapshot.protocol_violation:
-            self._terminal_failure_code = "protocol_violation"
         for name in STAGE_ORDER:
             if (
                 not raw[name]
@@ -345,38 +304,19 @@ class WR03Evaluator:
             ):
                 continue
             prerequisite = STAGE_PREREQUISITES[name]
-            if isinstance(prerequisite, tuple):
-                # The two doors may close in either order. The memory barrier
-                # can become visible in the same sample as the second close.
-                prerequisite_qualified = bool(
-                    all(qualified_now[value] for value in prerequisite)
-                )
-                prerequisite_reason = (
-                    "prerequisites_not_qualified:" + ",".join(
-                        value
-                        for value in prerequisite
-                        if not qualified_now[value]
-                    )
-                )
-            else:
-                prerequisite_qualified = (
-                    prerequisite is None or qualified_now[prerequisite]
-                )
-                prerequisite_reason = (
-                    f"prerequisite_not_qualified:{prerequisite}"
-                )
-            if not prerequisite_qualified:
+            if prerequisite is not None and not qualified_now[prerequisite]:
                 self._reject(
                     name,
                     snapshot.step_id,
-                    prerequisite_reason,
+                    f"prerequisite_not_qualified:{prerequisite}",
                 )
                 continue
             reason = self._stage_validation_failure(name, snapshot)
             if reason is not None:
                 self._reject(name, snapshot.step_id, reason)
-                if name in {"open_remembered_cabinet", "retrieve_can"}:
+                if name == "retrieve_can":
                     self._terminal_failure_code = reason
+                    break
                 continue
             self._qualify(name, snapshot.step_id)
             qualified_now[name] = True
@@ -396,21 +336,11 @@ class WR03Evaluator:
         name: str,
         snapshot: WR03EvaluationSnapshot,
     ) -> str | None:
-        if name == "open_remembered_cabinet":
-            if snapshot.wrong_retrieval_level_opened:
-                return "wrong_retrieval_cabinet"
-            if not snapshot.correct_cabinet_opened:
-                return "wrong_retrieval_cabinet"
-        elif name == "canonical_reset":
-            if not snapshot.canonical_reset:
-                return "canonical_reset_not_reached"
-        elif name == "retrieve_can":
+        if name == "retrieve_can":
             if snapshot.retrieved_item_id != CAN_ID:
                 return "wrong_item_retrieved"
             if not snapshot.can_outside_both:
                 return "can_not_extracted"
-            if not snapshot.other_door_closed:
-                return "other_door_not_closed"
             if not snapshot.correct_cabinet_opened:
                 return "wrong_retrieval_cabinet"
         elif name == "place_on_table":
@@ -447,24 +377,12 @@ class WR03Evaluator:
             reason = str(rejected[-1]["reason"])
         else:
             prerequisite = STAGE_PREREQUISITES[name]
-            if isinstance(prerequisite, tuple):
-                missing = [
-                    value
-                    for value in prerequisite
-                    if not self._stages[value].qualified
-                ]
-                reason = (
-                    "waiting_for_prerequisites:" + ",".join(missing)
-                    if missing
-                    else "not_observed"
-                )
-            else:
-                reason = (
-                    f"waiting_for_prerequisite:{prerequisite}"
-                    if prerequisite is not None
-                    and not self._stages[prerequisite].qualified
-                    else "not_observed"
-                )
+            reason = (
+                f"waiting_for_prerequisite:{prerequisite}"
+                if prerequisite is not None
+                and not self._stages[prerequisite].qualified
+                else "not_observed"
+            )
             invalidated = False
         return StageEvalResult(
             observed=stage.observed,
@@ -477,8 +395,9 @@ class WR03Evaluator:
 
     def _build_result(self, snapshot: WR03EvaluationSnapshot) -> WR03EvalResult:
         stages = {name: self._stage_result(name) for name in STAGE_ORDER}
-        final_valid = snapshot.final_retrieval_valid
-        success = bool(stages[STAGE_ORDER[-1]].qualified and final_valid)
+        success = bool(
+            stages[STAGE_ORDER[-1]].qualified and self._terminal_failure_code is None
+        )
         details = dict(snapshot.details)
         evaluation = dict(details.get("evaluation") or {})
         evaluation.update(
