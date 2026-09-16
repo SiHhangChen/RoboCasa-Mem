@@ -21,9 +21,9 @@
     "drawer": 2
   },
   "samples": [
-    {"index": 0, "name": "navigation_start", "xy": [3.17, -1.166], "yaw": -0.048},
-    {"index": 1, "name": "first_left_forward_before_turn", "xy": [4.332, -1.171], "yaw": -0.048},
+    {"index": 0, "name": "navigation_start", "xy": [3.17, -1.166], "yaw": -0.048, "sampling": {"shape": "disk", "radius_m": 0.05, "yaw_half_range_rad": 0.0}},
+    {"index": 1, "name": "first_left_forward_before_turn", "xy": [4.332, -1.171], "yaw": -0.048, "sampling": {"shape": "disk", "radius_m": 0.05, "yaw_half_range_rad": 0.0}},
     {"index": 2, "name": "drawer_station", "xy": [4.85, -1.37], "yaw": -1.5707963267948966},
-    {"index": 3, "name": "completion_button_station", "xy": [3.85, -1.37], "yaw": -1.5707963267948966}
+    {"index": 3, "name": "completion_button_station", "xy": [3.85, -1.37], "yaw": -1.5707963267948966, "sampling": {"shape": "disk", "radius_m": 0.05, "yaw_half_range_rad": 0.0}}
   ]
 }

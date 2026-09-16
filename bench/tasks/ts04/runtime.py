@@ -63,6 +63,7 @@ def _environment(
         "drawer_world_yaw_deg": scene.drawer_world_yaw_deg,
         "completion_button_world_xyz": scene.completion_button_world_xyz,
         "target_fixture": plan.target_fixture,
+        "drawer_material_by_fixture": dict(plan.drawer_material_by_fixture),
         "open_threshold": scene.open_threshold,
         "closed_threshold": scene.closed_threshold,
         "button_pressed_threshold_m": float(

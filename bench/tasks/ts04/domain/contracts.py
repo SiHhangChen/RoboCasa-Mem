@@ -9,7 +9,7 @@ from collections.abc import Mapping
 from typing import Any
 
 TASK_ID = "TS04"
-TASK_REVISION = "TS04-v1"
+TASK_REVISION = "TS04-v1.1"
 PARENT_TASK_ID = ""
 ENV_NAME = "TS04InspectTwoDrawers"
 DISPLAY_NAME = "Inspect Two Drawers"
@@ -27,11 +27,22 @@ DRAWER_WORLD_XYZS = (
 COMPLETION_BUTTON_WORLD_XYZ = (3.85, -2.06, 0.92)
 
 @dataclass(frozen=True)
+class DrawerOpenVariation:
+    prehook_variant: str
+    prehook_rotation_offset_deg: tuple[float, float, float]
+    handle_side_offset_m: float
+
+
+@dataclass(frozen=True)
 class EpisodePlan:
     seed: int
     demo_fixture_order: tuple[str, str]
     target_fixture: str
     max_horizon: int
+    drawer_material_by_fixture: Mapping[str, str] = field(default_factory=dict)
+    drawer_open_variation_by_fixture: Mapping[str, DrawerOpenVariation] = field(
+        default_factory=dict
+    )
 
 @dataclass(frozen=True)
 class SceneConfig:
@@ -115,7 +126,7 @@ class TaskConfig:
 
 __all__ = [
     "AXIS",
-    "ActionConfig", "EpisodePlan", "InitialStateConfig", "RobotBaseConfig", "RobotBaseMode", "RunContext", "SceneConfig", "TaskConfig", "TaskDefinition",
+    "ActionConfig", "DrawerOpenVariation", "EpisodePlan", "InitialStateConfig", "RobotBaseConfig", "RobotBaseMode", "RunContext", "SceneConfig", "TaskConfig", "TaskDefinition",
     "COMPLETION_BUTTON_WORLD_XYZ",
     "DISPLAY_NAME",
     "DRAWER_WORLD_XYZS",

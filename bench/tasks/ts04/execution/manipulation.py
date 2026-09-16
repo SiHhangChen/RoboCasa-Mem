@@ -21,9 +21,11 @@ from bench.execution.planning import (
 from bench.execution.planning.mplib_planner import run_mplib_planner_subprocess
 from bench.tasks.ts04.domain.contracts import ENV_NAME
 from bench.tasks.ts04.execution.geometry import (
+    DrawerMotionFrame,
     drawer_pull_target_positions,
     pose_matrix,
     resolve_drawer_motion_frame,
+    vary_drawer_grasp_targets,
 )
 
 
@@ -38,6 +40,8 @@ class DrawerPullConfig:
     hook_orientation_blend: float = 0.90
     handle_side_offset: float = 0.0
     handle_vertical_offset: float = 0.0
+    prehook_variant: str = "baseline"
+    prehook_rotation_offset_deg: tuple[float, float, float] = (0.0, 0.0, 0.0)
     prehook_distance: float = 0.125
     hook_offset: float = 0.005
     pull_distance: float = 0.125
@@ -125,35 +129,9 @@ def open_drawer_physically(
             hook_orientation_blend=float(config.hook_orientation_blend),
         )
         initial_handle = np.asarray(env.sim.data.geom_xpos[handle_id], dtype=float)
-        calibrated_targets: dict[str, np.ndarray] | None = None
-        pose_metadata: dict[str, Any] | None = None
-        if config.grasp_pose_file is not None:
-            calibrated_targets, pose_metadata = _load_drawer_grasp_targets(
-                Path(config.grasp_pose_file),
-                handle_world=initial_handle,
-            )
-            target_matrices = {
-                "prehook": calibrated_targets["prehook"],
-                "hook": calibrated_targets["hook"],
-            }
-            target_matrices["pull"] = calibrated_targets["hook"].copy()
-            target_matrices["pull"][:3, 3] += (
-                frame.open_direction_world * float(config.pull_distance)
-            )
-        else:
-            targets = drawer_pull_target_positions(
-                initial_handle,
-                frame,
-                prehook_distance=float(config.prehook_distance),
-                hook_offset=float(config.hook_offset),
-                pull_distance=float(config.pull_distance),
-                handle_side_offset=float(config.handle_side_offset),
-                handle_vertical_offset=float(config.handle_vertical_offset),
-            )
-            target_matrices = {
-                name: pose_matrix(position, frame.hook_rotation_world)
-                for name, position in targets.items()
-            }
+        target_matrices, pose_metadata = _drawer_pull_targets(
+            initial_handle, frame, config
+        )
         gripper_result: dict[str, Any] | None = None
         if int(config.gripper_steps) > 0:
             gripper_result = controller.driver.run_gripper(
@@ -205,28 +183,8 @@ def open_drawer_physically(
                     env, str(fixture.name)
                 )
             live_handle = np.asarray(env.sim.data.geom_xpos[handle_id], dtype=float)
-            if calibrated_targets is not None:
-                live_calibrated, _ = _load_drawer_grasp_targets(
-                    Path(config.grasp_pose_file),
-                    handle_world=live_handle,
-                )
-                pull_target = live_calibrated["hook"].copy()
-                pull_target[:3, 3] += (
-                    frame.open_direction_world * float(config.pull_distance)
-                )
-            else:
-                live_targets = drawer_pull_target_positions(
-                    live_handle,
-                    frame,
-                    prehook_distance=float(config.prehook_distance),
-                    hook_offset=float(config.hook_offset),
-                    pull_distance=float(config.pull_distance),
-                    handle_side_offset=float(config.handle_side_offset),
-                    handle_vertical_offset=float(config.handle_vertical_offset),
-                )
-                pull_target = pose_matrix(
-                    live_targets["pull"], frame.hook_rotation_world
-                )
+            live_targets, _ = _drawer_pull_targets(live_handle, frame, config)
+            pull_target = live_targets["pull"]
             pull = run(
                 "pull",
                 pull_target,
@@ -269,10 +227,14 @@ def open_drawer_physically(
             "open_direction_world": frame.open_direction_world.tolist(),
             "target_source": (
                 "calibrated_pose_file"
-                if calibrated_targets is not None
+                if config.grasp_pose_file is not None
                 else "procedural_geometry"
             ),
             "grasp_pose": pose_metadata,
+            "prehook_variant": config.prehook_variant,
+            "prehook_rotation_offset_deg": list(config.prehook_rotation_offset_deg),
+            "handle_side_offset": float(config.handle_side_offset),
+            "handle_vertical_offset": float(config.handle_vertical_offset),
             "targets_world": {
                 name: value[:3, 3].astype(float).tolist()
                 for name, value in target_matrices.items()
@@ -464,6 +426,41 @@ def _make_planner(script: Path, *, conda_env: str, timeout_s: float | None):
         return result
 
     return plan
+
+
+def _drawer_pull_targets(
+    handle_world: np.ndarray,
+    frame: DrawerMotionFrame,
+    config: DrawerPullConfig,
+) -> tuple[dict[str, np.ndarray], dict[str, Any] | None]:
+    metadata = None
+    if config.grasp_pose_file is not None:
+        targets, metadata = _load_drawer_grasp_targets(
+            Path(config.grasp_pose_file), handle_world=handle_world
+        )
+        targets["pull"] = targets["hook"].copy()
+        targets["pull"][:3, 3] += (
+            frame.open_direction_world * float(config.pull_distance)
+        )
+    else:
+        positions = drawer_pull_target_positions(
+            handle_world,
+            frame,
+            prehook_distance=float(config.prehook_distance),
+            hook_offset=float(config.hook_offset),
+            pull_distance=float(config.pull_distance),
+        )
+        targets = {
+            name: pose_matrix(position, frame.hook_rotation_world)
+            for name, position in positions.items()
+        }
+    return vary_drawer_grasp_targets(
+        targets,
+        frame,
+        handle_side_offset=float(config.handle_side_offset),
+        handle_vertical_offset=float(config.handle_vertical_offset),
+        prehook_rotation_offset_deg=config.prehook_rotation_offset_deg,
+    ), metadata
 
 
 def _load_drawer_grasp_targets(

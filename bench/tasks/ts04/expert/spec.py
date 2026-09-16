@@ -19,13 +19,27 @@ def build_expert_plan(inputs: ExpertPlanInputs):
     actions = inputs.action_config
     stages = []
     for fixture in fixtures:
+        variation = dict(
+            episode.facts.get("drawer_open_variation_by_fixture", {}).get(
+                fixture, {}
+            )
+        )
+        side_offset = float(actions.drawer_open_metadata.get("handle_side_offset", 0.0))
+        if variation:
+            variation["handle_side_offset"] = side_offset + float(
+                variation.pop("handle_side_offset_m")
+            )
         stages.extend([
-            navigate("drawer_station", name=f"navigate_{fixture}"),
+            navigate(
+                "drawer_station",
+                name=f"navigate_{fixture}",
+                metadata={"use_sampled_terminal_pose": True},
+            ),
             operate(
                 "open_fixture",
                 fixture,
                 name=f"open_{fixture}",
-                metadata=actions.drawer_open_metadata,
+                metadata={**dict(actions.drawer_open_metadata), **variation},
             ),
             operate(
                 "inspect_fixture",
@@ -66,6 +80,12 @@ def build_expert_plan(inputs: ExpertPlanInputs):
             "target_fixture": target_fixture,
             "search_count": search_count,
             "required_button_presses": search_count,
+            "drawer_material_by_fixture": dict(
+                episode.facts.get("drawer_material_by_fixture", {})
+            ),
+            "drawer_open_variation_by_fixture": dict(
+                episode.facts.get("drawer_open_variation_by_fixture", {})
+            ),
         },
     )
 

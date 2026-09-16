@@ -47,6 +47,22 @@ episode:
   # target_fixture is intentionally unset so each seed deterministically places
   # the red cube in exactly one drawer, independently of the search order.
   max_horizon: 1800
+  # Each cabinet frame and complete drawer share one finish. Handles stay dark.
+  drawer_material_candidates:
+    - wood/light_wood_planks
+    - wood/walnut_wood_grain
+    - wood/gray_wood_grain
+    - wood/bamboo
+    - flat/white
+    - flat/blue_gray
+    - flat/green
+    - steel-brushed
+  # Intrinsic tool-frame XYZ rotations relative to the calibrated prehook.
+  prehook_rotation_candidates_deg:
+    baseline: [0.0, 0.0, 0.0]
+    pitch_minus_5: [0.0, -5.0, 0.0]
+    pitch_plus_3: [0.0, 3.0, 0.0]
+  handle_side_offset_half_range_m: 0.015
 
 initial_state:
   robot_base:
@@ -143,12 +159,15 @@ operations:
     actuation_mode: contact
     open_fraction: 1.0
     enforce_proximity: true
-    max_base_distance: 1.05
+    # Include the 7.5 cm station radius and 3 cm navigation tolerance.
+    max_base_distance: 1.15
     hook_orientation_blend: 0.90
     handle_side_offset: 0.0
     handle_vertical_offset: 0.0
     prehook_distance: 0.125
     hook_offset: 0.005
+    # Preserve TS04's validated close-cycle margin while clearing the 0.70
+    # open threshold across the sampled station disk.
     pull_distance: 0.18
     open_fraction_threshold: 0.70
     gripper_steps: 25

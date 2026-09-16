@@ -8,6 +8,26 @@ target drawer, and then presses the completion button once per inspected drawer.
 This package directly owns TS04's canonical episode, RoboCasa scene, semantics,
 expert plan, runtime composition, and resources.
 
+Version 1.1.0 adds the same independent seeded drawer variation used by TS02
+while preserving TS04's two-drawer target, search-order, evaluator, and prompt
+semantics:
+
+- Each drawer independently samples one of eight body finishes. The fixed
+  cabinet frame and complete drawer share the finish; the handle and mounts
+  remain dark.
+- Every drawer check samples the Base uniformly inside the 15 cm diameter disk
+  centered at `(4.85, -1.37)`, with yaw sampled from `-90 +/- 5` degrees.
+- The three pure-position manual-path points sample independently inside 10 cm
+  diameter disks using the episode seed.
+- The prehook uses the calibrated orientation or a conservative pitch offset
+  of -5 or +3 degrees. Hook and pull orientations remain calibrated.
+- The complete approach shifts uniformly by up to 1.5 cm along the handle's
+  long axis, including pull targets recomputed from the live handle position.
+
+Random finishes and grasp variations are stored in resolved episode facts and
+expert metadata, never in policy-visible prompts. Their independent seed
+streams do not alter the existing target location or search order.
+
 Stage-conditioned evaluation uses the same handoff protocol as TS02, with TS04's
 own two-drawer evaluator and actual search length (one or two button presses):
 

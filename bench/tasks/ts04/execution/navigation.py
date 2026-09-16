@@ -115,6 +115,8 @@ def build_navigation_assembly(
     seed: int,
     base_driver: Any | None = None,
 ) -> NavigationAssembly:
+    # Keep manual-path waypoint randomization tied to the episode seed.
+    config = replace(config, manual_base_path_seed=int(seed))
     adapter = RoboCasaNavigationAdapter(env, obs, station_specs_provider=station_specs)
     driver = base_driver or BaseDriverAdapter(env, obs, nav_config=config)
     pose_provider = driver if hasattr(driver, "current_base_xy") else adapter

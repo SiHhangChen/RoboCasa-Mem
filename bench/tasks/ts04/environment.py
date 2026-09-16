@@ -3,11 +3,19 @@
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
+from collections.abc import Mapping
+from pathlib import Path
 from typing import Any
 
 import numpy as np
 
 from robocasa.environments.kitchen.kitchen import FixtureType, Kitchen
+from robocasa.models import assets_root
+
+from bench.tasks.families.drawer_inspection.materials import (
+    DRAWER_MATERIAL_TEXTURES,
+    apply_drawer_material,
+)
 
 from bench.tasks.ts04.button_asset import (
     TS04_BUTTON_MAX_TRAVEL_M,
@@ -86,6 +94,7 @@ class TS04InspectTwoDrawers(Kitchen):
             DEFAULT_COMPLETION_BUTTON_WORLD_XYZ
         ),
         target_fixture: str = FIXTURE_NAMES[0],
+        drawer_material_by_fixture: Mapping[str, str] | None = None,
         open_threshold: float = 0.70,
         closed_threshold: float = 0.08,
         button_pressed_threshold_m: float = 0.004,
@@ -119,6 +128,14 @@ class TS04InspectTwoDrawers(Kitchen):
         self.target_fixture = str(target_fixture)
         if self.target_fixture not in names:
             raise ValueError("TS04 target_fixture must name one of the two drawers")
+        finishes = dict(drawer_material_by_fixture or {})
+        if set(finishes) - set(names):
+            raise ValueError("TS04 drawer materials name unknown fixtures")
+        self.drawer_material_by_fixture = {
+            fixture: str(finishes.get(fixture, "original")) for fixture in names
+        }
+        if set(self.drawer_material_by_fixture.values()) - DRAWER_MATERIAL_TEXTURES.keys():
+            raise ValueError("TS04 drawer materials contain unknown finishes")
         self.open_threshold = float(open_threshold)
         self.closed_threshold = float(closed_threshold)
         self._physical_observer = TS04PhysicalObserver(
@@ -157,6 +174,13 @@ class TS04InspectTwoDrawers(Kitchen):
 
         xml_str = super().edit_model_xml(xml_str)
         root = ET.fromstring(xml_str)
+        for fixture, material_id in self.drawer_material_by_fixture.items():
+            apply_drawer_material(
+                root,
+                fixture_name=self.drawer_fixture_names[fixture],
+                material_id=material_id,
+                texture_root=Path(assets_root) / "textures",
+            )
         worldbody = root.find("worldbody")
         if worldbody is None:
             return xml_str
