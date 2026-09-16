@@ -125,6 +125,8 @@ def test_wa03_marked_compatibility_restores_old_prompt_and_target() -> None:
     assert descriptor.environment.env_kwargs == {
         "sugar_target_mode": "marked",
         "target_sugared_coffee_id": target,
+        "coffee_material_by_id": dict(episode.facts["coffee_material_by_id"]),
+        "sugar_cube_material": episode.facts["sugar_cube_material"],
     }
 
 

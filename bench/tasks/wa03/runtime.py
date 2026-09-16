@@ -23,7 +23,10 @@ from bench.tasks.wa03.evaluation import (
     report_stages_for_runtime,
     success_for_runtime,
 )
-from bench.tasks.wa03.execution.navigation import build_navigation_config
+from bench.tasks.wa03.execution.navigation import (
+    build_navigation_config,
+    resolve_station_randomization,
+)
 from bench.tasks.wa03.expert.operations import build_operation_handlers
 from bench.tasks.wa03.initialization import apply_fixed_initial_object_regions, apply_robot_base_initial_state
 from bench.tasks.wa03.prompts import resolve_prompt_spec
@@ -43,6 +46,8 @@ def _environment(config: Any, scene: Any, plan: Any, resources: Mapping[str, Any
     return {
         "sugar_target_mode": plan.sugar_target_mode,
         "target_sugared_coffee_id": plan.target_sugared_coffee_id,
+        "coffee_material_by_id": dict(plan.coffee_material_by_id),
+        "sugar_cube_material": str(plan.sugar_cube_material),
     }
 
 
@@ -64,7 +69,9 @@ def _initialize(descriptor: Any, env: Any, observation: Mapping[str, Any]):
         env, updated,
         config=descriptor.config.initial_state.robot_base,
         nav_config=descriptor.navigation,
-        seed=descriptor.scene.scene_seed,
+        seed=descriptor.episode_plan.seed,
+        randomization=resolve_station_randomization(descriptor.config.navigation),
+        settings=descriptor.config.navigation,
     )
     evaluator = WA03Evaluator(
         sugar_target_mode=descriptor.episode_plan.sugar_target_mode,

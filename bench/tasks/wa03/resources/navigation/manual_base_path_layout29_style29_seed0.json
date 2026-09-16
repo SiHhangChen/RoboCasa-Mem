@@ -4,7 +4,7 @@
     "layout_id": 29,
     "style_id": 29,
     "seed": 0,
-    "description": "WA-03 three-point manual base path."
+    "description": "WA-03 two-station manual base path. Intermediate turn samples are not stations."
   },
   "default_start_index": 0,
   "station_targets": {
@@ -12,35 +12,30 @@
     "coffee_machine": 0,
     "coffee_machine_station": 0,
     "coffee_A": 0,
-    "coffee_A:pick": {"index": 0, "routes": {"2": [2, 1, 0]}},
+    "coffee_A:pick": {"index": 0, "routes": {"1": [1, 0]}},
     "coffee_B": 0,
-    "coffee_B:pick": {"index": 0, "routes": {"2": [2, 1, 0]}},
+    "coffee_B:pick": {"index": 0, "routes": {"1": [1, 0]}},
     "coffee_C": 0,
-    "coffee_C:pick": {"index": 0, "routes": {"2": [2, 1, 0]}},
+    "coffee_C:pick": {"index": 0, "routes": {"1": [1, 0]}},
     "sugar": 0,
     "sugar_cube": 0,
     "sugar_plate": 0,
-    "coffee_turn": 1,
-    "dining_table_station": 2,
-    "dining_table": 2,
-    "dining_counter": 2,
-    "dining_delivery": {"index": 2, "routes": {"0": [0, 1, 2]}}
+    "dining_table_station": 1,
+    "dining_table": 1,
+    "dining_counter": 1,
+    "dining_delivery": {"index": 1, "routes": {"0": [0, 1]}}
   },
   "samples": [
     {
       "index": 0,
+      "station_id": "coffee_machine_station",
       "name": "coffee_machine_front",
       "xy": [0.244, -5.274],
       "yaw": 3.141
     },
     {
       "index": 1,
-      "name": "coffee_turn",
-      "xy": [0.667, -5.5],
-      "yaw": 0.067
-    },
-    {
-      "index": 2,
+      "station_id": "dining_table_station",
       "name": "dining_place",
       "xy": [1.151, -5.259],
       "yaw": 0.072

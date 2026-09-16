@@ -114,6 +114,8 @@ def build_expert_plan(inputs: ExpertPlanInputs) -> ExpertPlan:
         "dining_region_config": dining_region_config_summary(actions.dining_region_config),
         "dining_regions_by_slot": dict(actions.dining_regions_by_slot),
         "sampled_dining_targets_by_slot": dict(actions.sampled_dining_targets_by_slot),
+        "coffee_material_by_id": dict(facts.get("coffee_material_by_id") or {}),
+        "sugar_cube_material": facts.get("sugar_cube_material"),
     })
 
 

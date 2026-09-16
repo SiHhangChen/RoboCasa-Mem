@@ -99,6 +99,8 @@ class EpisodePlan:
     target_sugared_coffee_id: str | None
     delivery_order: tuple[str, ...]
     final_slot_assignment: Mapping[str, str]
+    coffee_material_by_id: Mapping[str, str]
+    sugar_cube_material: str
     max_horizon: int
 
 
