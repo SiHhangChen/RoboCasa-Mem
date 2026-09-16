@@ -14,6 +14,7 @@ from bench.execution.manipulation.drivers import (
     TrajectoryStopCheck,
 )
 from bench.execution.manipulation.pick_payloads import PickPayloadSelector, resolve_pick_payload
+from bench.execution.manipulation.finger_alignment import measure_finger_pad_center
 from bench.execution.manipulation.planning_bridge import (
     ManipulationRuntimeConfig,
     PlannedStageExecutor,
@@ -385,6 +386,15 @@ class ManipulationController:
                 "steps": 0,
             }
         )
+        finger_alignment = {"enabled": False, "pass": True}
+        if pregrasp["pass"] and _truthy(kwargs.get("align_preshape_finger_center"), default=False):
+            if self.runtime_config.execute:
+                finger_alignment = self._align_preshape_fingers(
+                    payload, object_name=object_name, initial_object_pos=initial_object_pos,
+                    post_step_callback=post_step_callback,
+                )
+            else:
+                finger_alignment = {"enabled": True, "pass": True, "skipped": "dry_run"}
         grasp = (
             self.stage_executor.run(
                 payload["poses"]["grasp"]["base"],
@@ -394,8 +404,8 @@ class ManipulationController:
                 post_step_callback=post_step_callback,
                 settle_steps=_stage_settle_steps(kwargs, "grasp"),
             )
-            if pregrasp["pass"]
-            else skipped_stage("grasp", "pregrasp_failed")
+            if pregrasp["pass"] and finger_alignment["pass"]
+            else skipped_stage("grasp", "pregrasp_or_finger_alignment_failed")
         )
         grasp_for_close = bool(grasp.get("pass", False)) or self._accept_pick_grasp_near_miss(
             grasp,
@@ -498,6 +508,8 @@ class ManipulationController:
             ]
         stages.extend(post_grasp_stages)
         checks = self._stage_checks(stages, command_name="close", command=close_result)
+        if finger_alignment["enabled"]:
+            checks["finger_center_alignment"] = bool(finger_alignment["pass"])
         grasp_validation = self._pick_grasp_validation(
             object_name,
             initial_object_pos=initial_object_pos,
@@ -553,6 +565,7 @@ class ManipulationController:
             "target_poses": payload["poses"],
             "open_gripper": self._without_obs(open_result),
             "preshape_gripper": self._without_obs(preshape_result),
+            "finger_center_alignment": finger_alignment,
             "close_gripper": self._without_obs(close_result),
             "post_close_hold": self._without_obs(post_close_hold),
             "grasp_validation_after_close": grasp_validation_after_close,
@@ -564,6 +577,80 @@ class ManipulationController:
             "dry_run": not self.runtime_config.execute,
             "pass": bool(all(checks.values())),
         }
+
+    def _align_preshape_fingers(
+        self, payload: dict[str, Any], *, object_name: str,
+        initial_object_pos: np.ndarray, post_step_callback: Any,
+    ) -> dict[str, Any]:
+        report: dict[str, Any] = {"enabled": True, "pass": False}
+        try:
+            measurement = measure_finger_pad_center(self.env)
+            report["before"] = measurement
+            target = matrix_from_json_pose(payload["poses"]["grasp"]["world"])
+            site_id = int(self.env.robots[0].eef_site_id["right"])
+            live_rotation = np.asarray(self.env.sim.data.site_xmat[site_id]).reshape(3, 3)
+            local_axis = live_rotation.T @ np.asarray(measurement["closing_axis_world"])
+            target_axis = target[:3, :3] @ local_axis
+            points = np.asarray(payload["object_bbox"]["points"], dtype=float)
+            required_opening = float(np.ptp(points @ target_axis)) + 0.004
+            report["required_opening_m"] = required_opening
+            reopen_steps = 0
+            while measurement["opening_m"] < required_opening and reopen_steps < 20:
+                self._run_gripper(-1.0, 1, post_step_callback=post_step_callback)
+                reopen_steps += 1
+                measurement = measure_finger_pad_center(self.env)
+            report.update({"after": measurement, "reopen_steps": reopen_steps})
+            if measurement["opening_m"] < required_opening:
+                report["reason"] = "insufficient_finger_opening"
+                return report
+            offset = np.asarray(measurement["pad_midpoint_in_tcp"], dtype=float)
+            # Keep the calibrated grasp depth; only compensate lateral pad offset.
+            offset[2] = 0.0
+            correction = -(target[:3, :3] @ offset)
+            object_motion = self._object_pos_world(object_name) - initial_object_pos
+            object_motion[2] = 0.0
+            correction += object_motion
+            report["object_center_world"] = (
+                np.asarray(payload["object_bbox"]["center"]) + object_motion
+            ).tolist()
+            report["correction_world_m"] = correction.tolist()
+            if float(np.linalg.norm(correction)) > 0.03:
+                report["reason"] = "finger_center_correction_exceeds_3cm"
+                return report
+            self.refresh_obs()
+            base_world = matrix_from_base_obs(self.obs)
+            corrected = copy.deepcopy(payload)
+            for name in ("grasp", "lift"):
+                pose = matrix_from_json_pose(corrected["poses"][name]["world"])
+                pose[:3, 3] += correction
+                corrected["poses"][name] = {
+                    "world": pose_from_matrix(pose),
+                    "base": pose_from_matrix(np.linalg.inv(base_world) @ pose),
+                }
+            snapshot = self._virtual_state_snapshot()
+            try:
+                validation = []
+                for name, action in (("grasp", 0.0), ("lift", 1.0)):
+                    stage = self.stage_executor.run(
+                        corrected["poses"][name]["base"], stage=name,
+                        gripper_action=action, execute=False, commit_virtual_state=True,
+                        holding_object=object_name if name == "lift" else None,
+                    )
+                    validation.append(stage)
+                    if not stage.get("pass", False):
+                        break
+                report["preflight"] = validation
+            finally:
+                self._restore_virtual_state_snapshot(snapshot)
+            if len(validation) != 2 or not all(stage.get("pass", False) for stage in validation):
+                report["reason"] = "corrected_finger_center_preflight_failed"
+                return report
+            payload["poses"] = corrected["poses"]
+            report["pass"] = True
+            return report
+        except (ValueError, KeyError, AttributeError) as error:
+            report["reason"] = str(error)
+            return report
 
     def _accept_pick_grasp_near_miss(
         self,

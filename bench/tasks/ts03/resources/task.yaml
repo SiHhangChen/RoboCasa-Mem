@@ -212,6 +212,7 @@ operations:
     grasp_clearance: -0.038
     lift_height: 0.24
     preshape_gripper_steps: 5
+    align_preshape_finger_center: true
     descent_gripper_action: 0.0
     close_gripper_action: 1.0
     held_gripper_action: 1.0
