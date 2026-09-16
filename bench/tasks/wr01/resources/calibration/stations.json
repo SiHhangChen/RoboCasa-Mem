@@ -44,28 +44,22 @@
       ]
     },
     "upper_door_station": {
-      "samples": [
-        {
-          "station_id": "upper_door_station",
-          "sample_index": 0,
-          "base_xy": [2.862, -1.243],
-          "base_yaw": 1.569,
-          "torso_height": 0.20,
-          "record_source": "task_probe_tuned_upper_door_operation"
-        }
-      ]
+      "circle": {
+        "center_xy": [2.862, -1.243],
+        "radius_m": 0.02,
+        "base_yaw": 1.569,
+        "torso_height": 0.20,
+        "record_source": "task_probe_tuned_upper_door_operation_2cm_region"
+      }
     },
     "lower_door_station": {
-      "samples": [
-        {
-          "station_id": "lower_door_station",
-          "sample_index": 0,
-          "base_xy": [2.65, -1.42],
-          "base_yaw": 1.5700056054202471,
-          "torso_height": 0.20,
-          "record_source": "terminal_manual_capture_lower_door_operation"
-        }
-      ]
+      "circle": {
+        "center_xy": [2.65, -1.42],
+        "radius_m": 0.02,
+        "base_yaw": 1.5700056054202471,
+        "torso_height": 0.20,
+        "record_source": "terminal_manual_capture_lower_door_operation_2cm_region"
+      }
     },
     "cabinet_front_station": {
       "circle": {

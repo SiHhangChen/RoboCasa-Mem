@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
+import xml.etree.ElementTree as ET
 
 import numpy as np
 
@@ -13,6 +14,7 @@ from robocasa.models.fixtures.fixture import Fixture
 from robocasa.utils.object_utils import get_fixture_to_point_rel_offset, get_pos_after_rel_offset
 
 from bench.tasks.wr03.domain.contracts import CABINET_LEVELS, CAN_ID
+from bench.tasks.wr03.cabinet_materials import CABINET_MATERIAL_TEXTURES, apply_cabinet_material
 from bench.tasks.wr03.domain.geometry import STORAGE_INTERIOR_LOCAL_CENTER, level_world_xyz, point_in_storage_interior
 from bench.tasks.wr03.domain.semantics import (
     PhysicalState, SemanticState, evaluate_success, latch_storage_hidden,
@@ -103,6 +105,7 @@ class WR03StoreAndRetrieveRememberedCan(Kitchen):
         upper_cabinet_z_offset: float = 0.40,
         object_scale: float = 0.90,
         item_placement_seed: int = 0,
+        cabinet_material_id: str = "original",
         final_closed_threshold: float = 0.08,
         cabinet_contains_margin: float = 0.04,
         physical_event_dwell_steps: int = 3,
@@ -115,6 +118,14 @@ class WR03StoreAndRetrieveRememberedCan(Kitchen):
         self._upper_cabinet_z_offset = float(upper_cabinet_z_offset)
         self._object_scale = float(object_scale)
         self._item_placement_seed = int(item_placement_seed)
+        self.cabinet_material_id = str(cabinet_material_id)
+        if self.cabinet_material_id not in CABINET_MATERIAL_TEXTURES:
+            raise ValueError(f"unknown WR-03 cabinet material: {self.cabinet_material_id!r}")
+        self.cabinet_material_randomization = {
+            "material": self.cabinet_material_id,
+            "fixtures": [LOWER_CABINET_NAME, UPPER_CABINET_NAME],
+            "applied": self.cabinet_material_id != "original",
+        }
         self.final_closed_threshold = float(final_closed_threshold)
         self.cabinet_contains_margin = float(cabinet_contains_margin)
         self.physical_event_dwell_steps = int(physical_event_dwell_steps)
@@ -146,6 +157,17 @@ class WR03StoreAndRetrieveRememberedCan(Kitchen):
         self.level_by_item = {CAN_ID: self._demo_storage_level}
         kwargs.setdefault("obj_registries", ("objaverse", "aigen", "lightwheel"))
         super().__init__(*args, **kwargs)
+
+    def edit_model_xml(self, xml_str: str) -> str:
+        xml_str = super().edit_model_xml(xml_str)
+        root = ET.fromstring(xml_str)
+        apply_cabinet_material(
+            root,
+            fixture_names=(LOWER_CABINET_NAME, UPPER_CABINET_NAME),
+            material_id=self.cabinet_material_id,
+            texture_root=Path(assets_root) / "textures",
+        )
+        return ET.tostring(root, encoding="unicode")
 
     # Scene construction -------------------------------------------------
 

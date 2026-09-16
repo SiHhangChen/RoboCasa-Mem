@@ -25,6 +25,12 @@ episode:
   # Recording plan only; policy evaluation accepts either door order.
   close_order: null
   max_horizon: 8000
+  cabinet_material_candidates:
+    - original
+    - light_wood
+    - walnut
+    - gray_wood
+    - warm_white
 
 initial_state:
   robot_base:

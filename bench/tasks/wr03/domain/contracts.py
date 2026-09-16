@@ -105,6 +105,7 @@ class EpisodePlan:
     stored_level: str
     close_order: tuple[str, str]
     max_horizon: int
+    cabinet_material_id: str = "original"
 
     @property
     def demo_storage_level(self) -> str:

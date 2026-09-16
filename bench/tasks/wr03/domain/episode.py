@@ -4,6 +4,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from bench.tasks.wr03.cabinet_materials import (
+    CABINET_MATERIAL_TEXTURES,
+    normalize_cabinet_material_candidates,
+    sample_cabinet_material,
+)
+
 from bench.tasks.wr03.domain.contracts import SceneConfig, TaskDefinition
 from bench.tasks.wr03.domain.contracts import (
     CABINET_LEVELS,
@@ -15,6 +21,8 @@ from bench.tasks.wr03.domain.contracts import (
 
 _CLOSE_ORDER_SALT = 0x57523343
 _CLOSE_ORDER_PERIOD = 200
+_STORAGE_LEVEL_SALT = 51
+_STORAGE_LEVEL_MULTIPLIER = 49
 
 
 def validate_level(value: Any) -> str:
@@ -28,15 +36,18 @@ def demo_storage_level_for_seed(seed: int) -> str:
     episode_seed = int(seed)
     if episode_seed < 0:
         raise ValueError("WR-03 seed must be non-negative")
-    return "lower" if episode_seed % 2 == 0 else "upper"
+    # Use an independent affine permutation rather than seed parity. It remains
+    # exactly balanced over every 200-seed release window without exposing the
+    # cabinet choice through an obvious even/odd rule.
+    bucket = (
+        episode_seed * _STORAGE_LEVEL_MULTIPLIER + _STORAGE_LEVEL_SALT
+    ) % _CLOSE_ORDER_PERIOD
+    return "lower" if bucket < _CLOSE_ORDER_PERIOD // 2 else "upper"
 
 
 def close_order_for_seed(seed: int) -> tuple[str, str]:
-    # Stored level is intentionally parity-based for this one-can task.  The
-    # close order must come from an independent stream; using the same parity
-    # would reveal the answer as soon as the first door is closed.  This
-    # affine permutation is deterministic, looks seed-random, and is exactly
-    # balanced over every contiguous 200-seed release window.
+    # The close order uses a stream independent of the stored level and is
+    # exactly balanced over every contiguous 200-seed release window.
     bucket = (int(seed) * 73 + _CLOSE_ORDER_SALT) % _CLOSE_ORDER_PERIOD
     return ("lower", "upper") if bucket < _CLOSE_ORDER_PERIOD // 2 else ("upper", "lower")
 
@@ -104,11 +115,15 @@ def resolve_episode_plan(*, seed: int, **values: Any) -> EpisodePlan:
     horizon = int(values.get("max_horizon", 8000))
     if horizon <= 0:
         raise ValueError("WR-03 max_horizon must be positive")
+    material_candidates = normalize_cabinet_material_candidates(
+        values.get("cabinet_material_candidates", tuple(CABINET_MATERIAL_TEXTURES))
+    )
     return EpisodePlan(
         seed=episode_seed,
         stored_level=level,
         close_order=close_order,
         max_horizon=horizon,
+        cabinet_material_id=sample_cabinet_material(episode_seed, material_candidates),
     )
 
 
