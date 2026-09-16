@@ -15,7 +15,10 @@ from bench.tasks.wa01.config import (
 )
 from bench.tasks.wa01.domain.episode import resolve_episode_plan, resolve_scene_config
 from bench.tasks.wa01.domain.geometry import dining_region_config_summary
-from bench.tasks.wa01.execution.navigation import build_navigation_config
+from bench.tasks.wa01.execution.navigation import (
+    build_navigation_config,
+    resolve_station_randomization,
+)
 from bench.tasks.wa01.evaluation import (
     REPORT_STAGE_PROFILE_ID,
     TASK_EVALUATOR_METADATA_KEY,
@@ -49,8 +52,10 @@ def _environment(
     resources: Mapping[str, Any],
 ) -> Mapping[str, Any]:
     del config, scene, resources
-    del plan
-    return {}
+    return {
+        "coffee_material_by_id": dict(plan.coffee_material_by_id),
+        "sugar_cube_material": str(plan.sugar_cube_material),
+    }
 
 
 def _initialize(descriptor: Any, env: Any, observation: Mapping[str, Any]):
@@ -71,7 +76,9 @@ def _initialize(descriptor: Any, env: Any, observation: Mapping[str, Any]):
         env, updated,
         config=descriptor.config.initial_state.robot_base,
         nav_config=descriptor.navigation,
-        seed=descriptor.scene.scene_seed,
+        seed=descriptor.episode_plan.seed,
+        randomization=resolve_station_randomization(descriptor.config.navigation),
+        settings=descriptor.config.navigation,
     )
     evaluator = WA01Evaluator()
     evaluator.reset(env.evaluation_snapshot())

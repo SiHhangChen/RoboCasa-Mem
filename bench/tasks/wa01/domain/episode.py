@@ -14,6 +14,12 @@ from bench.tasks.wa01.domain.contracts import (
     SceneConfig,
     TaskDefinition,
 )
+from bench.tasks.wa01.materials import (
+    normalize_coffee_material_candidates,
+    normalize_sugar_cube_material_candidates,
+    sample_coffee_materials,
+    sample_sugar_cube_material,
+)
 
 
 COFFEE_INITIAL_REGION_BOUNDS = {
@@ -148,6 +154,16 @@ def resolve_episode_plan(*, seed: int, **values: Any) -> EpisodePlan:
         seed=int(seed),
         delivery_order=(first, second),
         final_slot_assignment=final_slot_assignment_for_seed(seed),
+        coffee_material_by_id=sample_coffee_materials(
+            seed,
+            normalize_coffee_material_candidates(values.get("coffee_material_candidates")),
+        ),
+        sugar_cube_material=sample_sugar_cube_material(
+            seed,
+            normalize_sugar_cube_material_candidates(
+                values.get("sugar_cube_material_candidates")
+            ),
+        ),
         max_horizon=int(values.get("max_horizon", 5000)),
     )
 

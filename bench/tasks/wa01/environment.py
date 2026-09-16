@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -13,6 +14,12 @@ from robocasa.models import assets_root
 from robocasa.utils import object_utils as OU
 
 from bench.tasks.wa01.domain.contracts import COFFEE_IDS
+from bench.tasks.wa01.materials import (
+    COFFEE_MATERIAL_PROFILES,
+    SUGAR_CUBE_MATERIAL_PROFILES,
+    apply_coffee_material,
+    apply_object_material,
+)
 from bench.tasks.wa01.domain.geometry import (
     DiningPlacementRegionConfig,
     compute_dining_regions,
@@ -49,6 +56,8 @@ class WA01SortSugaredAndUnsugaredCoffee(Kitchen):
         self,
         minimum_cup_xy_separation: float = MIN_FINAL_CUP_XY_SEPARATION,
         cup_upright_threshold_deg: float = 15.0,
+        coffee_material_by_id: Mapping[str, str] | None = None,
+        sugar_cube_material: str = "original",
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -57,30 +66,51 @@ class WA01SortSugaredAndUnsugaredCoffee(Kitchen):
         self.minimum_cup_xy_separation = float(minimum_cup_xy_separation)
         self.cup_upright_threshold_deg = float(cup_upright_threshold_deg)
         self._semantic_state = SemanticState()
+        materials = dict(coffee_material_by_id or {})
+        if set(materials) - set(COFFEE_IDS):
+            raise ValueError("WA-01 coffee materials name unknown cups")
+        self.coffee_material_by_id = {
+            coffee_id: str(materials.get(coffee_id, "dark_blue")) for coffee_id in COFFEE_IDS
+        }
+        unknown_materials = set(self.coffee_material_by_id.values()) - set(
+            COFFEE_MATERIAL_PROFILES
+        )
+        if unknown_materials:
+            raise ValueError(
+                "unknown WA-01 coffee materials: " + ", ".join(sorted(unknown_materials))
+            )
+        cube_material = str(sugar_cube_material)
+        if cube_material not in SUGAR_CUBE_MATERIAL_PROFILES:
+            raise ValueError(f"unknown WA-01 sugar cube material: {cube_material!r}")
+        self.sugar_cube_material = cube_material
         super().__init__(*args, **kwargs)
 
     # Scene construction -------------------------------------------------
 
     def edit_model_xml(self, xml_str: str) -> str:
-        """在布局 29 中移除遮挡咖啡机操作空间的上方柜体。"""
+        """移除遮挡柜体，并写入本 episode 抽到的杯子外观材质。"""
 
         xml_str = super().edit_model_xml(xml_str)
-        if int(self.layout_id) != 29:
-            return xml_str
         root = ET.fromstring(xml_str)
         worldbody = root.find("worldbody")
-        if worldbody is None:
-            return xml_str
-        root_names = {f"{name}_main" for name in OVERHEAD_CABINET_FIXTURES}
-        parent_by_child = {
-            child: parent for parent in worldbody.iter() for child in parent
-        }
-        for body in list(worldbody.iter("body")):
-            if body.get("name") not in root_names:
-                continue
-            parent = parent_by_child.get(body)
-            if parent is not None:
-                parent.remove(body)
+        if worldbody is not None and int(self.layout_id) == 29:
+            root_names = {f"{name}_main" for name in OVERHEAD_CABINET_FIXTURES}
+            parent_by_child = {
+                child: parent for parent in worldbody.iter() for child in parent
+            }
+            for body in list(worldbody.iter("body")):
+                if body.get("name") not in root_names:
+                    continue
+                parent = parent_by_child.get(body)
+                if parent is not None:
+                    parent.remove(body)
+        for coffee_id, material_id in self.coffee_material_by_id.items():
+            apply_coffee_material(
+                root,
+                coffee_id=coffee_id,
+                material_id=material_id,
+                assets_root=Path(assets_root),
+            )
         return ET.tostring(root, encoding="unicode")
 
     def _setup_references(self) -> None:
@@ -160,6 +190,14 @@ class WA01SortSugaredAndUnsugaredCoffee(Kitchen):
         }
         for coffee_id in COFFEE_IDS:
             self._set_coffee_liquid_visual(coffee_id, visible=True)
+        self.material_randomization = {
+            "sugar_cube": apply_object_material(
+                self,
+                "sugar_cube",
+                self.sugar_cube_material,
+                SUGAR_CUBE_MATERIAL_PROFILES,
+            )
+        }
 
     def _get_obj_cfgs(self) -> list[dict[str, Any]]:
         """定义两只同款杯子、糖碟和糖块的 RoboCasa 物品配置。"""

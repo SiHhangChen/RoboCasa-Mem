@@ -97,6 +97,8 @@ class EpisodePlan:
     seed: int
     delivery_order: tuple[str, str]
     final_slot_assignment: Mapping[str, str]
+    coffee_material_by_id: Mapping[str, str]
+    sugar_cube_material: str
     max_horizon: int
 
 

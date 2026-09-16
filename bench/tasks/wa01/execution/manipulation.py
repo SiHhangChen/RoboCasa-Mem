@@ -136,7 +136,7 @@ def _build_runtime_config(
         orientation_threshold_deg=float(
             runtime_values.pop("orientation_threshold_deg", 15.0)
         ),
-        qpos_threshold=float(runtime_values.pop("qpos_threshold", 0.16)),
+        qpos_threshold=float(runtime_values.pop("qpos_threshold", 0.20)),
         open_steps=int(runtime_values.pop("open_steps", 10)),
         close_steps=int(runtime_values.pop("close_steps", 50)),
         release_steps=int(runtime_values.pop("release_steps", 20)),

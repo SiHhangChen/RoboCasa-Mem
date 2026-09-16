@@ -10,16 +10,18 @@ import numpy as np
 
 from bench.execution.navigation.base_motion import set_base_pose_kinematic
 from bench.runtime.contracts import InitializationReport
-from bench.execution.navigation.station_poses import (
-    StationPoseSelector,
-    load_station_pose_payload,
-    station_sample_records,
-)
 from bench.execution.planning import NavigationConfig
 from bench.tasks.wa01.domain.contracts import (
     COFFEE_IDS,
     RobotBaseConfig,
     RobotBaseMode,
+)
+from bench.execution.navigation.station_poses import StationPoseSampler
+from bench.tasks.wa01.execution.navigation import (
+    StationRandomization,
+    build_station_sampler,
+    resolve_station_randomization,
+    sample_initial_yaw,
 )
 from bench.tasks.wa01.domain.episode import (
     COFFEE_INITIAL_REACH_CENTER_XY,
@@ -42,6 +44,9 @@ def apply_robot_base_initial_state(
     config: RobotBaseConfig,
     nav_config: NavigationConfig,
     seed: int,
+    sampler: StationPoseSampler | None = None,
+    randomization: StationRandomization | None = None,
+    settings: Any | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """按照唯一 Base 模式设置 reset 后位姿，并返回可诊断摘要。"""
 
@@ -92,30 +97,39 @@ def apply_robot_base_initial_state(
     if config.mode is RobotBaseMode.STATION_SAMPLE:
         if nav_config.station_base_pose_file is None or config.station_id is None:
             raise ValueError("station_sample requires station poses and station id")
-        payload = load_station_pose_payload(nav_config.station_base_pose_file)
-        station = (payload.get("stations", {}) or {}).get(config.station_id)
-        if station is None:
-            raise KeyError(f"initial station {config.station_id!r} not found")
-        records = station_sample_records(list(station.get("samples", [])))
-        if not records:
-            raise ValueError(f"initial station {config.station_id!r} has no samples")
-        reset_xy = np.asarray(obs["robot0_base_pos"][:2], dtype=float)
-        selector = StationPoseSelector.from_config(nav_config, seed=int(seed))
-        record, selection = selector.select(config.station_id, records, base_xy=reset_xy)
+        resolved_randomization = randomization or resolve_station_randomization(settings)
+        resolved_sampler = sampler or build_station_sampler(nav_config, seed=int(seed))
+        pose = resolved_sampler.sample(config.station_id, purpose="initialization")
+        station_summary = dict(resolved_sampler.last_summary(config.station_id) or {})
+        circle = dict((station_summary.get("sample") or {}).get("circle") or {})
+        center_yaw = float(circle.get("base_yaw", 3.141))
+        yaw = sample_initial_yaw(
+            center_yaw,
+            seed=int(seed),
+            randomization=resolved_randomization,
+        )
         new_obs, summary = _set_base_pose(
             env,
             obs,
-            target_xy=np.asarray(record["target_xy"], dtype=float),
-            target_yaw=float(record["target_yaw"]),
+            target_xy=np.asarray(pose.position[:2], dtype=float),
+            target_yaw=yaw,
             mode=config.mode.value,
         )
+        env._wa01_station_sampler = resolved_sampler
+        env._wa01_station_randomization = resolved_randomization
         summary.update(
             {
-                "station_id": config.station_id,
+                "station_id": station_summary.get("station_id", config.station_id),
                 "station_base_pose_file": str(nav_config.station_base_pose_file),
-                "selection": selection,
-                "sample_index": int(record["sample_index"]),
-                "sample": dict(record["sample"]),
+                "selection": station_summary.get("station_pose_selection"),
+                "sample_index": int(station_summary.get("sample_index", 0)),
+                "sample": dict(station_summary.get("sample") or {}),
+                "sampled_xy": np.asarray(pose.position[:2], dtype=float).tolist(),
+                "sampled_yaw": float(yaw),
+                "circle_center_yaw": center_yaw,
+                "initial_yaw_half_range_rad": float(
+                    resolved_randomization.initial_yaw_half_range_rad
+                ),
             }
         )
         return new_obs, summary
@@ -146,6 +160,11 @@ def apply_fixed_initial_object_regions(
         "fixed_background": True,
         "coordinate_frame": "world",
         "objects": {},
+        "coffee_material_by_id": dict(getattr(env, "coffee_material_by_id", {})),
+        "sugar_cube_material": getattr(env, "sugar_cube_material", None),
+        "sugar_cube_material_application": dict(
+            getattr(env, "material_randomization", {}).get("sugar_cube") or {}
+        ),
     }
     if not enabled:
         return env._get_observations(force_update=True), summary

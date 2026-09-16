@@ -20,12 +20,14 @@ scene:
 
 episode:
   first_delivery_coffee: null
+  coffee_material_candidates: [dark_blue, green, brass, red_wood, steel]
+  sugar_cube_material_candidates: [original, sugar_white, sugar_cream, sugar_pink, sugar_blue]
   max_horizon: 5000
 
 initial_state:
   robot_base:
-    mode: manual_path_sample
-    sample_index: 0
+    mode: station_sample
+    station_id: coffee_machine_station
   objects:
     enabled: true
     coffee_initial_z: 0.97748
@@ -83,6 +85,9 @@ navigation:
   station_nav_dock_standoff: 0.0
   station_nav_require_footprint: false
   use_station_base_poses: true
+  initial_yaw_half_range_rad: 0.08726646259971647
+  turnaround_delta_rad: 3.141592653589793
+  turnaround_half_range_rad: 0.08726646259971647
 
 manipulation:
   pick_place:
@@ -113,7 +118,7 @@ manipulation:
     settle_steps: 10
     position_threshold: 0.12
     orientation_threshold_deg: 15.0
-    qpos_threshold: 0.16
+    qpos_threshold: 0.20
     open_steps: 10
     # The fingers reach the sugar in a few steps and then hold at the force cap,
     # so closing longer only adds wall time (mirrors TS-01).
