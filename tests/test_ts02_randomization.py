@@ -190,7 +190,7 @@ def test_expert_plan_applies_each_fixture_variation_and_sampled_navigation_goal(
 
 def test_contact_pull_distance_keeps_configured_margin() -> None:
     config = load_task_config()
-    assert config.operations["drawer_open"]["pull_distance"] == pytest.approx(0.20)
+    assert config.operations["drawer_open"]["pull_distance"] == pytest.approx(0.18)
 
 
 def test_navigation_runtime_uses_episode_seed_not_fixed_scene_seed(monkeypatch) -> None:

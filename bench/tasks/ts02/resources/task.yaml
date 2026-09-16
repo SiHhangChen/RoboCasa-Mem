@@ -169,8 +169,10 @@ operations:
     handle_vertical_offset: 0.0
     prehook_distance: 0.125
     hook_offset: 0.005
-    # Keep margin above the 0.70 open threshold across the full 15 cm base disk.
-    pull_distance: 0.20
+    # Preserve close-cycle margin while clearing the 0.70 open threshold across
+    # the sampled station disk. A 0.20 m pull can drive the 0.22 m slide into
+    # its mechanical limit and leave the close motion without stable contact.
+    pull_distance: 0.18
     open_fraction_threshold: 0.70
     gripper_steps: 25
     grasp_pose_resource: drawer_grasp_pose

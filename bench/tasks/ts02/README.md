@@ -29,9 +29,9 @@ target appearance, prompt, handle friction and all other dynamics fixed:
 - The entire prehook/hook/pull approach is shifted along the fixture-local X
   axis (the long axis of the handle), uniformly in +/-0.015 m. The same offset
   is reapplied when recomputing the pull from the live handle position.
-- The calibrated pull distance is 0.20 m so the full station disk retains
-  margin above the 0.70 open threshold; the drawer remains within its travel
-  limit and the close motion is unchanged.
+- The calibrated pull distance is 0.18 m so the full station disk retains
+  margin above the 0.70 open threshold without driving the 0.22 m drawer slide
+  into its mechanical limit, preserving reliable contact during close.
 
 Materials and per-drawer grasp variations are stored in resolved episode facts
 and expert plan metadata, never inserted into policy-visible prompts. Station
