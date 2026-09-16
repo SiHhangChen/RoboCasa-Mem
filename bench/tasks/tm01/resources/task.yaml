@@ -64,6 +64,16 @@ scene:
 episode:
   plan_balance: seed_mod_4
   max_horizon: 3200
+  # Appearance only: cabinet and drawer shell change, while handles and physics stay fixed.
+  drawer_material_candidates:
+    - wood/light_wood_planks
+    - wood/walnut_wood_grain
+    - wood/gray_wood_grain
+    - wood/bamboo
+    - flat/white
+    - flat/blue_gray
+    - flat/green
+    - steel-brushed
 
 initial_state:
   robot_base_sample_index: 0
@@ -166,10 +176,16 @@ operations:
     actuation_mode: pinch_and_rotate_native_knob
     target_qpos_rad: 1.5707963267948966
     require_contact_evidence: true
+    post_release_lift_m: 0.05
+    post_release_lift_tolerance_m: 0.01
+    post_release_lift_settle_steps: 10
   stove_knob_off:
     actuation_mode: pinch_and_rotate_native_knob
     target_qpos_rad: 0.0
     require_contact_evidence: true
+    post_release_lift_m: 0.05
+    post_release_lift_tolerance_m: 0.01
+    post_release_lift_settle_steps: 10
   drawer_open:
     actuation_mode: contact
     open_fraction: 1.0

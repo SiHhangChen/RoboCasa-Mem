@@ -56,6 +56,7 @@ class EpisodePlan:
     route: Route
     drawer_order: tuple[str, str]
     max_horizon: int
+    drawer_material_by_fixture: Mapping[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

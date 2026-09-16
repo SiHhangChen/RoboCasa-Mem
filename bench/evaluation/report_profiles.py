@@ -63,19 +63,37 @@ def _profile(
     )
 
 
-TM01_REPORT_PROFILE = _profile(
+TM01_REPORT_PROFILE_V1 = _profile(
     "TM01",
     "burner_on",
     "one_drawer_inspected",
     "both_threads_completed",
     "success",
 )
-TM02_REPORT_PROFILE = _profile(
+TM02_REPORT_PROFILE_V1 = _profile(
     "TM02",
     "faucet_on",
     "pot_filled_and_can_retrieved",
     "both_threads_completed",
     "success",
+)
+TM01_REPORT_PROFILE = _profile(
+    "TM01",
+    "burner_on",
+    "one_drawer_inspected",
+    "one_thread_completed",
+    "both_threads_completed",
+    "success",
+    version=2,
+)
+TM02_REPORT_PROFILE = _profile(
+    "TM02",
+    "faucet_on",
+    "pot_filled_and_can_retrieved",
+    "one_thread_completed",
+    "both_threads_completed",
+    "success",
+    version=2,
 )
 TS01_REPORT_PROFILE = _profile(
     "TS01",
@@ -239,12 +257,16 @@ REPORT_STAGE_PROFILES = (
 )
 
 _PROFILES_BY_TASK = {profile.task_id: profile for profile in REPORT_STAGE_PROFILES}
+# Historical reports remain readable only under their explicit profile id.
+# Keep them out of the default, one-profile-per-task catalog.
+_HISTORICAL_REPORT_STAGE_PROFILES = (TM01_REPORT_PROFILE_V1, TM02_REPORT_PROFILE_V1)
 _PROFILES_BY_ID = {
-    profile.profile_id: profile for profile in REPORT_STAGE_PROFILES
+    profile.profile_id: profile
+    for profile in (*REPORT_STAGE_PROFILES, *_HISTORICAL_REPORT_STAGE_PROFILES)
 }
 if len(_PROFILES_BY_TASK) != len(REPORT_STAGE_PROFILES):
     raise RuntimeError("benchmark report profiles must have unique task ids")
-if len(_PROFILES_BY_ID) != len(REPORT_STAGE_PROFILES):
+if len(_PROFILES_BY_ID) != len(REPORT_STAGE_PROFILES) + len(_HISTORICAL_REPORT_STAGE_PROFILES):
     raise RuntimeError("benchmark report profiles must have unique profile ids")
 
 
@@ -253,16 +275,19 @@ def get_report_stage_profile(
     *,
     profile_id: str | None = None,
 ) -> ReportStageProfile:
-    """Resolve the frozen public profile for one canonical benchmark task id."""
+    """Resolve the current default or an explicitly requested historical profile."""
 
     try:
         profile = _PROFILES_BY_TASK[str(task_id)]
     except KeyError as exc:
         raise KeyError(f"task {task_id!r} has no benchmark report profile") from exc
-    if profile_id is not None and profile.profile_id != str(profile_id):
-        raise KeyError(
-            f"task {task_id!r} does not use report profile {profile_id!r}"
-        )
+    if profile_id is not None:
+        selected = _PROFILES_BY_ID.get(str(profile_id))
+        if selected is None or selected.task_id != profile.task_id:
+            raise KeyError(
+                f"task {task_id!r} does not use report profile {profile_id!r}"
+            )
+        return selected
     return profile
 
 
@@ -270,7 +295,9 @@ __all__ = [
     "REPORT_STAGE_PROFILES",
     "ReportStageProfile",
     "TM01_REPORT_PROFILE",
+    "TM01_REPORT_PROFILE_V1",
     "TM02_REPORT_PROFILE",
+    "TM02_REPORT_PROFILE_V1",
     "TS01_REPORT_PROFILE",
     "TS02_REPORT_PROFILE",
     "TS03_REPORT_PROFILE",

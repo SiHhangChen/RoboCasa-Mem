@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, fields, replace
+from collections.abc import Mapping
+from dataclasses import dataclass, field, fields, replace
 from pathlib import Path
 from typing import Any
 
@@ -15,10 +16,18 @@ from bench.execution.navigation import (
     NavigationController,
     RoboCasaNavigationAdapter,
 )
-from bench.execution.navigation.station_poses import yaw_to_quat_xyzw
+from bench.execution.navigation.manual_base_path import ManualBasePathSample
+from bench.execution.navigation.station_poses import (
+    quat_xyzw_to_yaw,
+    yaw_to_quat_xyzw,
+)
 from bench.execution.planning import NavigationConfig
+from bench.execution.planning.nav_algo import normalize_angle
+from bench.execution.sampling.circle_sampling import (
+    sample_uniform_disk,
+    sample_uniform_yaw,
+)
 from bench.execution.sampling.rng import SeedStream
-from bench.execution.sampling.station_sampler import SimpleStationSampler
 from bench.tasks.tm01.domain.contracts import (
     DRAWER_NAMES,
     DRAWER_SIDE_COMPLETION_BUTTON,
@@ -37,12 +46,124 @@ STATION_IDS = (
     DRAWER_STATION,
 )
 
+# The active TM01 route is one clockwise loop. These eight relative turns sum
+# to one revolution; constraining their sampled perturbations to sum to zero
+# keeps the return-to-stove heading closed.
+MAIN_LOOP = (0, 19, 3, 4, 5, 6, 7, 20, 12, 13, 14, 15, 16, 17, 18, 0)
+MAIN_LOOP_TURN_INDICES = (19, 4, 6, 7, 20, 14, 16, 18)
+
+
+@dataclass
+class EpisodePathPoseSampler:
+    """Sample every TM01 path vertex once and reuse it for the episode."""
+
+    path_file: Path
+    seed: int
+    station_targets: dict[str, Any]
+    route_poses: dict[int, Pose]
+    route_summaries: dict[int, dict[str, Any]]
+    _summary_by_station: dict[str, dict[str, Any]] = field(default_factory=dict)
+
+    @classmethod
+    def from_file(cls, path: str | Path, *, seed: int) -> "EpisodePathPoseSampler":
+        path_value = Path(path)
+        payload = json.loads(path_value.read_text(encoding="utf-8"))
+        route_poses, route_summaries = sample_episode_path_poses(
+            payload,
+            seed=int(seed),
+        )
+        return cls(
+            path_file=path_value,
+            seed=int(seed),
+            station_targets=dict(payload.get("station_targets", {})),
+            route_poses=route_poses,
+            route_summaries=route_summaries,
+        )
+
+    def sample(self, station_name: str, *, purpose: str | None = None) -> Pose:
+        del purpose
+        if station_name not in self.station_targets:
+            raise KeyError(f"TM01 path has no station target {station_name!r}")
+        index = _target_index(self.station_targets[station_name])
+        try:
+            pose = self.route_poses[index]
+        except KeyError as exc:
+            raise ValueError(
+                f"TM01 station {station_name!r} targets unsampled path index {index}"
+            ) from exc
+        self._summary_by_station[station_name] = {
+            "station_name": station_name,
+            "station_id": station_name,
+            "station_pose_selection": {
+                "policy": "episode_circle_uniform",
+                "episode_stable": True,
+                "seed": int(self.seed),
+            },
+            **dict(self.route_summaries[index]),
+        }
+        return pose
+
+    def last_summary(self, station_name: str) -> dict[str, Any] | None:
+        return self._summary_by_station.get(station_name)
+
+    def reset_choices(self) -> None:
+        self._summary_by_station.clear()
+
+
+class SampledPathBaseDriver(BaseDriverAdapter):
+    """Install the episode-owned TM01 waypoint poses in the path executor."""
+
+    def __init__(
+        self,
+        env: Any,
+        obs: dict[str, Any],
+        *,
+        config: NavigationConfig,
+        sampler: EpisodePathPoseSampler,
+    ) -> None:
+        super().__init__(env, obs, nav_config=config)
+        self._station_sampler = sampler
+        self._sampled_executor: Any = None
+        self._waypoint_summaries: dict[int, dict[str, Any]] = {}
+
+    def _manual_path_executor(self) -> Any:
+        executor = super()._manual_path_executor()
+        if executor is None or executor is self._sampled_executor:
+            return executor
+        for index, pose in self._station_sampler.route_poses.items():
+            if not 0 <= index < len(executor.samples):
+                raise ValueError(f"TM01 sampled waypoint {index} is outside the path")
+            nominal = executor.samples[index]
+            executor.samples[index] = ManualBasePathSample(
+                index=index,
+                xy=np.asarray(pose.position[:2], dtype=float),
+                yaw=quat_xyzw_to_yaw(pose.quaternion),
+                name=nominal.name,
+            )
+            self._waypoint_summaries[index] = {
+                "path_index": index,
+                "nominal_xy": nominal.xy.tolist(),
+                "nominal_yaw": nominal.yaw,
+                **dict(self._station_sampler.route_summaries[index]),
+            }
+        self._sampled_executor = executor
+        return executor
+
+    def plan_and_move(self, *args: Any, **kwargs: Any) -> Any:
+        result = super().plan_and_move(*args, **kwargs)
+        result.details["sampled_path_waypoints"] = [
+            dict(self._waypoint_summaries[index])
+            for index in result.details.get("route_indices", ())
+            if index in self._waypoint_summaries
+        ]
+        return result
+
 
 @dataclass(frozen=True)
 class NavigationAssembly:
     controller: NavigationController
     env_adapter: RoboCasaNavigationAdapter
-    station_sampler: SimpleStationSampler
+    station_sampler: EpisodePathPoseSampler
     path_planner: None
     base_driver: Any
     config: NavigationConfig
@@ -127,6 +248,161 @@ def station_specs_from_manual_path(path: str | Path) -> dict[str, StationSpec]:
     return result
 
 
+def sample_episode_path_poses(
+    payload: Mapping[str, Any],
+    *,
+    seed: int,
+) -> tuple[dict[int, Pose], dict[int, dict[str, Any]]]:
+    """Resolve one reproducible, closed set of sampled TM01 path poses."""
+
+    raw_samples = list(payload.get("samples", ()))
+    samples: dict[int, dict[str, Any]] = {}
+    for fallback, raw in enumerate(raw_samples):
+        item = dict(raw)
+        index = int(item.get("index", fallback))
+        if index in samples:
+            raise ValueError(f"duplicate TM01 sampled path index {index}")
+        samples[index] = item
+    if sorted(samples) != list(range(len(samples))):
+        raise ValueError("TM01 sampled path indexes must be contiguous from zero")
+
+    seeds = SeedStream(base_seed=int(seed), namespace="tm01_navigation")
+    sampled_xy: dict[int, np.ndarray] = {}
+    for index, item in samples.items():
+        circle = item.get("circle")
+        if not isinstance(circle, Mapping):
+            raise ValueError(f"TM01 path sample {index} requires a circle")
+        sampled_xy[index] = sample_uniform_disk(
+            circle.get("center_xy", ()),
+            float(circle.get("radius_m", -1.0)),
+            seed=seeds.seed("waypoint", index, "xy"),
+            salt=0x544D3031,
+        )
+
+    turn_offsets = _sample_closed_turn_offsets(
+        samples,
+        seed=seeds.seed("main_loop_turns"),
+    )
+    resolved_yaw: dict[int, float] = {}
+    resolving: set[int] = set()
+
+    def yaw_for(index: int) -> float:
+        if index in resolved_yaw:
+            return resolved_yaw[index]
+        if index in resolving:
+            raise ValueError(f"TM01 path yaw dependency cycle at sample {index}")
+        if index not in samples:
+            raise ValueError(f"TM01 path yaw source {index} is unavailable")
+        resolving.add(index)
+        item = samples[index]
+        turn = item.get("relative_turn")
+        inherited_from = item.get("inherit_yaw_from")
+        if isinstance(turn, Mapping):
+            source_index = int(turn["source_index"])
+            nominal = float(turn["nominal_angle_rad"])
+            half_range = float(turn["angle_half_range_rad"])
+            if index in turn_offsets:
+                offset = turn_offsets[index]
+            else:
+                sampled = sample_uniform_yaw(
+                    nominal,
+                    half_range,
+                    seed=seeds.seed("turn", index),
+                    salt=0x5455524E,
+                )
+                offset = normalize_angle(sampled - nominal)
+            yaw = normalize_angle(yaw_for(source_index) + nominal + offset)
+        elif inherited_from is not None:
+            yaw = yaw_for(int(inherited_from))
+        else:
+            circle = item["circle"]
+            yaw = normalize_angle(float(circle.get("base_yaw", item.get("yaw"))))
+        resolving.remove(index)
+        resolved_yaw[index] = yaw
+        return yaw
+
+    poses: dict[int, Pose] = {}
+    summaries: dict[int, dict[str, Any]] = {}
+    for index, item in samples.items():
+        yaw = yaw_for(index)
+        circle = dict(item["circle"])
+        summary: dict[str, Any] = {
+            "path_index": int(index),
+            "sample_name": item.get("name"),
+            "route_role": "station_circle",
+            "target_xy": sampled_xy[index].astype(float).tolist(),
+            "target_yaw": float(yaw),
+            "circle": {
+                "center_xy": [float(value) for value in circle["center_xy"]],
+                "radius_m": float(circle["radius_m"]),
+            },
+        }
+        turn = item.get("relative_turn")
+        if isinstance(turn, Mapping):
+            nominal = float(turn["nominal_angle_rad"])
+            offset = turn_offsets.get(index)
+            if offset is None:
+                offset = normalize_angle(
+                    yaw - yaw_for(int(turn["source_index"])) - nominal
+                )
+            summary.update(
+                {
+                    "route_role": "relative_turn_circle",
+                    "source_index": int(turn["source_index"]),
+                    "nominal_turn_angle": nominal,
+                    "turn_angle_half_range": float(turn["angle_half_range_rad"]),
+                    "sampled_turn_offset": float(offset),
+                    "sampled_turn_angle": nominal + float(offset),
+                    "closed_loop_constraint": index in MAIN_LOOP_TURN_INDICES,
+                }
+            )
+        elif item.get("inherit_yaw_from") is not None:
+            summary.update(
+                {
+                    "route_role": "inherited_yaw_circle",
+                    "yaw_inherited_from_path_index": int(item["inherit_yaw_from"]),
+                }
+            )
+        poses[index] = Pose(
+            position=(float(sampled_xy[index][0]), float(sampled_xy[index][1]), 0.0),
+            quaternion=yaw_to_quat_xyzw(yaw),
+        )
+        summaries[index] = summary
+    return poses, summaries
+
+
+def _sample_closed_turn_offsets(
+    samples: Mapping[int, Mapping[str, Any]],
+    *,
+    seed: int,
+) -> dict[int, float]:
+    """Sample bounded turn noise whose sum closes the clockwise main loop."""
+
+    half_ranges = []
+    for index in MAIN_LOOP_TURN_INDICES:
+        turn = samples[index].get("relative_turn")
+        if not isinstance(turn, Mapping):
+            raise ValueError(f"TM01 main-loop turn {index} lacks relative_turn")
+        half_ranges.append(float(turn["angle_half_range_rad"]))
+    if not half_ranges or any(value <= 0.0 for value in half_ranges):
+        raise ValueError("TM01 main-loop turn ranges must be positive")
+    if not np.allclose(half_ranges, half_ranges[0]):
+        raise ValueError("TM01 closed-loop turns must share one half-range")
+
+    half_range = half_ranges[0]
+    rng = np.random.default_rng(int(seed))
+    for _ in range(10000):
+        values = rng.uniform(
+            -half_range,
+            half_range,
+            size=len(MAIN_LOOP_TURN_INDICES),
+        )
+        values -= float(np.mean(values))
+        if float(np.max(np.abs(values))) <= half_range:
+            return dict(zip(MAIN_LOOP_TURN_INDICES, values.astype(float).tolist()))
+    raise RuntimeError("TM01 could not sample bounded closed-loop turn offsets")
+
+
 def station_specs(env: Any) -> dict[str, dict[str, Any]]:
     """Expose task-owned anchors for diagnostics and obstacle inspection."""
 
@@ -177,13 +453,17 @@ def build_navigation_assembly(
 
     if not config.manual_base_path_enabled or config.manual_base_path_file is None:
         raise ValueError("TM01 requires its measured manual base path")
-    sampler = SimpleStationSampler(
-        stations=station_specs_from_manual_path(config.manual_base_path_file),
-        seeds=SeedStream(base_seed=int(seed), namespace="tm01_navigation"),
-        mode="first_valid",
+    sampler = EpisodePathPoseSampler.from_file(
+        config.manual_base_path_file,
+        seed=int(seed),
     )
     adapter = RoboCasaNavigationAdapter(env, obs, station_specs_provider=station_specs)
-    driver = base_driver or BaseDriverAdapter(env, obs, nav_config=config)
+    driver = base_driver or SampledPathBaseDriver(
+        env,
+        obs,
+        config=config,
+        sampler=sampler,
+    )
     pose_provider = driver if hasattr(driver, "current_base_xy") else adapter
     controller = NavigationController(
         station_sampler=sampler,
@@ -226,12 +506,17 @@ def _button_xy(env: Any, name: str) -> np.ndarray | None:
 __all__ = [
     "DRAWER_STATION",
     "DRAWER_SIDE_COMPLETION_STATION",
+    "EpisodePathPoseSampler",
+    "MAIN_LOOP",
+    "MAIN_LOOP_TURN_INDICES",
     "NavigationAssembly",
+    "SampledPathBaseDriver",
     "STATION_IDS",
     "STOVE_SIDE_COMPLETION_STATION",
     "STOVE_STATION",
     "build_navigation_assembly",
     "build_navigation_config",
+    "sample_episode_path_poses",
     "station_specs",
     "station_specs_from_manual_path",
 ]

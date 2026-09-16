@@ -109,9 +109,27 @@ class TM01ManipulationController(ManipulationController):
         target: str,
         *,
         turn_on: bool,
+        post_release_lift_m: float = 0.05,
+        post_release_lift_tolerance_m: float = 0.01,
+        post_release_lift_settle_steps: int = 10,
         **kwargs: Any,
     ) -> dict[str, Any]:
         del kwargs
+        lift_m = float(post_release_lift_m)
+        lift_tolerance_m = float(post_release_lift_tolerance_m)
+        lift_settle_steps = int(post_release_lift_settle_steps)
+        if not np.isfinite(lift_m) or lift_m <= 0.0:
+            raise ValueError("TM01 knob post-release lift must be positive and finite")
+        if (
+            not np.isfinite(lift_tolerance_m)
+            or lift_tolerance_m <= 0.0
+            or lift_tolerance_m >= lift_m
+        ):
+            raise ValueError(
+                "TM01 knob post-release lift tolerance must be positive and less than the lift"
+            )
+        if lift_settle_steps < 0:
+            raise ValueError("TM01 knob post-release lift settle steps must be non-negative")
         calibration = self.knob_calibration
         operation = TURN_ON_OPERATION if turn_on else TURN_OFF_OPERATION
         if str(target) != calibration.target_knob:
@@ -269,6 +287,33 @@ class TM01ManipulationController(ManipulationController):
         state_before_release = _live_knob_state(self.env)
         release_result = self.run_gripper_command(-1.0, calibration.release_steps)
         command_summaries.append({"command": "release", **_without_obs(release_result)})
+        state_after_release = _live_knob_state(self.env)
+        lift_start_world = np.asarray(
+            self.stage_executor.current_eef_site_world(), dtype=float
+        ).reshape(4, 4)
+        lift_target_world = lift_start_world.copy()
+        lift_target_world[2, 3] += lift_m
+        post_release_lift = self.run_planned_stage(
+            _world_target_in_current_base(self, lift_target_world),
+            stage=f"{operation}_post_release_lift",
+            gripper_action=-1.0,
+            settle_steps=lift_settle_steps,
+        )
+        lift_final_world = np.asarray(
+            self.stage_executor.current_eef_site_world(), dtype=float
+        ).reshape(4, 4)
+        actual_lift_m = float(lift_final_world[2, 3] - lift_start_world[2, 3])
+        lift_reached = bool(actual_lift_m >= lift_m - lift_tolerance_m)
+        post_release_lift.update(
+            {
+                "primitive": "post_knob_release_vertical_lift",
+                "configured_lift_m": lift_m,
+                "lift_tolerance_m": lift_tolerance_m,
+                "actual_lift_m": actual_lift_m,
+                "lift_reached": lift_reached,
+                "target_eef_world": pose_from_matrix(lift_target_world),
+            }
+        )
         final_state = _live_knob_state(self.env)
         if self.runtime_config.execute:
             physical_target = (
@@ -287,6 +332,8 @@ class TM01ManipulationController(ManipulationController):
                 bool(stage.get("pass", False)) for stage in move_summaries[1:]
             ),
             "physical_knob_target": bool(physical_target),
+            "post_release_lift_planned": bool(post_release_lift.get("pass", False)),
+            "post_release_lift_reached": lift_reached,
             "no_direct_knob_state_write": True,
             "no_knob_actuator_command": True,
         }
@@ -294,6 +341,15 @@ class TM01ManipulationController(ManipulationController):
         invalid_environment = list(diagnostics.get("invalid_environment_labels", ()))
         checks["environment_integrity"] = not invalid_environment
         passed = bool(all(checks.values()))
+        if passed:
+            reason = None
+        elif not (
+            checks["post_release_lift_planned"]
+            and checks["post_release_lift_reached"]
+        ):
+            reason = "tm01_knob_post_release_lift_failed"
+        else:
+            reason = "tm01_knob_physical_target_not_reached"
         return {
             "primitive": "pinch_and_rotate_native_knob",
             "operation": operation,
@@ -307,17 +363,19 @@ class TM01ManipulationController(ManipulationController):
             "executed_rotation_waypoints_deg": executed_waypoint_angles,
             "initial_state": initial_state,
             "state_before_release": state_before_release,
+            "state_after_release": state_after_release,
             "final_state": final_state,
             "approach_pose": approach_info,
             "pinch_off_pose": pinch_off_info,
             "endpoint_pose": endpoint_info,
             "gripper_commands": command_summaries,
             "stages": move_summaries,
+            "post_release_lift": post_release_lift,
             "checks": checks,
             "semantic_shortcut_used": False,
             "dry_run": not self.runtime_config.execute,
             "pass": passed,
-            "reason": None if passed else "tm01_knob_physical_target_not_reached",
+            "reason": reason,
         }
 
     def _knob_motion_failure(

@@ -7,7 +7,12 @@ from collections.abc import Mapping
 from typing import Any
 
 from bench.runtime import TaskRuntimeAdapter, default_close
-from bench.tasks.runtime_support import path_base_initialization, manual_navigation, standard_plan, standard_scene, variant_prompt
+from bench.tasks.runtime_support import (
+    manual_navigation,
+    standard_plan,
+    standard_scene,
+    variant_prompt,
+)
 from bench.tasks.tm01.config import (
     CALIBRATION_RESOURCE_NAMES,
     load_task_config,
@@ -42,12 +47,15 @@ def _actions(config: Any, plan: Any, resources: Mapping[str, Any]) -> Any:
     return actions
 
 
-def _environment(config: Any, scene: Any, plan: Any, resources: Mapping[str, Any]) -> Mapping[str, Any]:
-    del plan, resources
+def _environment(
+    config: Any, scene: Any, plan: Any, resources: Mapping[str, Any]
+) -> Mapping[str, Any]:
+    del resources
     return {
         "drawer_names": scene.drawer_names,
         "drawer_world_xyzs": scene.drawer_world_xyzs,
         "drawer_world_yaw_deg": scene.drawer_world_yaw_deg,
+        "drawer_material_by_fixture": dict(plan.drawer_material_by_fixture),
         "completion_button_world_xyzs": dict(scene.completion_button_world_xyzs),
         "expected_stove_asset": scene.expected_stove_asset,
         "knob_id": scene.knob_id,
@@ -58,7 +66,17 @@ def _environment(config: Any, scene: Any, plan: Any, resources: Mapping[str, Any
     }
 
 
-_initialize_base = path_base_initialization(apply_manual_path_initial_base_pose)
+def _initialize_base(descriptor: Any, env: Any, observation: Mapping[str, Any]):
+    updated, base = apply_manual_path_initial_base_pose(
+        env,
+        dict(observation),
+        path_file=descriptor.resources["manual_base_path"],
+        sample_index=int(
+            descriptor.config.initial_state.get("robot_base_sample_index", 0)
+        ),
+        seed=int(descriptor.episode_plan.seed),
+    )
+    return updated, {"base": base}, {}, None
 
 
 def _initialize(descriptor: Any, env: Any, observation: Mapping[str, Any]):
@@ -83,10 +101,14 @@ def _validate(config: Any, episode: Any, execute: bool) -> None:
         require_production_calibration(config)
 
 
-def _release_facts(config: Any, episode: Any, resources: Mapping[str, Any], options: Mapping[str, Any]) -> Mapping[str, Any]:
+def _release_facts(
+    config: Any, episode: Any, resources: Mapping[str, Any], options: Mapping[str, Any]
+) -> Mapping[str, Any]:
     del resources, options
     return {
-        "controller": {"max_joint_step": float(config.manipulation["runtime"]["max_joint_step"])},
+        "controller": {
+            "max_joint_step": float(config.manipulation["runtime"]["max_joint_step"])
+        },
         "missing_physical_calibration": list(missing_calibration_resources(config)),
         "allow_partial_calibration": bool(episode.allow_partial_calibration),
     }
@@ -121,4 +143,11 @@ check_success = _ADAPTER.check_success
 diagnostics = _ADAPTER.diagnostics
 close_runtime = _ADAPTER.close_runtime
 
-__all__ = ["TASK_RUNTIME_API", "build_descriptor", "check_success", "close_runtime", "diagnostics", "initialize_runtime"]
+__all__ = [
+    "TASK_RUNTIME_API",
+    "build_descriptor",
+    "check_success",
+    "close_runtime",
+    "diagnostics",
+    "initialize_runtime",
+]

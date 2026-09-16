@@ -13,6 +13,10 @@ import numpy as np
 from robocasa.environments.kitchen.kitchen import FixtureType, Kitchen
 from robocasa.models import assets_root
 
+from bench.tasks.families.drawer_inspection.materials import (
+    DRAWER_MATERIAL_TEXTURES,
+    apply_drawer_material,
+)
 from bench.tasks.tm01.config import load_task_config, resolve_observer_config
 from bench.tasks.tm01.domain.contracts import (
     AXIS,
@@ -78,6 +82,7 @@ class TM01BoilWaterAndInspectTwoDrawers(Kitchen):
             tuple[float, float, float], ...
         ] = DEFAULT_DRAWER_WORLD_XYZS,
         drawer_world_yaw_deg: float = 180.0,
+        drawer_material_by_fixture: Mapping[str, str] | None = None,
         completion_button_world_xyzs: (
             Mapping[str, tuple[float, float, float]] | None
         ) = None,
@@ -122,6 +127,16 @@ class TM01BoilWaterAndInspectTwoDrawers(Kitchen):
         self.fixture_names = self.drawer_names
         self.drawer_world_xyzs = xyzs
         self.drawer_world_yaw_deg = float(drawer_world_yaw_deg)
+        finishes = dict(drawer_material_by_fixture or {})
+        if set(finishes) - set(names):
+            raise ValueError("TM01 drawer materials name unknown drawers")
+        self.drawer_material_by_fixture = {
+            drawer: str(finishes.get(drawer, "original")) for drawer in names
+        }
+        if set(self.drawer_material_by_fixture.values()) - set(
+            DRAWER_MATERIAL_TEXTURES
+        ):
+            raise ValueError("TM01 drawer materials contain unknown finishes")
         self.completion_button_world_xyzs = button_xyzs
         self.expected_stove_asset = str(expected_stove_asset)
         if str(knob_id) != KNOB_ID or str(burner_id) != BURNER_ID:
@@ -161,6 +176,13 @@ class TM01BoilWaterAndInspectTwoDrawers(Kitchen):
 
         xml_str = super().edit_model_xml(xml_str)
         root = ET.fromstring(xml_str)
+        for drawer, material_id in self.drawer_material_by_fixture.items():
+            apply_drawer_material(
+                root,
+                fixture_name=DRAWER_FIXTURE_NAMES[drawer],
+                material_id=material_id,
+                texture_root=Path(assets_root) / "textures",
+            )
         worldbody = root.find("worldbody")
         if worldbody is None:
             return xml_str

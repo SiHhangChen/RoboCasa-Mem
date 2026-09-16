@@ -22,7 +22,7 @@ from bench.tasks.ts02.domain.geometry import (
     DEFAULT_DRAWER_WORLD_YAW_DEG,
     normalize_drawer_world_xyzs,
 )
-from bench.tasks.ts02.drawer_materials import DRAWER_MATERIAL_TEXTURES
+from bench.tasks.ts02.drawer_materials import normalize_drawer_material_candidates
 
 
 DEMO_ORDER_SEED_SALT = 0x54533032
@@ -230,15 +230,9 @@ def _fixture_rng(seed: int, salt: int, index: int) -> np.random.Generator:
 def normalize_drawer_randomization(
     values: Mapping[str, Any],
 ) -> tuple[tuple[str, ...], dict[str, tuple[float, float, float]], float]:
-    materials = values.get("drawer_material_candidates", ("original",))
-    if isinstance(materials, (str, bytes)) or not isinstance(materials, Sequence):
-        raise ValueError("TS02 drawer_material_candidates must be a non-empty sequence")
-    candidates = tuple(str(item) for item in materials)
-    if not candidates or len(set(candidates)) != len(candidates):
-        raise ValueError("TS02 drawer_material_candidates must be non-empty and unique")
-    unknown = sorted(set(candidates) - DRAWER_MATERIAL_TEXTURES.keys())
-    if unknown:
-        raise ValueError("unknown TS02 drawer materials: " + ", ".join(unknown))
+    candidates = normalize_drawer_material_candidates(
+        values.get("drawer_material_candidates", ("original",))
+    )
     rotations = values.get("prehook_rotation_candidates_deg", {"baseline": (0.0, 0.0, 0.0)})
     if not isinstance(rotations, Mapping) or not rotations:
         raise ValueError("TS02 prehook_rotation_candidates_deg must be a non-empty mapping")

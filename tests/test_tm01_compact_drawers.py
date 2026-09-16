@@ -34,6 +34,15 @@ def test_tm01_uses_ts04_compact_drawer_layout_and_one_station() -> None:
     assert drawer_station["xy"] == pytest.approx([4.85, -1.37])
 
 
+def test_tm01_knob_operations_lift_before_returning_arm() -> None:
+    config = load_task_config()
+    for operation in ("stove_knob_on", "stove_knob_off"):
+        metadata = config.operations[operation]
+        assert metadata["post_release_lift_m"] == pytest.approx(0.05)
+        assert metadata["post_release_lift_tolerance_m"] == pytest.approx(0.01)
+        assert metadata["post_release_lift_settle_steps"] == 10
+
+
 @pytest.mark.parametrize("seed", range(4))
 def test_tm01_drawer_plan_returns_arm_and_presses_once(seed: int) -> None:
     episode = TaskCatalog.resolve(EpisodeRequest(task_id="TM01", seed=seed))
@@ -48,6 +57,21 @@ def test_tm01_drawer_plan_returns_arm_and_presses_once(seed: int) -> None:
     ]
     assert operations.count("retreat_and_return_arm_after_drawer") == 2
     assert operations.count("press_completion_button") == 1
+
+    knob_stages = [
+        stage
+        for stage in plan.stages
+        if isinstance(stage, OperateStage)
+        and stage.operation in {
+            "turn_native_stove_knob_on",
+            "turn_native_stove_knob_off",
+        }
+    ]
+    assert len(knob_stages) == 2
+    for stage in knob_stages:
+        assert stage.metadata["post_release_lift_m"] == pytest.approx(0.05)
+        assert stage.metadata["post_release_lift_tolerance_m"] == pytest.approx(0.01)
+        assert stage.metadata["post_release_lift_settle_steps"] == 10
 
     navigation_targets = [
         stage.target.station_id

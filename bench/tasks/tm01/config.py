@@ -9,6 +9,9 @@ from typing import Any
 
 import yaml
 
+from bench.tasks.families.drawer_inspection.materials import (
+    normalize_drawer_material_candidates,
+)
 from bench.tasks.tm01.domain.contracts import (
     CANONICAL_PROMPT,
     CANONICAL_PROMPT_SHA256,
@@ -97,6 +100,9 @@ def load_task_config(path: str | Path = DEFAULT_TASK_CONFIG_FILE) -> TaskConfig:
     ):
         if appliance.get(field) is not True:
             raise ValueError(f"TM01 appliance.{field} must be true")
+    normalize_drawer_material_candidates(
+        sections["episode"].get("drawer_material_candidates", ("original",))
+    )
     return TaskConfig(source_path=config_path, **sections)
 
 

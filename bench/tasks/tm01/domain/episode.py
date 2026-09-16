@@ -7,6 +7,9 @@ from typing import Any
 
 import numpy as np
 
+from bench.tasks.families.drawer_inspection.materials import (
+    normalize_drawer_material_candidates,
+)
 from bench.tasks.tm01.domain.contracts import (
     BURNER_ID,
     BURNER_SITE,
@@ -26,6 +29,7 @@ from bench.tasks.tm01.domain.contracts import (
 
 DEFAULT_LAYOUT_ID = 39
 DEFAULT_STYLE_ID = 24
+DRAWER_MATERIAL_SEED_SALT = 0x544D4D41
 DEFAULT_DRAWER_WORLD_XYZS = (
     (4.60, -2.37, 1.1363333333333332),
     (4.85, -2.37, 1.1363333333333332),
@@ -36,7 +40,12 @@ DEFAULT_COMPLETION_BUTTON_WORLD_XYZS = (
 )
 
 
-def sample_episode_plan(seed: int, *, max_horizon: int = 3200) -> EpisodePlan:
+def sample_episode_plan(
+    seed: int,
+    *,
+    max_horizon: int = 3200,
+    drawer_material_candidates: Sequence[str] = ("original",),
+) -> EpisodePlan:
     """Balance route and drawer order over every consecutive four seeds."""
 
     seed_value = int(seed)
@@ -46,11 +55,25 @@ def sample_episode_plan(seed: int, *, max_horizon: int = 3200) -> EpisodePlan:
     index = seed_value % 4
     route = Route.L1 if index in (0, 2) else Route.L2
     order = DRAWER_NAMES if index in (0, 1) else tuple(reversed(DRAWER_NAMES))
+    material_candidates = normalize_drawer_material_candidates(
+        drawer_material_candidates
+    )
+    materials = {
+        drawer: str(
+            np.random.default_rng(
+                np.random.SeedSequence(
+                    [seed_value, DRAWER_MATERIAL_SEED_SALT, fixture_index]
+                )
+            ).choice(material_candidates)
+        )
+        for fixture_index, drawer in enumerate(DRAWER_NAMES)
+    }
     return EpisodePlan(
         seed=seed_value,
         route=route,
         drawer_order=(str(order[0]), str(order[1])),
         max_horizon=horizon,
+        drawer_material_by_fixture=materials,
     )
 
 
@@ -60,9 +83,14 @@ def resolve_episode_plan(
     max_horizon: int = 3200,
     route: str | Route | None = None,
     drawer_order: Sequence[str] | str | None = None,
+    drawer_material_candidates: Sequence[str] = ("original",),
     **_: Any,
 ) -> EpisodePlan:
-    sampled = sample_episode_plan(seed, max_horizon=max_horizon)
+    sampled = sample_episode_plan(
+        seed,
+        max_horizon=max_horizon,
+        drawer_material_candidates=drawer_material_candidates,
+    )
     resolved_route = (
         sampled.route
         if route is None
@@ -78,6 +106,7 @@ def resolve_episode_plan(
         route=resolved_route,
         drawer_order=resolved_order,
         max_horizon=int(max_horizon),
+        drawer_material_by_fixture=dict(sampled.drawer_material_by_fixture),
     )
 
 
