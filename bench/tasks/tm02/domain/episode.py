@@ -7,6 +7,12 @@ from typing import Any
 
 import numpy as np
 
+from bench.tasks.tm02.cabinet_materials import (
+    CABINET_MATERIAL_TEXTURES,
+    normalize_cabinet_material_candidates,
+    sample_cabinet_material,
+)
+
 from bench.tasks.tm02.domain.contracts import (
     CAN_NAME,
     ENV_NAME,
@@ -54,7 +60,7 @@ def resolve_episode_plan(
     seed: int,
     max_horizon: int = 3600,
     route: str | Route | None = None,
-    **_: Any,
+    **values: Any,
 ) -> EpisodePlan:
     sampled = sample_episode_plan(seed, max_horizon=max_horizon)
     resolved_route = (
@@ -64,10 +70,14 @@ def resolve_episode_plan(
         if isinstance(route, Route)
         else Route(str(route))
     )
+    candidates = normalize_cabinet_material_candidates(
+        values.get("cabinet_material_candidates", tuple(CABINET_MATERIAL_TEXTURES))
+    )
     return EpisodePlan(
         seed=int(seed),
         route=resolved_route,
         max_horizon=int(max_horizon),
+        cabinet_material_id=sample_cabinet_material(seed, candidates),
     )
 
 

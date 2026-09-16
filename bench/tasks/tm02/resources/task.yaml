@@ -60,6 +60,12 @@ scene:
 
 episode:
   plan_balance: seed_parity
+  cabinet_material_candidates:
+    - original
+    - light_wood
+    - walnut
+    - gray_wood
+    - warm_white
   # Pure action recordings reach success at steps 3290 and 3206; keep 248
   # steps of headroom for the longer route under the 20 Hz controller.
   max_horizon: 3600

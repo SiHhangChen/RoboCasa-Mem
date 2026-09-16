@@ -51,6 +51,7 @@ class EpisodePlan:
     seed: int
     route: Route
     max_horizon: int
+    cabinet_material_id: str = "original"
 
 
 @dataclass(frozen=True)

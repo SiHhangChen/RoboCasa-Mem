@@ -20,6 +20,10 @@ from robocasa.utils.object_utils import (
 )
 
 from bench.tasks.tm02.config import load_task_config, resolve_observer_config
+from bench.tasks.tm02.cabinet_materials import (
+    CABINET_MATERIAL_TEXTURES,
+    apply_cabinet_material,
+)
 from bench.tasks.tm02.domain.contracts import (
     AXIS,
     BUTTON_NAMES,
@@ -190,11 +194,20 @@ class TM02FillPotAndRetrieveCan(Kitchen):
         can_name: str = CAN_NAME,
         can_xml: str = RED_CAN_XML,
         can_scale: float = 0.90,
+        cabinet_material_id: str = "original",
         gripper_force_limit: float = 20.0,
         gripper_pad_friction: tuple[float, float, float] = (2.0, 0.05, 0.0001),
         observer_config: ObserverConfig | Mapping[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
+        self.cabinet_material_id = str(cabinet_material_id)
+        if self.cabinet_material_id not in CABINET_MATERIAL_TEXTURES:
+            raise ValueError(f"unknown TM02 cabinet material: {self.cabinet_material_id!r}")
+        self.cabinet_material_randomization = {
+            "material": self.cabinet_material_id,
+            "fixtures": [CABINET_NAME],
+            "applied": self.cabinet_material_id != "original",
+        }
         water_button_xyz = _finite_xyz(
                 water_button_world_xyz,
                 label="water_button_world_xyz",
@@ -394,6 +407,11 @@ class TM02FillPotAndRetrieveCan(Kitchen):
     def edit_model_xml(self, xml_str: str) -> str:
         xml_str = super().edit_model_xml(xml_str)
         root = ET.fromstring(xml_str)
+        apply_cabinet_material(
+            root,
+            material_id=self.cabinet_material_id,
+            texture_root=Path(assets_root) / "textures",
+        )
         worldbody = root.find("worldbody")
         if worldbody is None:
             return xml_str

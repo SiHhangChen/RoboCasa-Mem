@@ -7,7 +7,7 @@ from dataclasses import asdict
 from typing import Any
 
 from bench.runtime import TaskRuntimeAdapter, default_close
-from bench.tasks.runtime_support import config_actions, manual_navigation, path_base_initialization, standard_plan, standard_scene, variant_prompt
+from bench.tasks.runtime_support import config_actions, manual_navigation, standard_plan, standard_scene, variant_prompt
 from bench.tasks.tm02.config import CALIBRATION_RESOURCE_NAMES, load_task_config, missing_calibration_resources, require_production_calibration, resolve_action_config, resolve_observer_config, resolve_task_options
 from bench.tasks.tm02.domain.episode import resolve_episode_plan, resolve_scene_config
 from bench.tasks.tm02.evaluation import (
@@ -18,14 +18,14 @@ from bench.tasks.tm02.evaluation import (
     report_stages_for_runtime,
     success_for_runtime,
 )
-from bench.tasks.tm02.execution.navigation import build_navigation_config
+from bench.tasks.tm02.execution.navigation import build_navigation_config, sample_episode_path_poses
 from bench.tasks.tm02.expert.operations import build_operation_handlers
 from bench.tasks.tm02.initialization import apply_manual_path_initial_base_pose
 from bench.tasks.tm02.prompts import resolve_prompt_spec
 
 
 def _environment(config: Any, scene: Any, plan: Any, resources: Mapping[str, Any]) -> Mapping[str, Any]:
-    del plan, resources
+    del resources
     gripper = dict(config.manipulation.get("gripper", {}))
     return {
         "water_button_world_xyz": scene.water_button_world_xyz,
@@ -39,6 +39,7 @@ def _environment(config: Any, scene: Any, plan: Any, resources: Mapping[str, Any
         "can_name": scene.can_name,
         "can_xml": scene.can_xml,
         "can_scale": scene.can_scale,
+        "cabinet_material_id": str(plan.cabinet_material_id),
         "gripper_force_limit": float(gripper.get("force_limit", 20.0)),
         "gripper_pad_friction": tuple(
             float(value)
@@ -62,7 +63,18 @@ def _release_facts(config: Any, episode: Any, resources: Mapping[str, Any], opti
     }
 
 
-_initialize_base = path_base_initialization(apply_manual_path_initial_base_pose)
+def _initialize_base(descriptor: Any, env: Any, observation: Mapping[str, Any]):
+    """Initialize base using episode-seeded circle/turn sampling (TM01-style)."""
+    updated, base = apply_manual_path_initial_base_pose(
+        env,
+        dict(observation),
+        path_file=descriptor.resources["manual_base_path"],
+        sample_index=int(
+            descriptor.config.initial_state.get("robot_base_sample_index", 0)
+        ),
+        seed=int(descriptor.episode_plan.seed),
+    )
+    return updated, {"base": base}, {}, None
 
 
 def _initialize(descriptor: Any, env: Any, observation: Mapping[str, Any]):
