@@ -116,6 +116,20 @@ def resolve_episode_plan(*, seed: int, **values: Any) -> EpisodePlan:
         values.pop("item_sample_radius_m", 0.045), label="item_sample_radius_m"
     )
     horizon = int(values.pop("max_horizon", 5200))
+    carton_types = _candidate_pool(
+        values.pop("carton_type_candidates", MILK_CARTON_TYPES),
+        allowed=MILK_CARTON_TYPES,
+        label="carton_type_candidates",
+    )
+    if set(carton_types) != set(MILK_CARTON_TYPES):
+        raise ValueError(
+            "WR-08 carton_type_candidates must include both fixed carton types"
+        )
+    carton_materials = _candidate_pool(
+        values.pop("carton_material_candidates", MILK_CARTON_MATERIALS),
+        allowed=MILK_CARTON_MATERIALS,
+        label="carton_material_candidates",
+    )
     values.pop("color_pool", None)
     if values:
         raise ValueError("unknown WR-08 episode settings: " + ", ".join(sorted(values)))

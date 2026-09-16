@@ -6,7 +6,8 @@ from typing import Any
 
 import numpy as np
 
-from bench.execution.navigation.base_motion import set_base_pose_kinematic
+from bench.execution.navigation.base_motion import base_yaw, set_base_pose_kinematic
+from bench.execution.sampling.circle_sampling import sample_uniform_disk
 from bench.runtime.contracts import InitializationReport
 from bench.tasks.wr08.domain.contracts import (
     EpisodePlan,
@@ -28,6 +29,7 @@ def initialize_episode_state(
             "unknown WR-08 initial object settings: " + ", ".join(sorted(objects))
         )
     env.configure_episode(episode)
+    base_sampling = None
     if robot_base.mode is RobotBaseMode.EXPLICIT_POSE:
         if robot_base.xy is None or robot_base.yaw is None:
             raise ValueError("explicit WR-08 robot base pose is incomplete")
@@ -36,6 +38,30 @@ def initialize_episode_state(
             target_xy=np.asarray(robot_base.xy, dtype=float),
             target_yaw=float(robot_base.yaw),
         )
+    elif robot_base.mode is RobotBaseMode.RESET_CIRCLE:
+        if robot_base.radius_m is None:
+            raise ValueError("WR-08 reset_circle radius is incomplete")
+        center = np.asarray(obs["robot0_base_pos"], dtype=float)[:2]
+        yaw = base_yaw(obs)
+        sampled_xy = sample_uniform_disk(
+            center,
+            robot_base.radius_m,
+            seed=episode.seed,
+            salt=0x57523038,
+        )
+        obs = set_base_pose_kinematic(
+            env,
+            target_xy=sampled_xy,
+            target_yaw=yaw,
+        )
+        base_sampling = {
+            "policy": "reset_circle_uniform_area",
+            "center_xy": center.tolist(),
+            "radius_m": robot_base.radius_m,
+            "sampled_xy": sampled_xy.tolist(),
+            "offset_xy": (sampled_xy - center).tolist(),
+            "preserved_yaw": yaw,
+        }
     elif robot_base.mode is not RobotBaseMode.PRESERVE_RESET_POSE:
         raise ValueError(f"unsupported WR-08 robot base mode: {robot_base.mode!r}")
     return obs, {
@@ -51,8 +77,14 @@ def initialize_episode_state(
             for item in episode.transport_order
         },
         "transport_order": list(episode.transport_order),
+        "carton_type_by_item": dict(episode.carton_type_by_item),
+        "carton_asset_by_item": dict(episode.carton_asset_by_item),
+        "carton_material_by_item": dict(episode.carton_material_by_item),
+        "carton_type_candidates": list(episode.carton_type_candidates),
+        "carton_material_candidates": list(episode.carton_material_candidates),
         "initial_source_physically_verified": True,
         "robot_base_mode": robot_base.mode.value,
+        "initial_base_sampling": base_sampling,
         "actual_base_pos": np.asarray(
             obs.get("robot0_base_pos", (0.0, 0.0)), dtype=float
         ).tolist(),

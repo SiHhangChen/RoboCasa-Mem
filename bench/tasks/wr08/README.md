@@ -16,12 +16,21 @@ When the taller `milk_0` carton is assigned to `source_right`, its sampled
 in-plate offset is deterministically mirrored toward the open side of the tray;
 the adjusted offset remains part of the resolved episode facts.
 
-Each transport uses the current WR-07 motion setup: the five calibrated shared
-source-counter poses, the target-side 10 cm disk, four object-relative top-down
-grasp candidates, four placement yaw candidates, and the asset-native contact
-parameters. At reset, each carton's height is computed from its source tray's
-top offset and its own bottom offset. Episode configuration validates these
-seed-owned assignments without repositioning objects after reset settling.
+Each carton independently samples one of the `matte`, `satin`, `glossy`, or
+`foil` appearance profiles from the configured candidate pool. The profile
+recolors the carton's green texture region and sets its specular, shininess,
+and reflectance values without changing mesh or collision geometry. Sampling
+is deterministic for the episode seed and is exposed in runtime facts.
+
+The robot reset pose is sampled uniformly by area within a 5 cm-radius disk
+around the simulator reset position while preserving reset yaw. Each transport
+uses the current WR-07 motion setup: a 10 cm-diameter source-counter disk, the
+target-side 10 cm disk, four object-relative top-down grasp candidates, four
+placement yaw candidates, and the asset-native contact parameters. Source
+observation and pickup reuse one sampled source pose within the episode. At
+reset, each carton's height is computed from its source tray's top offset and
+its own bottom offset. Episode configuration validates these seed-owned
+assignments without repositioning objects after reset settling.
 
 The task-local pick executor checks the compiled open-cabinet shelf geoms,
 including procedural shelves missing from the fixture's cached contact list.

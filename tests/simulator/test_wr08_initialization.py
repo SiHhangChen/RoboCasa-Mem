@@ -62,6 +62,7 @@ def env():
         ITEM_IDS[0]: np.array([0.03, -0.02]), ITEM_IDS[1]: np.array([0.04, 0.01]),
     }
     instance.source_item_yaw_by_item = dict(zip(ITEM_IDS, (1.2, -0.7)))
+    instance.carton_material_by_item = {item: "satin" for item in ITEM_IDS}
     sim.data.qvel[:] = 3.0
     return instance
 
@@ -96,6 +97,7 @@ def test_episode_configuration_does_not_reposition_settled_cartons(env):
             "source_slot_by_item", "source_color_by_item", "target_slot_by_color",
             "source_item_offset_xy_by_item", "target_item_offset_xy_by_item",
             "source_item_yaw_by_item", "target_item_yaw_by_item",
+            "carton_material_by_item",
         )
     }, transport_order=ITEM_IDS[::-1])
     env.sim.data.qpos[:] += 0.01

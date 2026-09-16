@@ -69,7 +69,7 @@ def load_task_config(path: str | Path = DEFAULT_TASK_CONFIG_FILE) -> TaskConfig:
         initial, {"robot_base", "source_regions", "objects"}, "initial_state fields"
     )
     base = _mapping(initial, "robot_base")
-    _reject_unknown(base, {"mode", "xy", "yaw"}, "robot_base fields")
+    _reject_unknown(base, {"mode", "xy", "yaw", "radius_m"}, "robot_base fields")
     source_regions = _mapping(initial, "source_regions")
     if set(source_regions) != set(SOURCE_SLOTS):
         raise ValueError(
@@ -323,12 +323,22 @@ def resolve_robot_base_config(
     mode: str | RobotBaseMode = RobotBaseMode.PRESERVE_RESET_POSE,
     xy: Sequence[float] | None = None,
     yaw: float | None = None,
+    radius_m: float | None = None,
 ) -> RobotBaseConfig:
     raw = mode.value if isinstance(mode, RobotBaseMode) else str(mode).strip().lower()
     try:
         resolved = RobotBaseMode(raw)
     except ValueError as exc:
         raise ValueError(f"unsupported WR-08 robot-base mode: {raw!r}") from exc
+    if resolved is RobotBaseMode.RESET_CIRCLE:
+        if xy is not None or yaw is not None:
+            raise ValueError("reset_circle uses the reset pose; xy and yaw are not allowed")
+        radius = float(0.05 if radius_m is None else radius_m)
+        if not isfinite(radius) or radius < 0.0:
+            raise ValueError("reset_circle radius_m must be finite and non-negative")
+        return RobotBaseConfig(resolved, radius_m=radius)
+    if radius_m is not None:
+        raise ValueError("radius_m is only supported by reset_circle")
     if resolved is RobotBaseMode.PRESERVE_RESET_POSE:
         if xy is not None or yaw is not None:
             raise ValueError("preserve_reset_pose does not accept xy or yaw")

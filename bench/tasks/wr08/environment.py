@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
 
+import mujoco
 import numpy as np
 
 from robocasa.environments.kitchen.kitchen import Kitchen
@@ -15,10 +16,12 @@ from bench.tasks.wr08.domain.contracts import (
     COLOR_RGBA,
     ITEM_IDS,
     ITEM_LABELS,
+    MILK_CARTON_MATERIAL_PROFILES,
     SOURCE_SLOTS,
     TARGET_SLOTS,
 )
 from bench.tasks.wr08.domain.episode import (
+    validate_carton_material,
     validate_color,
     validate_source_slot,
     validate_target_slot,
@@ -83,6 +86,7 @@ class WR08MatchMilkCartonsToColoredSugarPlates(Kitchen):
         source_item_yaw_by_item: Mapping[str, float] | None = None,
         target_item_offset_xy_by_item: Mapping[str, Any] | None = None,
         target_item_yaw_by_item: Mapping[str, float] | None = None,
+        carton_material_by_item: Mapping[str, str] | None = None,
         transport_order: Sequence[str] | None = None,
         item_sample_radius_m: float = 0.045,
         plate_threshold: float = 0.16,
@@ -156,6 +160,13 @@ class WR08MatchMilkCartonsToColoredSugarPlates(Kitchen):
         }
         self.target_item_yaw_by_item = {
             item: float((target_item_yaw_by_item or {}).get(item, 0.0))
+            for item in ITEM_IDS
+        }
+        material_values = dict(carton_material_by_item or {})
+        if material_values and set(material_values) != set(ITEM_IDS):
+            raise ValueError("WR-08 carton_material_by_item must define both cartons")
+        self.carton_material_by_item = {
+            item: validate_carton_material(material_values.get(item, "satin"))
             for item in ITEM_IDS
         }
         self.item_sample_radius_m = float(item_sample_radius_m)
@@ -321,6 +332,7 @@ class WR08MatchMilkCartonsToColoredSugarPlates(Kitchen):
         )
         self._apply_milk_carton_poses()
         self._apply_plate_colors()
+        self._apply_carton_materials()
         self._update_task_state()
 
     def configure_episode(self, episode: Any) -> None:
@@ -357,6 +369,8 @@ class WR08MatchMilkCartonsToColoredSugarPlates(Kitchen):
         if len(order) != len(ITEM_IDS) or set(order) != set(ITEM_IDS):
             raise ValueError("WR-08 EpisodePlan transport_order is invalid")
         self._transport_order = order
+        if dict(episode.carton_material_by_item) != self.carton_material_by_item:
+            raise ValueError("WR-08 environment and EpisodePlan carton materials differ")
 
     def source_plate_name(self, slot: str) -> str:
         return f"source_plate_{validate_source_slot(slot).removeprefix('source_')}"
@@ -417,6 +431,93 @@ class WR08MatchMilkCartonsToColoredSugarPlates(Kitchen):
             self._set_body_color(self.source_plate_name(slot), COLOR_RGBA[color])
         for slot, color in self.target_plate_color_by_slot.items():
             self._set_body_color(self.target_plate_name(slot), COLOR_RGBA[color])
+
+    def _apply_carton_materials(self) -> None:
+        """Apply each episode-owned optical profile to its fixed carton mesh."""
+        for item in ITEM_IDS:
+            self._apply_carton_material(
+                item,
+                MILK_CARTON_MATERIAL_PROFILES[self.carton_material_by_item[item]],
+            )
+
+    def _apply_carton_material(
+        self,
+        item: str,
+        profile: Mapping[str, Any],
+    ) -> None:
+        model = self.sim.model
+        root = int(self.obj_body_id[item])
+        parents = np.asarray(model.body_parentid, dtype=int)
+        material_ids: set[int] = set()
+        for geom_id, body_id in enumerate(np.asarray(model.geom_bodyid, dtype=int)):
+            current = int(body_id)
+            belongs = False
+            while current > 0:
+                if current == root:
+                    belongs = True
+                    break
+                current = int(parents[current])
+            if not belongs or float(model.geom_rgba[geom_id, 3]) <= 0.0:
+                continue
+            material_id = int(model.geom_matid[geom_id])
+            if material_id >= 0:
+                material_ids.add(material_id)
+            model.geom_rgba[geom_id, :] = (1.0, 1.0, 1.0, 1.0)
+
+        for material_id in material_ids:
+            model.mat_specular[material_id] = float(profile["specular"])
+            model.mat_shininess[material_id] = float(profile["shininess"])
+            model.mat_reflectance[material_id] = float(profile["reflectance"])
+
+        raw_model = model._model
+        texture_ids = {
+            int(texture_id)
+            for material_id in material_ids
+            for texture_id in np.asarray(raw_model.mat_texid[material_id]).reshape(-1)
+            if int(texture_id) >= 0
+        }
+        cache = getattr(self, "_carton_texture_original_data", None)
+        if cache is None:
+            cache = {}
+            self._carton_texture_original_data = cache
+        target = np.asarray(profile["texture_rgb"], dtype=np.float32)
+        source_green = np.asarray((0, 107, 14), dtype=np.float32)
+        white = np.full(3, 255.0, dtype=np.float32)
+        green_axis = source_green - white
+        green_axis_norm = float(np.dot(green_axis, green_axis))
+        for texture_id in texture_ids:
+            address = int(raw_model.tex_adr[texture_id])
+            width = int(raw_model.tex_width[texture_id])
+            height = int(raw_model.tex_height[texture_id])
+            channels = int(raw_model.tex_nchannel[texture_id])
+            size = width * height * channels
+            original = cache.setdefault(
+                texture_id,
+                np.asarray(
+                    raw_model.tex_data[address : address + size],
+                    dtype=np.uint8,
+                ).copy(),
+            )
+            pixels = original.reshape(height, width, channels).copy()
+            rgb = pixels[..., :3].astype(np.float32)
+            green_mask = (rgb[..., 1] > rgb[..., 0] + 2.0) & (
+                rgb[..., 1] > rgb[..., 2] + 2.0
+            )
+            coverage = np.sum((rgb - white) * green_axis, axis=-1) / green_axis_norm
+            coverage = np.clip(coverage, 0.0, 1.0)
+            recolored = rgb + coverage[..., None] * (target - source_green)
+            pixels[..., :3][green_mask] = np.clip(
+                recolored[green_mask], 0.0, 255.0
+            ).astype(np.uint8)
+            raw_model.tex_data[address : address + size] = pixels.reshape(-1)
+            self._upload_texture_if_rendering(texture_id)
+
+    def _upload_texture_if_rendering(self, texture_id: int) -> None:
+        context = getattr(self.sim, "_render_context_offscreen", None)
+        if context is None:
+            return
+        context.gl_ctx.make_current()
+        mujoco.mjr_uploadTexture(self.sim.model._model, context.con, int(texture_id))
 
     def _set_body_color(
         self, name: str, rgba: tuple[float, float, float, float]

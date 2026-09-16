@@ -101,6 +101,7 @@ COLOR_RGBA = {
 class RobotBaseMode(str, Enum):
     PRESERVE_RESET_POSE = "preserve_reset_pose"
     EXPLICIT_POSE = "explicit_pose"
+    RESET_CIRCLE = "reset_circle"
 
 
 @dataclass(frozen=True)
@@ -108,6 +109,7 @@ class RobotBaseConfig:
     mode: RobotBaseMode
     xy: tuple[float, float] | None = None
     yaw: float | None = None
+    radius_m: float | None = None
 
 
 @dataclass(frozen=True)
@@ -209,20 +211,6 @@ CARTON_TYPE_BY_ITEM = {
 }
 
 MILK_CARTON_TYPES = tuple(CARTON_TYPE_BY_ITEM.values())
-
-
-class RobotBaseMode(str, Enum):
-    PRESERVE_RESET_POSE = "preserve_reset_pose"
-    EXPLICIT_POSE = "explicit_pose"
-    RESET_CIRCLE = "reset_circle"
-
-
-@dataclass(frozen=True)
-class RobotBaseConfig:
-    mode: RobotBaseMode
-    xy: tuple[float, float] | None = None
-    yaw: float | None = None
-    radius_m: float | None = None
 
 
 __all__ = [

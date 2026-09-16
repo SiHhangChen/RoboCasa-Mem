@@ -48,6 +48,7 @@ def _environment(
         "source_item_yaw_by_item": dict(plan.source_item_yaw_by_item),
         "target_item_offset_xy_by_item": dict(plan.target_item_offset_xy_by_item),
         "target_item_yaw_by_item": dict(plan.target_item_yaw_by_item),
+        "carton_material_by_item": dict(plan.carton_material_by_item),
         "item_sample_radius_m": float(plan.item_sample_radius_m),
         "plate_threshold": float(config.semantics.get("plate_threshold", 0.16)),
         "physical_event_dwell_steps": int(
@@ -93,6 +94,11 @@ _ADAPTER = TaskRuntimeAdapter(
         "task_revision": TASK_REVISION,
         "task_id": episode.task_id,
         "carton_asset_by_item": dict(CARTON_ASSET_BY_ITEM),
+        "carton_material_by_item": dict(episode.facts["carton_material_by_item"]),
+        "carton_type_candidates": list(episode.facts["carton_type_candidates"]),
+        "carton_material_candidates": list(
+            episode.facts["carton_material_candidates"]
+        ),
     },
     expert_runtime=build_operation_handlers,
 )

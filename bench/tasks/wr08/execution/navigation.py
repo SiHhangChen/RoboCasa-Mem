@@ -52,11 +52,33 @@ class SourcePlateStationSampler:
         self._delegate = delegate
         self._env = env
         self._summary_by_station: dict[str, dict[str, Any]] = {}
+        # Reuse one source pose for observe and pick within an episode.
+        self._source_circle_pose: Pose | None = None
+        self._source_circle_summary: dict[str, Any] | None = None
 
     def sample(self, station_name: str, *, purpose: str | None = None) -> Pose:
-        pose = self._delegate.sample(station_name, purpose=purpose)
-        summary = dict(self._delegate.last_summary(station_name) or {})
+        station_id_resolver = getattr(self._delegate, "station_id", None)
+        station_id = (
+            station_id_resolver(station_name, purpose=purpose)
+            if callable(station_id_resolver)
+            else station_name
+        )
+        is_source_station = str(station_id) == "counter_pick_station"
+        if is_source_station and self._source_circle_pose is not None:
+            pose = self._source_circle_pose
+            summary = dict(self._source_circle_summary or {})
+            summary["purpose"] = purpose
+        else:
+            pose = self._delegate.sample(station_name, purpose=purpose)
+            summary = dict(self._delegate.last_summary(station_name) or {})
         sample = dict(summary.get("sample") or {})
+        if (
+            is_source_station
+            and self._source_circle_pose is None
+            and isinstance(sample.get("circle"), dict)
+        ):
+            self._source_circle_pose = pose
+            self._source_circle_summary = dict(summary)
         settings = sample.get("object_relative_xy")
         if not isinstance(settings, dict) or not bool(settings.get("enabled", False)):
             self._summary_by_station[station_name] = summary
@@ -119,6 +141,8 @@ class SourcePlateStationSampler:
     def reset_choices(self) -> None:
         self._delegate.reset_choices()
         self._summary_by_station.clear()
+        self._source_circle_pose = None
+        self._source_circle_summary = None
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self._delegate, name)
