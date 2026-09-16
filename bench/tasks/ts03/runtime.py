@@ -92,7 +92,7 @@ _ADAPTER = TaskRuntimeAdapter(
     report_stage_profile_id=REPORT_STAGE_PROFILE_ID,
     report_stages=report_stages_for_runtime,
     release_facts=lambda config, episode, resources, options: {
-        "task_revision": str(getattr(config, "task", {}).get("revision", "TS03-v1")),
+        "task_revision": str(getattr(config, "task", {}).get("revision", "TS03-v2")),
         **episode_profile_metadata(type("EpisodeFacts", (), dict(episode.facts))()),
         "saucepan_type": episode.facts.get("saucepan_type"),
         "saucepan_asset": episode.facts.get("saucepan_asset"),

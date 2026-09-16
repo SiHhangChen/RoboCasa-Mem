@@ -63,37 +63,19 @@ def _profile(
     )
 
 
-TM01_REPORT_PROFILE_V1 = _profile(
-    "TM01",
-    "burner_on",
-    "one_drawer_inspected",
-    "both_threads_completed",
-    "success",
-)
-TM02_REPORT_PROFILE_V1 = _profile(
-    "TM02",
-    "faucet_on",
-    "pot_filled_and_can_retrieved",
-    "both_threads_completed",
-    "success",
-)
 TM01_REPORT_PROFILE = _profile(
     "TM01",
     "burner_on",
     "one_drawer_inspected",
-    "one_thread_completed",
     "both_threads_completed",
     "success",
-    version=2,
 )
 TM02_REPORT_PROFILE = _profile(
     "TM02",
     "faucet_on",
     "pot_filled_and_can_retrieved",
-    "one_thread_completed",
     "both_threads_completed",
     "success",
-    version=2,
 )
 TS01_REPORT_PROFILE = _profile(
     "TS01",
@@ -116,8 +98,10 @@ TS03_REPORT_PROFILE = _profile(
     "TS03",
     "sugar_1",
     "sugar_2",
+    "sugar_3",
     "success",
-    conditional=("sugar_2",),
+    conditional=("sugar_2", "sugar_3"),
+    version=2,
 )
 TS04_REPORT_PROFILE = _profile(
     "TS04",
@@ -133,9 +117,7 @@ WA01_REPORT_PROFILE = _profile(
     "sugar_added",
     "one_cup_ready",
     "two_cups_ready",
-    "select",
     "success",
-    version=2,
 )
 WA02_REPORT_PROFILE = _profile(
     "WA-02",
@@ -152,9 +134,7 @@ WA03_REPORT_PROFILE = _profile(
     "one_cup_ready",
     "two_cups_ready",
     "three_cups_ready",
-    "select",
     "success",
-    version=2,
 )
 WA05_REPORT_PROFILE = _profile(
     "WA-05",
@@ -162,21 +142,26 @@ WA05_REPORT_PROFILE = _profile(
     "cup_staged",
     "success",
 )
+WA06_REPORT_PROFILE = _profile(
+    "WA-06",
+    "sugar_added",
+    "sugared_cup_selected",
+    "success",
+)
 WR01_REPORT_PROFILE = _profile(
     "WR-01",
     "one_can_stored",
     "two_cans_stored",
+    "storage_hidden",
     "correct_cabinet_opened",
     "success",
-    version=2,
 )
 WR03_REPORT_PROFILE = _profile(
     "WR-03",
-    "one_door_closed",
-    "both_doors_closed",
+    "can_stored",
+    "storage_hidden",
     "correct_cabinet_opened",
     "success",
-    version=2,
 )
 WR05_REPORT_PROFILE = _profile(
     "WR-05",
@@ -195,21 +180,21 @@ WR06_REPORT_PROFILE = _profile(
 WR07_REPORT_PROFILE = _profile(
     "WR-07",
     "item_picked",
-    "item_placed",
+    "memory_color_latched",
     "target_plate_matched",
     "success",
-    version=4,
+    version=3,
 )
 WR08_REPORT_PROFILE = _profile(
     "WR-08",
     "one_item_picked",
-    "one_item_placed",
+    "one_item_color_latched",
     "one_item_matched",
     "two_items_picked",
-    "two_items_placed",
+    "two_items_color_latched",
     "two_items_matched",
     "success",
-    version=3,
+    version=2,
 )
 WX01_REPORT_PROFILE = _profile(
     "WX-01",
@@ -242,6 +227,7 @@ REPORT_STAGE_PROFILES = (
     WA02_REPORT_PROFILE,
     WA03_REPORT_PROFILE,
     WA05_REPORT_PROFILE,
+    WA06_REPORT_PROFILE,
     WR01_REPORT_PROFILE,
     WR03_REPORT_PROFILE,
     WR05_REPORT_PROFILE,
@@ -253,16 +239,12 @@ REPORT_STAGE_PROFILES = (
 )
 
 _PROFILES_BY_TASK = {profile.task_id: profile for profile in REPORT_STAGE_PROFILES}
-# Historical reports remain readable only under their explicit profile id.
-# Keep them out of the default, one-profile-per-task catalog.
-_HISTORICAL_REPORT_STAGE_PROFILES = (TM01_REPORT_PROFILE_V1, TM02_REPORT_PROFILE_V1)
 _PROFILES_BY_ID = {
-    profile.profile_id: profile
-    for profile in (*REPORT_STAGE_PROFILES, *_HISTORICAL_REPORT_STAGE_PROFILES)
+    profile.profile_id: profile for profile in REPORT_STAGE_PROFILES
 }
 if len(_PROFILES_BY_TASK) != len(REPORT_STAGE_PROFILES):
     raise RuntimeError("benchmark report profiles must have unique task ids")
-if len(_PROFILES_BY_ID) != len(REPORT_STAGE_PROFILES) + len(_HISTORICAL_REPORT_STAGE_PROFILES):
+if len(_PROFILES_BY_ID) != len(REPORT_STAGE_PROFILES):
     raise RuntimeError("benchmark report profiles must have unique profile ids")
 
 
@@ -271,19 +253,16 @@ def get_report_stage_profile(
     *,
     profile_id: str | None = None,
 ) -> ReportStageProfile:
-    """Resolve the current default or an explicitly requested historical profile."""
+    """Resolve the frozen public profile for one canonical benchmark task id."""
 
     try:
         profile = _PROFILES_BY_TASK[str(task_id)]
     except KeyError as exc:
         raise KeyError(f"task {task_id!r} has no benchmark report profile") from exc
-    if profile_id is not None:
-        selected = _PROFILES_BY_ID.get(str(profile_id))
-        if selected is None or selected.task_id != profile.task_id:
-            raise KeyError(
-                f"task {task_id!r} does not use report profile {profile_id!r}"
-            )
-        return selected
+    if profile_id is not None and profile.profile_id != str(profile_id):
+        raise KeyError(
+            f"task {task_id!r} does not use report profile {profile_id!r}"
+        )
     return profile
 
 
@@ -291,9 +270,7 @@ __all__ = [
     "REPORT_STAGE_PROFILES",
     "ReportStageProfile",
     "TM01_REPORT_PROFILE",
-    "TM01_REPORT_PROFILE_V1",
     "TM02_REPORT_PROFILE",
-    "TM02_REPORT_PROFILE_V1",
     "TS01_REPORT_PROFILE",
     "TS02_REPORT_PROFILE",
     "TS03_REPORT_PROFILE",
@@ -302,6 +279,7 @@ __all__ = [
     "WA02_REPORT_PROFILE",
     "WA03_REPORT_PROFILE",
     "WA05_REPORT_PROFILE",
+    "WA06_REPORT_PROFILE",
     "WR01_REPORT_PROFILE",
     "WR03_REPORT_PROFILE",
     "WR05_REPORT_PROFILE",
