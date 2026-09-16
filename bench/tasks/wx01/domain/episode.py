@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 import numpy as np
@@ -19,6 +19,14 @@ from bench.tasks.wx01.domain.geometry import (
     sample_temporary_offsets,
     sample_wipe_offsets,
 )
+from bench.tasks.wx01.object_randomization import (
+    CUP_MATERIAL_IDS,
+    SPONGE_TYPES,
+)
+
+
+CUP_MATERIAL_SEED_SALT = 0x5758434D
+SPONGE_TYPE_SEED_SALT = 0x57585350
 
 
 def resolve_task_definition(**values: Any) -> TaskDefinition:
@@ -77,7 +85,7 @@ def resolve_episode_plan(
     episode: Mapping[str, Any],
     object_settings: Mapping[str, Any],
 ) -> EpisodePlan:
-    """Freeze original regions, temporary targets and wipe trajectory for one seed."""
+    """Freeze original regions, temporary targets, wipe trajectory and appearance for one seed."""
 
     values = dict(episode)
     start_mode = str(
@@ -89,6 +97,16 @@ def resolve_episode_plan(
         )
     temporary = values.pop("temporary_targets", {})
     wipe = values.pop("wipe_sampling", {})
+    cup_material_candidates = _candidate_pool(
+        values.pop("cup_material_candidates", CUP_MATERIAL_IDS),
+        allowed=CUP_MATERIAL_IDS,
+        label="cup_material_candidates",
+    )
+    sponge_type_candidates = _candidate_pool(
+        values.pop("sponge_type_candidates", SPONGE_TYPES),
+        allowed=SPONGE_TYPES,
+        label="sponge_type_candidates",
+    )
     max_horizon = int(values.pop("max_horizon", 3200))
     if values:
         raise ValueError("unknown WX-01 episode settings: " + ", ".join(sorted(values)))
@@ -106,6 +124,16 @@ def resolve_episode_plan(
         raise ValueError("WX-01 max_horizon must be positive")
     return EpisodePlan(
         seed=int(seed),
+        cup_material_id=str(
+            _episode_rng(seed, CUP_MATERIAL_SEED_SALT).choice(
+                cup_material_candidates
+            )
+        ),
+        sponge_type=str(
+            _episode_rng(seed, SPONGE_TYPE_SEED_SALT).choice(
+                sponge_type_candidates
+            )
+        ),
         initial_object_poses=sample_initial_object_poses(
             episode_seed=int(seed),
             settings=object_settings,
@@ -128,6 +156,27 @@ def _pair(value: Any, label: str) -> tuple[float, float]:
 
 def _optional_int(value: Any) -> int | None:
     return None if value is None else int(value)
+
+
+def _episode_rng(seed: int, salt: int) -> np.random.Generator:
+    return np.random.default_rng(np.random.SeedSequence([int(seed), salt]))
+
+
+def _candidate_pool(
+    value: Any,
+    *,
+    allowed: Sequence[str],
+    label: str,
+) -> tuple[str, ...]:
+    if isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
+        raise ValueError(f"WX-01 {label} must be a non-empty sequence")
+    candidates = tuple(str(item) for item in value)
+    if not candidates or len(set(candidates)) != len(candidates):
+        raise ValueError(f"WX-01 {label} must be non-empty and unique")
+    unknown = sorted(set(candidates) - set(allowed))
+    if unknown:
+        raise ValueError(f"unknown WX-01 {label}: " + ", ".join(unknown))
+    return candidates
 
 
 __all__ = [

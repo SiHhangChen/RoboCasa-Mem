@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import xml.etree.ElementTree as ET
 from typing import Any
 
 import numpy as np
@@ -10,6 +11,7 @@ from robocasa.environments.kitchen.kitchen import FixtureType, Kitchen
 from robocasa.models import assets_root
 from robocasa.utils import object_utils as OU
 
+from bench.tasks.wx01 import object_randomization
 from bench.tasks.wx01.domain.geometry import bottom_center_xy_distance
 from bench.tasks.wx01.domain.semantics import (
     PhysicalState,
@@ -21,8 +23,21 @@ from bench.tasks.wx01.evaluation import WX01EvaluationSnapshot, WX01Evaluator
 from bench.tasks.wx01.prompts import resolve_prompt_spec
 
 
-CLEANING_TOOL_XML = f"{assets_root}/objects/objaverse/sponge/sponge_0/model.xml"
+def _rgba(value: Any, label: str) -> tuple[float, float, float, float]:
+    """Module-level helper to validate RGBA tuples for stains etc."""
+    arr = np.asarray(value, dtype=float).reshape(-1)
+    if arr.size != 4 or not np.all(np.isfinite(arr)):
+        raise ValueError(f"WX-01 {label} must be 4 finite values")
+    if not (0.0 <= arr[3] <= 1.0):
+        raise ValueError(f"WX-01 {label} alpha must be in [0,1]")
+    return float(arr[0]), float(arr[1]), float(arr[2]), float(arr[3])
+
+
+# Base cup asset (material will be overridden per-episode via apply_cup_material)
 BLOCKING_OBJECT_XML = f"{assets_root}/objects/objaverse/cup/cup_5/model.xml"
+
+# Fallback (will be overridden by self.sponge_type at runtime)
+CLEANING_TOOL_XML = f"{assets_root}/objects/objaverse/sponge/sponge_0/model.xml"
 
 
 class WX01ReturnObjectToOriginalPlace(Kitchen):
@@ -33,7 +48,7 @@ class WX01ReturnObjectToOriginalPlace(Kitchen):
     def __init__(
         self,
         *,
-        origin_threshold: float = 0.02,
+        origin_threshold: float = 0.01,
         wipe_radius: float = 0.20,
         contact_separation: float = 0.02,
         minimum_contact_count: int = 2,
@@ -43,6 +58,11 @@ class WX01ReturnObjectToOriginalPlace(Kitchen):
         blocking_object_placement_size: tuple[float, float] = (0.16, 0.20),
         blocking_object_placement_pos: tuple[float, float] = (1.0, 1.0),
         blocking_object_rotation: tuple[float, float] = (0.0, 0.0),
+        cup_material_id: str = "ceramic_white",
+        sponge_type: str = "sponge_0",
+        stain_color_rgba: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0),
+        stain_circle_radius: float = 0.045,
+        stain_z_offset: float = 0.0018,
         **kwargs: Any,
     ) -> None:
         self.origin_threshold = _positive(origin_threshold, "origin_threshold")
@@ -64,8 +84,72 @@ class WX01ReturnObjectToOriginalPlace(Kitchen):
             blocking_object_rotation,
             "blocking_object_rotation",
         )
+        self.cup_material_id = object_randomization.validate_cup_material(cup_material_id)
+        self.sponge_type = object_randomization.validate_sponge_type(sponge_type)
+        # Resolve the actual sponge asset path for this episode
+        self._cleaning_tool_xml = str(
+            object_randomization.resolve_sponge_xml(
+                sponge_type=self.sponge_type, asset_root=assets_root
+            )
+        )
+        self.stain_color_rgba = _rgba(stain_color_rgba, "stain_color_rgba")
+        self.stain_circle_radius = _positive(stain_circle_radius, "stain_circle_radius")
+        self.stain_z_offset = _positive(stain_z_offset, "stain_z_offset")
+        self._stain_geom_names = ("wx01_stain_circle",)
         self._wx01_evaluator: WX01Evaluator | None = None
         super().__init__(**kwargs)
+
+    def edit_model_xml(self, xml_str: str) -> str:
+        """Overlay one white, non-colliding circle centered on the remembered cup pose."""
+
+        xml_str = super().edit_model_xml(xml_str)
+        root = ET.fromstring(xml_str)
+        worldbody = root.find("worldbody")
+        if worldbody is None:
+            return xml_str
+
+        # Avoid duplicate names if re-called
+        existing = {g.get("name") for g in worldbody.iter("geom") if g.get("name")}
+
+        surface_z = self._dining_table_surface_z() + self.stain_z_offset
+
+        # Before reset-time episode binding, use a harmless placeholder. The
+        # authoritative center is installed by _position_stains_on_remembered_area.
+        base_center = np.array([2.55, -3.49], dtype=float)  # good for layout 38 dining area
+        for name in self._stain_geom_names:
+            if name in existing:
+                continue
+            xy = base_center
+            rgba = self.stain_color_rgba
+            ET.SubElement(
+                worldbody,
+                "geom",
+                {
+                    "name": name,
+                    "type": "cylinder",
+                    "pos": f"{xy[0]:.8f} {xy[1]:.8f} {surface_z:.8f}",
+                    "size": f"{self.stain_circle_radius:.6f} 0.0008",
+                    "rgba": " ".join(f"{v:.6f}" for v in rgba),
+                    "contype": "0",
+                    "conaffinity": "0",
+                    "group": "1",
+                },
+            )
+        return ET.tostring(root, encoding="utf8").decode("utf8")
+
+    def _dining_table_surface_z(self) -> float:
+        try:
+            points = np.asarray(self.dining_table.get_bbox_points(), dtype=float)
+            if points.ndim == 2 and points.shape[1] >= 3:
+                return float(np.max(points[:, 2]))
+        except Exception:
+            pass
+        try:
+            pos = np.asarray(getattr(self.dining_table, "pos", (0, 0, 0)), dtype=float)
+            size = np.asarray(getattr(self.dining_table, "size", (0, 0, 0)), dtype=float)
+            return float(pos[2] + 0.5 * size[2])
+        except Exception:
+            return 0.78
 
     def _setup_kitchen_references(self) -> None:
         """Register the two fixture anchors required by this task."""
@@ -93,16 +177,63 @@ class WX01ReturnObjectToOriginalPlace(Kitchen):
         self.table_contact_timer = 0
         self.wipe_sweep_range = 0.0
         self.original_area_wiped = False
+        self.stain_progress = 0.0
         self.original_tool_pose = self._placement_pose("cleaning_tool")
-        self.original_blocking_object_pose = self._placement_pose("blocking_object")
+
+        # CRITICAL FIX for stain vs wipe target alignment (~5cm mismatch):
+        #
+        # Do NOT blindly assign self.original_blocking_object_pose from the current
+        # sim placement here.
+        #
+        # In the short-start flow:
+        #   - apply_initial_object_plan places the cup at the *remembered*
+        #     (pre-displacement) episode-sampled world position.
+        #   - It calls set_original_object_poses(..., blocking_object=remembered_pose).
+        #     This is the authoritative place that stores the "dirty spot" pose
+        #     AND calls _position_stains_on_remembered_area() to put the white
+        #     target circle exactly where the cleaning tool will wipe.
+        #   - Only *after* that the cup is displaced to the temporary location.
+        #
+        # When _setup_scene runs (especially on resets for recording), the live
+        # placement of "blocking_object" is usually already the temporary displaced pose.
+        #
+        # Overwriting the remembered pose here is what caused the stains to be
+        # generated at a different location from the wipe target.
+        #
+        # Rule: original_blocking_object_pose (the remembered dirty spot) must
+        # only be written by set_original_object_poses. We only take a fallback
+        # if it was never set.
+
+        if getattr(self, "original_blocking_object_pose", None) is None:
+            self.original_blocking_object_pose = self._placement_pose("blocking_object")
+
+        # Re-position stains using the (hopefully correct) remembered pose.
+        if getattr(self, "original_blocking_object_pose", None) is not None:
+            self._position_stains_on_remembered_area()
+
+        # Apply per-episode appearance (cup material + correct sponge model is already in _get_obj_cfgs)
+        self._sync_stain_visual()  # ensure stains start visible (full alpha)
+        if self.cup_material_id and "blocking_object" in self.obj_body_id:
+            try:
+                model = self.sim.model
+                root_body_id = self.obj_body_id["blocking_object"]
+                object_randomization.apply_cup_material(
+                    model, root_body_id=root_body_id, material_id=self.cup_material_id
+                )
+            except Exception:
+                # Best-effort for rendering / dry runs
+                pass
 
     def _get_obj_cfgs(self) -> list[dict[str, Any]]:
-        """Create one fixed sponge and one fixed cup without host-specific paths."""
+        """Create one fixed sponge (per-episode type) and one fixed cup (material applied later)."""
+
+        # Use the episode-resolved sponge XML (set in __init__ via sponge_type)
+        sponge_xml = getattr(self, "_cleaning_tool_xml", None) or CLEANING_TOOL_XML
 
         return [
             dict(
                 name="cleaning_tool",
-                obj_groups=CLEANING_TOOL_XML,
+                obj_groups=sponge_xml,
                 graspable=True,
                 init_robot_here=True,
                 placement=dict(
@@ -135,7 +266,11 @@ class WX01ReturnObjectToOriginalPlace(Kitchen):
         cleaning_tool: Any,
         blocking_object: Any,
     ) -> None:
-        """Install the original poses sampled before the short-start displacement."""
+        """Install the original poses sampled before the short-start displacement.
+
+        Also positions the visual stains exactly on the remembered dirty spot
+        (the location the cup occupied before being displaced).
+        """
 
         tool = _pose3(cleaning_tool, "cleaning_tool original pose")
         blocking = _pose3(blocking_object, "blocking_object original pose")
@@ -145,10 +280,16 @@ class WX01ReturnObjectToOriginalPlace(Kitchen):
         refs["original_tool_pose"] = tool.tolist()
         refs["original_blocking_object_pose"] = blocking.tolist()
 
+        # Now that we have the authoritative remembered position, place the stains there.
+        self._position_stains_on_remembered_area()
+        self._sync_stain_visual()
+
     def record_wipe_completed(self) -> bool:
         """Latch the historical wipe event after an accepted physical sweep."""
 
         self.original_area_wiped = True
+        self.stain_progress = 1.0
+        self._sync_stain_visual()
         return record_wipe_completion(self._semantic_state)
 
     def update_state(self) -> None:
@@ -213,6 +354,8 @@ class WX01ReturnObjectToOriginalPlace(Kitchen):
             "wipe_sweep_range": float(self.wipe_sweep_range),
             "original_tool_pose": self.original_tool_pose,
             "original_blocking_object_pose": self.original_blocking_object_pose,
+            "target_circle_center": self.original_blocking_object_pose,
+            "target_circle_radius": float(self.stain_circle_radius),
             "blocking_object_origin_distance": self.blocking_object_origin_distance(),
             "blocking_object_on_dining_table": physical.blocking_object_on_dining_table,
             "objects_released": bool(
@@ -314,14 +457,18 @@ class WX01ReturnObjectToOriginalPlace(Kitchen):
             np.linalg.norm(contact[:2] - origin_xy) <= self.wipe_radius
             for contact in self.table_contact_positions
         )
-        self.original_area_wiped = bool(
-            self.original_area_wiped
-            or (
-                covered
-                and self.table_contact_timer >= self.minimum_contact_count
-                and self.wipe_sweep_range >= self.minimum_wipe_sweep
-            )
+        newly_wiped = (
+            covered
+            and self.table_contact_timer >= self.minimum_contact_count
+            and self.wipe_sweep_range >= self.minimum_wipe_sweep
         )
+        if newly_wiped and not self.original_area_wiped:
+            self.original_area_wiped = True
+            self.stain_progress = 1.0
+            self._sync_stain_visual()
+        elif self.original_area_wiped:
+            self.stain_progress = 1.0
+            self._sync_stain_visual()
 
     def _placement_pose(self, object_name: str) -> list[float] | None:
         placement = getattr(self, "object_placements", {}).get(object_name)
@@ -343,6 +490,52 @@ class WX01ReturnObjectToOriginalPlace(Kitchen):
             dtype=float,
         )
         return body_pos + body_rotation @ bottom_offset
+
+    def _position_stains_on_remembered_area(self) -> None:
+        """Place the single white target circle at the remembered cup center."""
+
+        model = getattr(getattr(self, "sim", None), "model", None)
+        if model is None:
+            return
+        if self.original_blocking_object_pose is None:
+            return
+
+        origin_xy = np.asarray(self.original_blocking_object_pose, dtype=float)[:2]
+        surface_z = self._dining_table_surface_z() + self.stain_z_offset
+
+        # The circle center is the exact placement target; there is no visual
+        # offset between the marker and the remembered cup pose.
+        for name in self._stain_geom_names:
+            try:
+                gid = int(model.geom_name2id(name))
+            except Exception:
+                continue
+            if gid < 0:
+                continue
+            xy = origin_xy
+            model.geom_pos[gid, 0] = float(xy[0])
+            model.geom_pos[gid, 1] = float(xy[1])
+            model.geom_pos[gid, 2] = float(surface_z)
+
+    def _sync_stain_visual(self) -> None:
+        """Fade the white target circle after the wipe is accepted."""
+
+        model = getattr(getattr(self, "sim", None), "model", None)
+        if model is None:
+            return
+        progress = float(getattr(self, "stain_progress", 0.0))
+        remaining = max(0.0, 1.0 - progress)
+        for name in getattr(self, "_stain_geom_names", ()):
+            try:
+                gid = int(model.geom_name2id(name))
+            except Exception:
+                continue
+            if gid < 0:
+                continue
+            base = np.asarray(self.stain_color_rgba, dtype=float)
+            model.geom_rgba[gid, :] = np.array(
+                [*base[:3], base[3] * remaining], dtype=float
+            )
 
 
 def _positive(value: Any, label: str) -> float:

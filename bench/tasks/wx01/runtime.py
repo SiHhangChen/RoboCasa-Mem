@@ -36,9 +36,11 @@ def _plan(config: Any, resolved: Any, options: Mapping[str, Any]) -> Any:
 
 
 def _environment(config: Any, scene: Any, plan: Any, resources: Mapping[str, Any]) -> Mapping[str, Any]:
-    del plan, resources
+    del resources
     semantics = dict(config.semantics)
-    return {"origin_threshold": float(semantics.get("origin_threshold", 0.02)),
+    return {"cup_material_id": str(plan.cup_material_id),
+            "sponge_type": str(plan.sponge_type),
+            "origin_threshold": float(semantics.get("origin_threshold", 0.01)),
             "wipe_radius": float(semantics.get("wipe_radius", 0.20)),
             "contact_separation": float(semantics.get("contact_separation", 0.02)),
             "minimum_contact_count": int(semantics.get("minimum_contact_count", 2)),
@@ -47,10 +49,16 @@ def _environment(config: Any, scene: Any, plan: Any, resources: Mapping[str, Any
             "blocking_object_scale": scene.blocking_object_scale,
             "blocking_object_placement_size": scene.blocking_object_placement_size,
             "blocking_object_placement_pos": scene.blocking_object_placement_pos,
-            "blocking_object_rotation": scene.blocking_object_rotation}
+            "blocking_object_rotation": scene.blocking_object_rotation,
+            "stain_color_rgba": tuple(semantics.get("stain_color_rgba", (1.0, 1.0, 1.0, 1.0))),
+            "stain_circle_radius": float(semantics.get("stain_circle_radius", 0.045)),
+            "stain_z_offset": float(semantics.get("stain_z_offset", 0.0018))}
 
 
 def _initialize(descriptor: Any, env: Any, observation: Mapping[str, Any]):
+    configure_episode = getattr(env, "configure_episode", None)
+    if callable(configure_episode):
+        configure_episode(descriptor.episode_plan)
     updated, objects = apply_initial_object_plan(
         env, episode=descriptor.episode_plan,
         enabled=bool(descriptor.config.initial_state.objects.get("enabled", True)),
@@ -88,6 +96,16 @@ _ADAPTER = TaskRuntimeAdapter(
     diagnostics=diagnostics_for_runtime, success=success_for_runtime, close=default_close,
     report_stage_profile_id=REPORT_STAGE_PROFILE_ID,
     report_stages=report_stages_for_runtime,
+    release_facts=lambda config, episode, resources, options: {
+        "cup_material_id": str(
+            getattr(episode, "cup_material_id", None)
+            or (getattr(episode, "facts", {}) or {}).get("cup_material_id", "")
+        ),
+        "sponge_type": str(
+            getattr(episode, "sponge_type", None)
+            or (getattr(episode, "facts", {}) or {}).get("sponge_type", "")
+        ),
+    },
     expert_runtime=build_operation_handlers,
 )
 TASK_RUNTIME_API = _ADAPTER.api()

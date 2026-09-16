@@ -127,6 +127,8 @@ class EpisodePlan:
     """All random decisions frozen before WX-01 environment execution."""
 
     seed: int
+    cup_material_id: str
+    sponge_type: str
     initial_object_poses: Mapping[str, InitialObjectPose]
     temporary_blocking_offset_xy: tuple[float, float]
     temporary_tool_offset_xy: tuple[float, float]

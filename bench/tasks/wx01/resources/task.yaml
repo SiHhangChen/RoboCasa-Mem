@@ -28,6 +28,10 @@ scene:
 episode:
   start_mode: short_preplaced_blocking_pregrasped_tool
   max_horizon: 3200
+  cup_material_candidates:
+    [ceramic_white, ceramic_blue, ceramic_green, ceramic_yellow, matte_black]
+  sponge_type_candidates:
+    [sponge_0, sponge_1, sponge_2, sponge_3, sponge_4, sponge_5, sponge_6, sponge_8]
   temporary_targets:
     blocking_center_offset_xy: [0.0, 0.18]
     blocking_jitter_x: [-0.06, 0.06]
@@ -204,7 +208,7 @@ operations:
     clearance_settle_steps: 4
     retreat_settle_steps: 2
     require_pre_release_check: true
-    pre_release_xy_tolerance: 0.015
+    pre_release_xy_tolerance: 0.008
     pre_release_z_tolerance: 0.03
     pre_release_upright_threshold_deg: 15.0
     target_max_base_x: 0.60
@@ -216,12 +220,16 @@ operations:
     blocking_object_max_base_x: 0.66
 
 semantics:
-  origin_threshold: 0.02
+  origin_threshold: 0.01
   wipe_radius: 0.20
   contact_separation: 0.02
   minimum_contact_count: 2
   minimum_wipe_sweep: 0.07
   release_distance: 0.15
+  # One white, purely visual target circle. Its center is the cup placement target.
+  stain_color_rgba: [1.0, 1.0, 1.0, 1.0]
+  stain_circle_radius: 0.045
+  stain_z_offset: 0.0018
 
 recording:
   record_depth: true

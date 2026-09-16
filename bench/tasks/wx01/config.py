@@ -80,7 +80,14 @@ def load_task_config(path: str | Path = DEFAULT_TASK_CONFIG_FILE) -> TaskConfig:
     episode = dict(_mapping(payload, "episode", config_path))
     _reject_unknown(
         episode,
-        {"start_mode", "temporary_targets", "wipe_sampling", "max_horizon"},
+        {
+            "start_mode",
+            "temporary_targets",
+            "wipe_sampling",
+            "cup_material_candidates",
+            "sponge_type_candidates",
+            "max_horizon",
+        },
         "episode fields",
     )
 
@@ -193,6 +200,9 @@ def load_task_config(path: str | Path = DEFAULT_TASK_CONFIG_FILE) -> TaskConfig:
             "minimum_contact_count",
             "minimum_wipe_sweep",
             "release_distance",
+            "stain_color_rgba",
+            "stain_circle_radius",
+            "stain_z_offset",
         },
         "semantic fields",
     )

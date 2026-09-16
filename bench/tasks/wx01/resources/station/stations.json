@@ -1,32 +1,41 @@
 {
   "config_kind": "station",
-  "description": "WX-01 stations aligned with the two-point manual path.",
+  "description": "WX-01 10 cm-diameter stations aligned with the two-point manual path.",
   "env_name": "WX01ReturnObjectToOriginalPlace",
   "layout_id": 38,
-  "samples_per_station": 1,
-  "schema_version": 1,
+  "schema_version": 2,
   "seed": 0,
   "split": "pretrain",
   "stations": {
     "tool_origin_station": {
-      "samples": [{
-        "station_id": "tool_origin_station",
-        "sample_index": 0,
-        "base_pos": [2.195, -5.023, 0.7000042503740603],
-        "base_xy": [2.195, -5.023],
+      "circle": {
+        "center_xy": [2.195, -5.023],
+        "radius_m": 0.05,
         "base_yaw": -0.001,
-        "record_source": "manual_path_sample_0_start_cleaning_tool"
-      }]
+        "yaw_half_range_rad": 0.08726646259971647,
+        "record_source": "wx01_tool_origin_10cm_disk"
+      },
+      "sampling_region": {
+        "shape": "disk",
+        "center_xy": [2.195, -5.023],
+        "radius_m": 0.05
+      },
+      "samples": []
     },
     "dining_table_station": {
-      "samples": [{
-        "station_id": "dining_table_station",
-        "sample_index": 0,
-        "base_pos": [2.171, -3.833, 0.7000042503740603],
-        "base_xy": [2.171, -3.833],
+      "circle": {
+        "center_xy": [2.171, -3.833],
+        "radius_m": 0.05,
         "base_yaw": -0.042,
-        "record_source": "manual_path_sample_1_dining_table_front"
-      }]
+        "yaw_half_range_rad": 0.08726646259971647,
+        "record_source": "wx01_dining_table_10cm_disk"
+      },
+      "sampling_region": {
+        "shape": "disk",
+        "center_xy": [2.171, -3.833],
+        "radius_m": 0.05
+      },
+      "samples": []
     }
   },
   "style_id": 38,
