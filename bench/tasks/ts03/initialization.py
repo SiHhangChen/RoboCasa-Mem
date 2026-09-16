@@ -18,6 +18,8 @@ from bench.tasks.ts03.domain.contracts import (
 )
 from bench.tasks.ts03.domain.geometry import (
     SUGAR_PLATE_EDGE_MARGIN,
+    SUGAR_PLATE_SAMPLING_RADIUS_M,
+    sample_sugar_cube_yaws_for_seed,
     sample_sugar_plate_offsets_xy,
     validate_sugar_plate_offsets_xy,
 )
@@ -111,6 +113,7 @@ def apply_initial_object_state(
     if plate_qpos.size < 7:
         raise ValueError("sugar plate must have a free joint")
     plate_pos = plate_qpos[:3].copy()
+    import mujoco
     from robosuite.utils import transform_utils as T
 
     plate_rot = T.quat2mat(T.convert_quat(plate_qpos[3:7], to="xyzw"))
@@ -120,6 +123,10 @@ def apply_initial_object_state(
         cube_radii.append(0.5 * float(np.linalg.norm(size)))
     plate_half_extents = 0.5 * np.asarray(getattr(plate, "size", (0.36, 0.32, 0.02)), dtype=float)[:2]
     edge_margin = float(values.get("sugar_plate_edge_margin", SUGAR_PLATE_EDGE_MARGIN))
+    sampling_radius = float(
+        values.get("sugar_plate_sampling_radius_m", SUGAR_PLATE_SAMPLING_RADIUS_M)
+    )
+    yaw_half_range = np.deg2rad(float(values.get("sugar_cube_yaw_half_range_deg", 180.0)))
     safe_half_extents = plate_half_extents - max(cube_radii) - edge_margin
     if not np.all(np.isfinite(safe_half_extents)) or np.any(safe_half_extents <= 0.0):
         raise ValueError("sugar cubes do not fit inside the tray after applying edge margin")
@@ -127,24 +134,43 @@ def apply_initial_object_state(
         count=episode.total_sugar_count,
         rng=np.random.default_rng(int(episode.sugar_plate_layout_seed)),
         safe_half_extents_xy=safe_half_extents,
+        sampling_radius_m=sampling_radius,
     )
     validate_sugar_plate_offsets_xy(
         offsets,
         count=episode.total_sugar_count,
         safe_half_extents_xy=safe_half_extents,
     )
+    yaws = sample_sugar_cube_yaws_for_seed(
+        count=episode.total_sugar_count,
+        seed=episode.seed,
+        half_range_rad=yaw_half_range,
+    )
     env.sugar_plate_offsets_xy = tuple(offsets)
+    env.sugar_cube_yaws_rad = yaws
     env.sugar_plate_safe_half_extents_xy = tuple(float(value) for value in safe_half_extents)
     summary["sugar_plate_offsets_xy"] = [list(row) for row in offsets]
     summary["sugar_plate_safe_half_extents_xy"] = list(env.sugar_plate_safe_half_extents_xy)
+    summary["sugar_plate_sampling_radius_m"] = sampling_radius
+    summary["sugar_cube_yaws_rad"] = list(yaws)
+    summary["sugar_cube_yaw_half_range_deg"] = float(np.rad2deg(yaw_half_range))
 
-    for name, offset in zip(episode.sugar_names, offsets, strict=True):
+    for name, offset, yaw in zip(episode.sugar_names, offsets, yaws, strict=True):
         obj = env.objects[name]
         qpos = np.asarray(env.sim.data.get_joint_qpos(obj.joints[0]), dtype=float).reshape(-1)
         if qpos.size < 7:
             raise ValueError(f"sugar object {name!r} must have a free joint")
         local = np.asarray([float(offset[0]), float(offset[1]), 0.0], dtype=float)
         qpos[:3] = plate_pos + plate_rot @ local
+        # Change world yaw while preserving the cube's reset-time roll/pitch.
+        rotation = np.empty(9, dtype=float)
+        mujoco.mju_quat2Mat(rotation, qpos[3:7])
+        delta_yaw = yaw - float(np.arctan2(rotation[3], rotation[0]))
+        half_yaw = 0.5 * delta_yaw
+        yaw_quaternion = np.asarray([np.cos(half_yaw), 0.0, 0.0, np.sin(half_yaw)])
+        rotated_quaternion = np.empty(4, dtype=float)
+        mujoco.mju_mulQuat(rotated_quaternion, yaw_quaternion, qpos[3:7])
+        qpos[3:7] = rotated_quaternion
         env.sim.data.set_joint_qpos(obj.joints[0], qpos)
         if name in getattr(env, "object_placements", {}):
             env.object_placements[name] = (
@@ -152,7 +178,12 @@ def apply_initial_object_state(
                 tuple(float(value) for value in qpos[3:7]),
                 obj,
             )
-        summary["objects"][name] = {"after_pos": qpos[:3].astype(float).tolist(), "offset_xy": list(offset)}
+        summary["objects"][name] = {
+            "after_pos": qpos[:3].astype(float).tolist(),
+            "after_quat_wxyz": qpos[3:7].astype(float).tolist(),
+            "offset_xy": list(offset),
+            "yaw_rad": yaw,
+        }
 
     _apply_object_coefficients(env, episode.sugar_names, values, summary)
     env.sim.forward()
@@ -278,4 +309,3 @@ def initialize_episode(runtime: Any, episode: Any) -> InitializationReport:
     """Expose reset facts already applied by the task runtime."""
     del episode
     return InitializationReport.applied(facts=dict(getattr(runtime, "initialization", {}) or {}))
-

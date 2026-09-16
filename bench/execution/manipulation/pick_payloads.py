@@ -112,6 +112,8 @@ def resolve_pick_payload(
         grasp_offset_x=float(kwargs.get("grasp_offset_x", 0.0)),
         grasp_offset_y=float(kwargs.get("grasp_offset_y", 0.0)),
         grasp_offset_z=float(kwargs.get("grasp_offset_z", 0.0)),
+        grasp_finger_offset_x=float(kwargs.get("grasp_finger_offset_x", 0.0)),
+        grasp_finger_offset_y=float(kwargs.get("grasp_finger_offset_y", 0.0)),
     )
     return payload, None
 

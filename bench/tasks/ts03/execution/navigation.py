@@ -117,15 +117,20 @@ def _completion_button_xy(env: Any) -> np.ndarray | None:
 
 
 def build_navigation_config(
-    settings: dict[str, Any], *, manual_base_path_file: Path
+    settings: dict[str, Any], *, manual_base_path_file: Path | None = None,
+    station_base_pose_file: Path | None = None,
 ) -> NavigationConfig:
     values = dict(settings)
     allowed = {field.name for field in fields(NavigationConfig)}
     unknown = sorted(set(values) - allowed)
     if unknown:
-        raise ValueError("unknown TS01 navigation settings: " + ", ".join(unknown))
-    values["manual_base_path_file"] = Path(manual_base_path_file)
-    values["station_base_pose_file"] = None
+        raise ValueError("unknown TS03 navigation settings: " + ", ".join(unknown))
+    values["manual_base_path_file"] = (
+        None if manual_base_path_file is None else Path(manual_base_path_file)
+    )
+    values["station_base_pose_file"] = (
+        None if station_base_pose_file is None else Path(station_base_pose_file)
+    )
     return replace(NavigationConfig(), **values)
 
 
@@ -143,7 +148,7 @@ def build_navigation_assembly(
     aliases = station_aliases(tuple(getattr(env, "sugar_names", ())))
     if config.use_station_base_poses:
         if config.station_base_pose_file is None:
-            raise ValueError("TS01 use_station_base_poses requires station_base_pose_file")
+            raise ValueError("TS03 use_station_base_poses requires station_base_pose_file")
         sampler: Any = StationPoseSampler.from_file(
             config.station_base_pose_file,
             config=config,
@@ -158,7 +163,7 @@ def build_navigation_assembly(
         )
         sampler = SimpleStationSampler(
             stations=generated,
-            seeds=SeedStream(base_seed=int(seed), namespace="ts01_navigation"),
+            seeds=SeedStream(base_seed=int(seed), namespace="ts03_navigation"),
         )
     planner = None
     if not config.manual_base_path_enabled and config.use_station_astar_paths:

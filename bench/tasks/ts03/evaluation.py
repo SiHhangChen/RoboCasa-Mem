@@ -2,9 +2,9 @@
 
 TS03 owns this evaluator independently from TS01.  The simulator supplies a
 debounced saucepan sugar count and physical completion-button state; this
-module enforces the profile-frozen sugar_1 -> sugar_2 -> button protocol,
-terminal over-add, and the two-stage reporting view shared by all four TS03
-K/N profiles.
+module enforces the profile-frozen sugar_1 -> sugar_2 -> sugar_3 -> button
+protocol, terminal over-add, and the padded three-sugar reporting view shared
+by all six TS03 K/N profiles.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from bench.tasks.ts03.domain.contracts import (
 )
 
 
-SUGAR_STAGE_NAMES = ("sugar_1", "sugar_2")
+SUGAR_STAGE_NAMES = ("sugar_1", "sugar_2", "sugar_3")
 STAGE_ORDER = (*SUGAR_STAGE_NAMES, "button", "success")
 REPORT_STAGE_ORDER = TS03_REPORT_PROFILE.stage_ids
 REPORT_STAGE_PROFILE_ID = TS03_REPORT_PROFILE.profile_id
@@ -288,6 +288,7 @@ class TS03Evaluator:
         return {
             "sugar_1": None,
             "sugar_2": "sugar_1",
+            "sugar_3": "sugar_2",
             "button": f"sugar_{self.target_sugar_count}",
             "success": "button",
         }

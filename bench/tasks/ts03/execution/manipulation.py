@@ -45,7 +45,11 @@ def build_manipulation_assembly(
             planner=planner,
             static_scene=_section(settings, "static_scene"),
         ),
-        pick_payload_selector=build_pick_payload_selector(),
+        pick_payload_selector=build_pick_payload_selector(
+            descriptor.actions.grasp_yaw_offsets_deg,
+            grasp_finger_offset_x=getattr(descriptor.actions, "grasp_finger_offset_x", 0.0),
+            grasp_finger_offset_y=getattr(descriptor.actions, "grasp_finger_offset_y", 0.0),
+        ),
     )
     _install_held_sugar_follow_assist(env, controller)
     return ManipulationAssembly(controller, planner)

@@ -1,4 +1,4 @@
-"""Live TS01 grasp and saucepan placement geometry."""
+"""Live TS03 grasp and saucepan placement geometry."""
 
 from __future__ import annotations
 
@@ -84,7 +84,7 @@ def build_saucepan_release_candidate_groups(
 
     anchor = np.asarray(anchor_world, dtype=float).reshape(-1)
     if anchor.size != 3 or not np.all(np.isfinite(anchor)):
-        raise ValueError("TS01 saucepan anchor must be a finite xyz position")
+        raise ValueError("TS03 saucepan anchor must be a finite xyz position")
     order = tuple(str(value).strip().upper() for value in region_order)
     if len(order) != len(SUGAR_RELEASE_REGION_NAMES) or set(order) != set(
         SUGAR_RELEASE_REGION_NAMES
@@ -142,8 +142,15 @@ def build_saucepan_release_candidate_groups(
     return groups
 
 
-def build_pick_payload_selector(yaw_offsets_deg: Any = DEFAULT_GRASP_YAW_OFFSETS_DEG):
+def build_pick_payload_selector(
+    yaw_offsets_deg: Any = DEFAULT_GRASP_YAW_OFFSETS_DEG,
+    *,
+    grasp_finger_offset_x: float = 0.0,
+    grasp_finger_offset_y: float = 0.0,
+):
     defaults = _float_sequence(yaw_offsets_deg)
+    finger_off_x = float(grasp_finger_offset_x)
+    finger_off_y = float(grasp_finger_offset_y)
 
     def selector(request: dict[str, Any]) -> dict[str, Any] | None:
         name = str(request.get("object_name", ""))
@@ -152,6 +159,9 @@ def build_pick_payload_selector(yaw_offsets_deg: Any = DEFAULT_GRASP_YAW_OFFSETS
         kwargs = dict(request.get("kwargs") or {})
         config = request["pick_place_config"]
         offsets = _float_sequence(kwargs.get("grasp_yaw_offsets_deg", defaults))
+        # Allow per-request override, otherwise fall back to factory value
+        fx = float(kwargs.get("grasp_finger_offset_x", finger_off_x))
+        fy = float(kwargs.get("grasp_finger_offset_y", finger_off_y))
         preferred = preferred_tray_grasp_yaw_offset_deg(request["env"], name)
         candidates: list[dict[str, Any]] = []
         reachable: list[tuple[tuple[float, ...], dict[str, Any], dict[str, Any]]] = []
@@ -165,6 +175,8 @@ def build_pick_payload_selector(yaw_offsets_deg: Any = DEFAULT_GRASP_YAW_OFFSETS
                 grasp_clearance=float(kwargs.get("grasp_clearance", config.grasp_clearance)),
                 lift_height=float(request.get("lift_height", config.lift_height)),
                 grasp_yaw_offset_deg=float(yaw),
+                grasp_finger_offset_x=fx,
+                grasp_finger_offset_y=fy,
             )
             dry_sequence = request.get("dry_run_pick_sequence")
             validation = (
@@ -176,7 +188,12 @@ def build_pick_payload_selector(yaw_offsets_deg: Any = DEFAULT_GRASP_YAW_OFFSETS
                     gripper_action=-1.0,
                 )
             )
-            score = (_yaw_distance(float(yaw), preferred), *_plan_score(validation, index))
+            score = _grasp_candidate_score(
+                validation,
+                yaw=float(yaw),
+                preferred_yaw=preferred,
+                index=index,
+            )
             record = {
                 "index": index,
                 "yaw_offset_deg": float(yaw),
@@ -194,7 +211,7 @@ def build_pick_payload_selector(yaw_offsets_deg: Any = DEFAULT_GRASP_YAW_OFFSETS
             "payload": payload,
             "selection": {
                 "pass": True,
-                "mode": "four_direction_tray_side_preference",
+                "mode": "four_direction_best_plan",
                 "selected_yaw_offset_deg": selected["yaw_offset_deg"],
                 "selected_score": list(score),
                 "candidates": candidates,
@@ -216,11 +233,33 @@ def preferred_tray_grasp_yaw_offset_deg(env: Any, object_name: str) -> float:
 
 
 def _plan_score(validation: Mapping[str, Any], index: int) -> tuple[float, ...]:
+    max_len, sum_len = _plan_lengths(validation)
     if not bool(validation.get("pass", False)):
         return (1.0e12, 1.0e12, float(index))
+    return (max_len, sum_len, float(index))
+
+
+def _plan_lengths(validation: Mapping[str, Any]) -> tuple[float, float]:
+    if not bool(validation.get("pass", False)):
+        return (1.0e12, 1.0e12)
     stages = [item for item in validation.get("stages", ()) if isinstance(item, Mapping)]
     lengths = [float((item.get("plan") or {}).get("trajectory_len", 1.0e12)) for item in stages]
-    return (max(lengths, default=1.0e12), sum(lengths), float(index))
+    return (max(lengths, default=1.0e12), sum(lengths))
+
+
+def _grasp_candidate_score(
+    validation: Mapping[str, Any],
+    *,
+    yaw: float,
+    preferred_yaw: float,
+    index: int,
+) -> tuple[float, ...]:
+    """Rank reachable yaws by plan quality; tray-side preference is a tie-break only."""
+
+    max_len, sum_len = _plan_lengths(validation)
+    if not bool(validation.get("pass", False)):
+        return (1.0e12, 1.0e12, 1.0e12, float(index))
+    return (max_len, sum_len, _yaw_distance(yaw, preferred_yaw), float(index))
 
 
 def _yaw_distance(value: float, target: float) -> float:
@@ -231,7 +270,7 @@ def _float_sequence(value: Any) -> tuple[float, ...]:
     raw = value.replace(";", ",").split(",") if isinstance(value, str) else value
     result = tuple(float(item) for item in raw)
     if not result:
-        raise ValueError("TS01 grasp yaw offsets must not be empty")
+        raise ValueError("TS03 grasp yaw offsets must not be empty")
     return result
 
 

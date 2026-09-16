@@ -2,7 +2,7 @@
 """Recover TS03 stage boundaries and per-sugar memory events.
 
 TS03 varies the requested sugar count K and the visible sugar count N across
-four profiles.  The high-level policy still uses two semantic labels: one
+the full K<=N<=3 table.  The high-level policy still uses two semantic labels: one
 repeatable sugar-delivery subtask and one completion-button subtask.  This
 bridge reconstructs every expert stage and retains the end of each completed
 sugar cycle as an explicit keyframe so MemER can count progress toward K.
@@ -21,7 +21,7 @@ from typing import Any
 
 TASK_ID = "TS03"
 EXPERT_PLAN_VERSION = "membench.expert_plan/v2"
-VALID_PROFILES = frozenset({(1, 2), (1, 3), (2, 2), (2, 3)})
+VALID_PROFILES = frozenset({(1, 1), (1, 2), (1, 3), (2, 2), (2, 3), (3, 3)})
 EPISODE_DIR_PATTERN = re.compile(r"^seed_(\d{6})_attempt_00$")
 STEP_KEYS = frozenset({"steps", "executed_steps", "release_settle_steps"})
 

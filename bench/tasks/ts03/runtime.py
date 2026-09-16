@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from bench.runtime import TaskRuntimeAdapter, default_close
-from bench.tasks.runtime_support import episode_actions, manual_navigation, standard_plan, standard_scene, sugar_initialization, sugar_prompt
+from bench.tasks.runtime_support import episode_actions, station_navigation, standard_plan, standard_scene, sugar_initialization, sugar_prompt
 from bench.tasks.ts03.config import load_task_config, resolve_action_config, resolve_task_options
 from bench.tasks.ts03.domain.episode import resolve_episode_plan, resolve_scene_config
 from bench.tasks.ts03.domain.contracts import episode_profile_metadata
@@ -40,6 +40,13 @@ def _environment(config: Any, scene: Any, plan: Any, resources: Mapping[str, Any
             "target_sugar_names": plan.target_sugar_names,
             "sugar_plate_name": scene.sugar_plate_name,
             "receptacle_name": scene.receptacle_name,
+            "saucepan_type": getattr(plan, "saucepan_type", "Saucepan002"),
+            "saucepan_asset": getattr(
+                plan, "saucepan_asset", "lightwheel/saucepan/Saucepan002/model.xml"
+            ),
+            "saucepan_material": getattr(plan, "saucepan_material", "original"),
+            "sugar_plate_material": getattr(plan, "sugar_plate_material", "original"),
+            "sugar_cube_material": getattr(plan, "sugar_cube_material", "original"),
             "completion_button_position_file": str(resources["completion_button_position"]),
             "confirmed_sugar_dwell_steps": CONFIRMED_SUGAR_DWELL_STEPS,
             "minimum_press_displacement_m": float(
@@ -78,7 +85,7 @@ def _initialize(descriptor: Any, env: Any, observation: Mapping[str, Any]):
 _ADAPTER = TaskRuntimeAdapter(
     task_id="TS03", load_task_config=load_task_config, resolve_task_options=resolve_task_options,
     scene=standard_scene(resolve_scene_config), plan=standard_plan(resolve_episode_plan),
-    actions=episode_actions(resolve_action_config), navigation=manual_navigation(build_navigation_config),
+    actions=episode_actions(resolve_action_config), navigation=station_navigation(build_navigation_config),
     prompt=sugar_prompt(resolve_prompt_spec), environment=_environment,
     initialize=_initialize,
     diagnostics=diagnostics_for_runtime, success=success_for_runtime, close=default_close,
@@ -87,6 +94,11 @@ _ADAPTER = TaskRuntimeAdapter(
     release_facts=lambda config, episode, resources, options: {
         "task_revision": str(getattr(config, "task", {}).get("revision", "TS03-v1")),
         **episode_profile_metadata(type("EpisodeFacts", (), dict(episode.facts))()),
+        "saucepan_type": episode.facts.get("saucepan_type"),
+        "saucepan_asset": episode.facts.get("saucepan_asset"),
+        "saucepan_material": episode.facts.get("saucepan_material"),
+        "sugar_plate_material": episode.facts.get("sugar_plate_material"),
+        "sugar_cube_material": episode.facts.get("sugar_cube_material"),
     },
     expert_runtime=build_operation_handlers,
 )

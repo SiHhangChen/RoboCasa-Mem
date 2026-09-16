@@ -5,7 +5,7 @@ schema_version: 1
 task:
   id: TS03
   display_name: Hierarchical Add K Sugar To Hot Chocolate
-  description: Complete one of four separately reported K/N sugar-count profiles, then press the completion button.
+  description: Complete one of six separately reported K/N sugar-count profiles, then press the completion button.
   success_conditions:
     - exact_target_sugar_count
     - no_extra_sugar_added
@@ -36,14 +36,20 @@ episode:
   # Three post-pick carrying-pose returns plus the final navigation and physical
   # button press add control steps to a K=3 episode.
   max_horizon: 2800
+  saucepan_type_candidates: [Saucepan002]
+  saucepan_material_candidates: [original, steel, dark_metal, copper]
+  sugar_plate_material_candidates: [original, ceramic_white, ceramic_blue, ceramic_green, metal]
+  sugar_cube_material_candidates: [original, sugar_white, sugar_cream, sugar_pink, sugar_blue]
 
 initial_state:
   robot_base:
-    mode: manual_path_sample
-    sample_index: 0
+    mode: preserve_reset_pose
   objects:
     enabled: true
     sugar_plate_edge_margin: 0.012
+    # Uniform disk sampling around slot centers: 1 cm diameter, full world yaw.
+    sugar_plate_sampling_radius_m: 0.005
+    sugar_cube_yaw_half_range_deg: 180.0
     sugar_cube_sliding_friction: 1.0
     sugar_cube_mass_scale: 1.0
 
@@ -59,6 +65,7 @@ sensors:
 
 resources:
   manual_base_path: navigation/manual_base_path_layout39_style37_seed0.json
+  station_poses: navigation/stations.json
   completion_button_position: poses/completion_button_position_layout39_style37_seed0.json
   planner_script: ../../../execution/planning/mplib_planner.py
 
@@ -70,7 +77,7 @@ navigation:
   base_waypoint_tolerance: 0.10
   base_yaw_tolerance: 0.10
   base_max_steps: 1600
-  manual_base_path_enabled: true
+  manual_base_path_enabled: false
   manual_base_path_start_index: 0
   manual_base_path_xy_tolerance: 0.08
   manual_base_path_yaw_tolerance: 0.08
@@ -138,7 +145,7 @@ navigation:
   station_nav_require_footprint: false
   station_nav_allow_endpoint_snap: true
   station_nav_endpoint_snap_radius: 0.60
-  use_station_base_poses: false
+  use_station_base_poses: true
 
 manipulation:
   pick_place:
@@ -209,6 +216,12 @@ operations:
     close_gripper_action: 1.0
     held_gripper_action: 1.0
     grasp_yaw_offsets_deg: [0.0, 90.0, 180.0, 270.0]
+    # Finger-pad center compensation in gripper-local frame (after yaw rotation).
+    # X is along finger separation. Positive value shifts TCP so the pads' midpoint
+    # moves relative to bbox center. Typical starting values: ±0.005 ~ ±0.012 m.
+    # Use to fix "planning put TCP at bbox center but fingers are asymmetric".
+    # grasp_finger_offset_x: 0.009   # example: push TCP so left pad moves outward
+    # grasp_finger_offset_y: 0.0
     allow_pregrasp_near_miss: true
     allow_grasp_near_miss: true
     # Let the arm controller converge at the pregrasp pose before descending.

@@ -1,4 +1,4 @@
-"""TS03 identity and the four-cell hierarchy contract."""
+"""TS03 identity and the full K/N hierarchy contract."""
 
 from __future__ import annotations
 
@@ -11,10 +11,10 @@ from typing import Any
 
 
 TASK_ID = "TS03"
-TASK_REVISION = "TS03-v1"
+TASK_REVISION = "TS03-v2"
 ENV_NAME = "TS03HierarchicalAddKSugarToHotChocolate"
 DISPLAY_NAME = "Hierarchical Add K Sugar To Hot Chocolate"
-HIERARCHY_SCHEMA_VERSION = 1
+HIERARCHY_SCHEMA_VERSION = 2
 AXIS = "TQ-S"
 SUGAR_PLATE_NAME = "sugar_plate"
 RECEPTACLE_NAME = "saucepan"
@@ -55,6 +55,11 @@ class EpisodePlan:
     sugar_release_region_orders: tuple[tuple[str, ...], ...]
     sugar_plate_layout_seed: int
     max_horizon: int
+    saucepan_type: str = "Saucepan002"
+    saucepan_asset: str = "lightwheel/saucepan/Saucepan002/model.xml"
+    saucepan_material: str = "original"
+    sugar_plate_material: str = "original"
+    sugar_cube_material: str = "original"
 
 @dataclass(frozen=True)
 class SceneConfig:
@@ -82,6 +87,8 @@ class ActionConfig:
     return_arm_metadata: Mapping[str, Any] = field(default_factory=dict)
     handler_settings: Mapping[str, Any] = field(default_factory=dict)
     grasp_yaw_offsets_deg: tuple[float, ...] = ()
+    grasp_finger_offset_x: float = 0.0
+    grasp_finger_offset_y: float = 0.0
 
 @dataclass(frozen=True)
 class RunContext:
@@ -130,7 +137,7 @@ class SugarCountProfile:
 
     @property
     def is_add_all_control(self) -> bool:
-        return self.profile_id == "k2_n2"
+        return self.target_sugar_count == self.total_sugar_count
 
     @property
     def is_core_memory_cell(self) -> bool:
@@ -138,10 +145,12 @@ class SugarCountProfile:
 
 
 _PROFILE_SEQUENCE = (
+    SugarCountProfile("k1_n1", 1, 1, 1, "add_all_skill_control", "control"),
     SugarCountProfile("k1_n2", 1, 1, 2, "weak_one_step_stop", "foundation"),
     SugarCountProfile("k1_n3", 2, 1, 3, "one_step_with_extra_distractors", "selection"),
     SugarCountProfile("k2_n2", 2, 2, 2, "add_all_skill_control", "control"),
     SugarCountProfile("k2_n3", 3, 2, 3, "core_memory_cell", "core"),
+    SugarCountProfile("k3_n3", 3, 3, 3, "add_all_skill_control", "control"),
 )
 PROFILES = MappingProxyType({item.profile_id: item for item in _PROFILE_SEQUENCE})
 PROFILE_IDS = tuple(PROFILES)

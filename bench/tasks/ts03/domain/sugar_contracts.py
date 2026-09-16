@@ -60,6 +60,8 @@ class ActionConfig:
     return_arm_metadata: Mapping[str, Any]
     handler_settings: Mapping[str, Any]
     grasp_yaw_offsets_deg: tuple[float, ...]
+    grasp_finger_offset_x: float = 0.0
+    grasp_finger_offset_y: float = 0.0
 
 
 @dataclass(frozen=True)

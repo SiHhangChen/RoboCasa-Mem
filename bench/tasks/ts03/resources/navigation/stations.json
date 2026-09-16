@@ -1,2 +1,41 @@
-{"schema_version": "membench.task_navigation_stations/v1", "entries": {}}
-
+{
+  "schema_version": 2,
+  "metadata": {
+    "task_id": "TS03",
+    "layout_id": 39,
+    "style_id": 37,
+    "description": "TS03 terminal stations sampled uniformly inside 10 cm diameter disks with +/-5 degree yaw variation."
+  },
+  "stations": {
+    "saucepan_station": {
+      "circle": {
+        "center_xy": [3.621, -3.69],
+        "radius_m": 0.05,
+        "base_yaw": 1.5708,
+        "yaw_half_range_rad": 0.08726646259971647,
+        "record_source": "ts03_saucepan_station_disk"
+      },
+      "samples": []
+    },
+    "sugar_station": {
+      "circle": {
+        "center_xy": [4.219, -3.69],
+        "radius_m": 0.05,
+        "base_yaw": 1.5708,
+        "yaw_half_range_rad": 0.08726646259971647,
+        "record_source": "ts03_sugar_station_disk"
+      },
+      "samples": []
+    },
+    "completion_button_station": {
+      "circle": {
+        "center_xy": [3.3, -3.69],
+        "radius_m": 0.05,
+        "base_yaw": 1.5708,
+        "yaw_half_range_rad": 0.08726646259971647,
+        "record_source": "ts03_completion_button_station_disk"
+      },
+      "samples": []
+    }
+  }
+}

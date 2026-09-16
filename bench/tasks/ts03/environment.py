@@ -25,6 +25,13 @@ from bench.tasks.ts03.domain.episode import (
     normalize_total_sugar_count,
 )
 from bench.tasks.ts03.domain.geometry import point_is_inside_cylindrical_region
+from bench.tasks.ts03.materials import (
+    SAUCEPAN_ASSET_BY_TYPE,
+    SAUCEPAN_MATERIAL_PROFILES,
+    SUGAR_CUBE_MATERIAL_PROFILES,
+    SUGAR_PLATE_MATERIAL_PROFILES,
+    apply_object_material,
+)
 from bench.tasks.ts03.domain.semantics import PhysicalState, SuccessReport, evaluate_success
 from bench.tasks.ts03.evaluation import TS03EvaluationSnapshot
 
@@ -36,7 +43,9 @@ SUGAR_CUBE_SCALE = 1.2
 SUGAR_PLATE_SCALE = (0.85, 0.85, 0.8)
 SUGAR_PLATE_REFERENCE_OFFSET = -1.0
 SAUCEPAN_INTERIOR_REGION_SUFFIX = "reg_int"
+SAUCEPAN_LIQUID_REGION_SUFFIX = "liquid"
 SAUCEPAN_CONTAINMENT_METHOD = "object_center_inside_saucepan_reg_int_cylinder"
+HOT_CHOCOLATE_RGBA = (0.58, 0.37, 0.24, 0.92)
 PACKAGE_ROOT = Path(__file__).resolve().parent
 DEFAULT_COMPLETION_BUTTON_POSITION_FILE = (
     PACKAGE_ROOT
@@ -62,6 +71,11 @@ class TS03HierarchicalAddKSugarToHotChocolate(Kitchen):
         target_sugar_names: tuple[str, ...],
         sugar_plate_name: str = SUGAR_PLATE_NAME,
         receptacle_name: str = RECEPTACLE_NAME,
+        saucepan_type: str = "Saucepan002",
+        saucepan_asset: str | Path | None = None,
+        saucepan_material: str = "original",
+        sugar_plate_material: str = "original",
+        sugar_cube_material: str = "original",
         completion_button_position_file: str | Path | None = None,
         target_threshold: float = 0.16,
         confirmed_sugar_dwell_steps: int = 5,
@@ -90,6 +104,27 @@ class TS03HierarchicalAddKSugarToHotChocolate(Kitchen):
         self._target_sugar_names = targets
         self.sugar_plate_name = str(sugar_plate_name)
         self.receptacle_name = str(receptacle_name)
+        self.saucepan_type = str(saucepan_type)
+        if self.saucepan_type not in SAUCEPAN_ASSET_BY_TYPE:
+            raise ValueError(f"unknown TS03 saucepan type: {self.saucepan_type!r}")
+        self.saucepan_asset = str(
+            saucepan_asset or SAUCEPAN_ASSET_BY_TYPE[self.saucepan_type]
+        )
+        if not Path(self.saucepan_asset).is_absolute():
+            self.saucepan_asset = str(Path(assets_root) / "objects" / self.saucepan_asset)
+        expected_asset = str(Path(assets_root) / "objects" / SAUCEPAN_ASSET_BY_TYPE[self.saucepan_type])
+        if Path(self.saucepan_asset).resolve() != Path(expected_asset).resolve():
+            raise ValueError("TS03 saucepan_asset does not match saucepan_type")
+        self.saucepan_material = str(saucepan_material)
+        self.sugar_plate_material = str(sugar_plate_material)
+        self.sugar_cube_material = str(sugar_cube_material)
+        for value, profiles, label in (
+            (self.saucepan_material, SAUCEPAN_MATERIAL_PROFILES, "saucepan_material"),
+            (self.sugar_plate_material, SUGAR_PLATE_MATERIAL_PROFILES, "sugar_plate_material"),
+            (self.sugar_cube_material, SUGAR_CUBE_MATERIAL_PROFILES, "sugar_cube_material"),
+        ):
+            if value not in profiles:
+                raise ValueError(f"unknown TS03 {label}: {value!r}")
         self.completion_button_position_file = (
             None
             if completion_button_position_file is None
@@ -147,11 +182,19 @@ class TS03HierarchicalAddKSugarToHotChocolate(Kitchen):
         self.confirmed_sugar_count = 0
         self.objects_released = False
         self.stove.set_knob_state(env=self, rng=self.rng, knob=self.knob, mode="on")
-        try:
-            liquid = self.sim.model.geom_name2id("saucepan_liquid")
-            self.sim.model.geom_rgba[liquid] = [0.58, 0.37, 0.24, 0.92]
-        except Exception:
-            pass
+        self.material_randomization = {
+            self.receptacle_name: apply_object_material(
+                self, self.receptacle_name, self.saucepan_material, SAUCEPAN_MATERIAL_PROFILES
+            ),
+            self.sugar_plate_name: apply_object_material(
+                self, self.sugar_plate_name, self.sugar_plate_material, SUGAR_PLATE_MATERIAL_PROFILES
+            ),
+        }
+        for name in self.sugar_names:
+            self.material_randomization[name] = apply_object_material(
+                self, name, self.sugar_cube_material, SUGAR_CUBE_MATERIAL_PROFILES
+            )
+        self._set_saucepan_liquid_rgba()
         self.original_sugar_poses = {
             name: self._placement_pose(name) for name in self.sugar_names
         }
@@ -207,7 +250,7 @@ class TS03HierarchicalAddKSugarToHotChocolate(Kitchen):
         configs.append(
             dict(
                 name=self.receptacle_name,
-                obj_groups=SAUCEPAN_XML,
+                obj_groups=self.saucepan_asset,
                 placement=dict(
                     fixture=self.stove,
                     ensure_object_boundary_in_range=False,
@@ -306,6 +349,24 @@ class TS03HierarchicalAddKSugarToHotChocolate(Kitchen):
             self.confirmed_sugar_count == self.target_sugar_count
             and self.objects_released
         )
+
+    def _set_saucepan_liquid_rgba(self) -> None:
+        """Keep hot chocolate independent of saucepan appearance randomization."""
+
+        saucepan = self.objects[self.receptacle_name]
+        names = (
+            f"{saucepan.naming_prefix}{SAUCEPAN_LIQUID_REGION_SUFFIX}",
+            "saucepan_liquid",
+        )
+        model = self.sim.model
+        for name in names:
+            try:
+                geom_id = int(model.geom_name2id(name))
+            except Exception:
+                continue
+            if geom_id >= 0:
+                model.geom_rgba[geom_id] = HOT_CHOCOLATE_RGBA
+                return
 
     def _saucepan_interior_cylinder(self) -> dict[str, Any]:
         """Read the live world-space cylinder encoded by the saucepan asset."""
@@ -569,6 +630,12 @@ class TS03HierarchicalAddKSugarToHotChocolate(Kitchen):
                 "distractor_sugar_names": list(self.distractor_sugar_names),
                 "sugar_plate_name": self.sugar_plate_name,
                 "receptacle_name": self.receptacle_name,
+                "saucepan_type": self.saucepan_type,
+                "saucepan_asset": self.saucepan_asset,
+                "saucepan_material": self.saucepan_material,
+                "sugar_plate_material": self.sugar_plate_material,
+                "sugar_cube_material": self.sugar_cube_material,
+                "material_randomization": dict(getattr(self, "material_randomization", {})),
                 "completion_button_name": COMPLETION_BUTTON_NAME,
             }
         )

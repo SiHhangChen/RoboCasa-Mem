@@ -1,4 +1,4 @@
-"""Pure TS03 identity resolution and four-profile episode sampling."""
+"""Pure TS03 identity resolution and full K/N episode sampling."""
 
 from __future__ import annotations
 
@@ -21,21 +21,32 @@ from bench.tasks.ts03.domain.contracts import (
     profile_for_seed,
 )
 from bench.tasks.ts03.domain.geometry import SUGAR_RELEASE_REGION_NAMES
+from bench.tasks.ts03.materials import (
+    SAUCEPAN_ASSET_BY_TYPE,
+    SAUCEPAN_MATERIALS,
+    SAUCEPAN_TYPES,
+    SUGAR_CUBE_MATERIALS,
+    SUGAR_PLATE_MATERIALS,
+)
 
 
 # Keep these streams identical to the calibrated TS01 physical task. TS03 owns
-# its implementation, but its four hierarchy profiles only specialize K/N.
+# its implementation; the six K/N profiles only specialize count sampling.
 TARGET_ORDER_SALT = 0x54415247
 LAYOUT_SALT = 0x504C4154
 RELEASE_REGION_ORDER_SALT = 0x5245474E
+SAUCEPAN_TYPE_SALT = 0x53505459
+SAUCEPAN_MATERIAL_SALT = 0x53504D41
+SUGAR_PLATE_MATERIAL_SALT = 0x53504C54
+SUGAR_CUBE_MATERIAL_SALT = 0x53504355
 
 
 def normalize_target_sugar_count(value: Any | None) -> int | None:
     if value is None or value == "":
         return None
     result = int(value)
-    if result not in (1, 2):
-        raise ValueError("TS03 target_sugar_count must be 1 or 2")
+    if result not in (1, 2, 3):
+        raise ValueError("TS03 target_sugar_count must be 1, 2, or 3")
     return result
 
 
@@ -78,7 +89,7 @@ def resolve_task_definition(**values: Any) -> TaskDefinition:
         description=str(
             values.get(
                 "description",
-                "Complete one of four hierarchical exactly-K sugar-count profiles.",
+                "Complete one of six K/N sugar-count profiles.",
             )
         ),
         success_conditions=conditions,
@@ -144,6 +155,10 @@ def resolve_episode_plan(
     sugar_name_prefix: str = "sugar",
     target_sugar_names: Any | None = None,
     max_horizon: Any = 2800,
+    saucepan_type_candidates: Any = SAUCEPAN_TYPES,
+    saucepan_material_candidates: Any = SAUCEPAN_MATERIALS,
+    sugar_plate_material_candidates: Any = SUGAR_PLATE_MATERIALS,
+    sugar_cube_material_candidates: Any = SUGAR_CUBE_MATERIALS,
     **unknown: Any,
 ) -> EpisodePlan:
     if unknown:
@@ -187,6 +202,22 @@ def resolve_episode_plan(
     horizon = int(max_horizon)
     if horizon <= 0:
         raise ValueError("TS03 max_horizon must be positive")
+    saucepan_types = _candidate_pool(
+        saucepan_type_candidates, allowed=SAUCEPAN_TYPES, label="saucepan_type_candidates"
+    )
+    saucepan_materials = _candidate_pool(
+        saucepan_material_candidates, allowed=SAUCEPAN_MATERIALS, label="saucepan_material_candidates"
+    )
+    plate_materials = _candidate_pool(
+        sugar_plate_material_candidates, allowed=SUGAR_PLATE_MATERIALS, label="sugar_plate_material_candidates"
+    )
+    cube_materials = _candidate_pool(
+        sugar_cube_material_candidates, allowed=SUGAR_CUBE_MATERIALS, label="sugar_cube_material_candidates"
+    )
+    saucepan_type = str(_rng(episode_seed, SAUCEPAN_TYPE_SALT).choice(saucepan_types))
+    saucepan_material = str(_rng(episode_seed, SAUCEPAN_MATERIAL_SALT).choice(saucepan_materials))
+    sugar_plate_material = str(_rng(episode_seed, SUGAR_PLATE_MATERIAL_SALT).choice(plate_materials))
+    sugar_cube_material = str(_rng(episode_seed, SUGAR_CUBE_MATERIAL_SALT).choice(cube_materials))
     return EpisodePlan(
         seed=episode_seed,
         target_sugar_count=profile.target_sugar_count,
@@ -197,6 +228,11 @@ def resolve_episode_plan(
         sugar_release_region_orders=release_region_orders,
         sugar_plate_layout_seed=layout_seed,
         max_horizon=horizon,
+        saucepan_type=saucepan_type,
+        saucepan_asset=SAUCEPAN_ASSET_BY_TYPE[saucepan_type],
+        saucepan_material=saucepan_material,
+        sugar_plate_material=sugar_plate_material,
+        sugar_cube_material=sugar_cube_material,
     )
 
 
@@ -253,6 +289,18 @@ def _normalize_target_names(
 
 def _rng(seed: int, salt: int) -> np.random.Generator:
     return np.random.default_rng(np.random.SeedSequence([int(seed), int(salt)]))
+
+
+def _candidate_pool(value: Any, *, allowed: tuple[str, ...], label: str) -> tuple[str, ...]:
+    if isinstance(value, (str, bytes)) or not hasattr(value, "__iter__"):
+        raise ValueError(f"TS03 {label} must be a non-empty sequence")
+    candidates = tuple(str(item).strip() for item in value)
+    if not candidates or len(set(candidates)) != len(candidates):
+        raise ValueError(f"TS03 {label} must be non-empty and unique")
+    unknown = sorted(set(candidates) - set(allowed))
+    if unknown:
+        raise ValueError(f"unknown TS03 {label}: {', '.join(unknown)}")
+    return candidates
 
 
 __all__ = [

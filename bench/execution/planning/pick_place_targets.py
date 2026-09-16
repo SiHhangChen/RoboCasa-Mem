@@ -478,6 +478,12 @@ def make_object_pick_target_poses(
     grasp_offset_x: float = 0.0,
     grasp_offset_y: float = 0.0,
     grasp_offset_z: float = 0.0,
+    # Offsets applied in the final gripper frame (after rotation).
+    # X is along finger separation (local X of the grasp rot), Y perpendicular.
+    # Positive X shifts the TCP so the finger-pad midpoint moves relative to object center.
+    # Use small values (e.g. ±0.005 to ±0.015 m) to compensate TCP vs actual pad center.
+    grasp_finger_offset_x: float = 0.0,
+    grasp_finger_offset_y: float = 0.0,
 ) -> dict[str, Any]:
     """Build local pick-stage TCP targets from the current base pose."""
     base_world = matrix_from_base_obs(obs)
@@ -524,6 +530,15 @@ def make_object_pick_target_poses(
         }
     else:
         grasp_pos = top_center + np.array([0.0, 0.0, grasp_clearance], dtype=float) + grasp_offset
+        # Apply offsets in the final gripper-local frame (after rot).
+        # grasp_finger_offset_x moves along the finger-separation axis (rot[:,0]).
+        # This lets us shift the TCP so the effective finger-pad midpoint aligns better
+        # with the object center, instead of forcing the TCP itself to the bbox center.
+        finger_off = np.array(
+            [float(grasp_finger_offset_x), float(grasp_finger_offset_y), 0.0],
+            dtype=float,
+        )
+        grasp_pos = grasp_pos + (rot @ finger_off)
         poses_world = {
             "pregrasp": matrix_with_pose(
                 grasp_pos + np.array([0.0, 0.0, pregrasp_height - grasp_clearance], dtype=float),

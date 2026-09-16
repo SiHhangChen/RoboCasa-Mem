@@ -8,10 +8,17 @@ from bench.tasks.ts01.domain.episode import (
     resolve_episode_plan as resolve_ts01_episode_plan,
 )
 from bench.tasks.ts03.config import load_task_config, resolve_action_config
-from bench.tasks.ts03.domain.contracts import profile_for_seed
+from bench.tasks.ts03.domain.contracts import PROFILE_IDS, profile_for_seed, VALID_CELLS
 from bench.tasks.ts03.domain.episode import resolve_episode_plan
 from bench.tasks.ts03.domain.geometry import SUGAR_RELEASE_REGION_NAMES
 from bench.tasks.ts03.execution.geometry import build_saucepan_release_candidate_groups
+
+
+def test_ts03_seed_cycle_covers_full_k_n_table() -> None:
+    assert VALID_CELLS == ((1, 1), (1, 2), (1, 3), (2, 2), (2, 3), (3, 3))
+    assert PROFILE_IDS == ("k1_n1", "k1_n2", "k1_n3", "k2_n2", "k2_n3", "k3_n3")
+    observed = [profile_for_seed(seed).profile_id for seed in range(6)]
+    assert observed == list(PROFILE_IDS)
 
 
 def test_ts03_seeded_sampling_matches_ts01_physical_policy() -> None:
@@ -26,7 +33,10 @@ def test_ts03_seeded_sampling_matches_ts01_physical_policy() -> None:
             max_horizon=2800,
         )
 
-        assert asdict(actual) == asdict(expected)
+        actual_values = asdict(actual)
+        expected_values = asdict(expected)
+        for key, value in expected_values.items():
+            assert actual_values[key] == value
 
 
 def test_ts03_release_orders_are_seeded_permutations_accepted_by_execution() -> None:
@@ -67,7 +77,10 @@ def test_ts03_explicit_target_order_and_seed_validation_match_ts01() -> None:
         target_sugar_names="sugar2;sugar0",
         max_horizon=2800,
     )
-    assert asdict(actual) == asdict(expected)
+    actual_values = asdict(actual)
+    expected_values = asdict(expected)
+    for key, value in expected_values.items():
+        assert actual_values[key] == value
 
     with pytest.raises(ValueError, match="seed must be non-negative"):
         resolve_episode_plan(seed=-1, profile_id="k1_n2")
