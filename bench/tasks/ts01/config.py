@@ -98,6 +98,10 @@ def load_task_config(path: str | Path = DEFAULT_TASK_CONFIG_FILE) -> TaskConfig:
             "sugar_name_prefix",
             "target_sugar_names",
             "max_horizon",
+            "saucepan_type_candidates",
+            "saucepan_material_candidates",
+            "sugar_plate_material_candidates",
+            "sugar_cube_material_candidates",
         },
         "episode fields",
     )
@@ -117,6 +121,8 @@ def load_task_config(path: str | Path = DEFAULT_TASK_CONFIG_FILE) -> TaskConfig:
         {
             "enabled",
             "sugar_plate_edge_margin",
+            "sugar_plate_sampling_radius_m",
+            "sugar_cube_yaw_half_range_deg",
             "sugar_cube_sliding_friction",
             "sugar_cube_mass_scale",
         },
@@ -141,7 +147,7 @@ def load_task_config(path: str | Path = DEFAULT_TASK_CONFIG_FILE) -> TaskConfig:
     resources = dict(_mapping(payload, "resources", config_path))
     _reject_unknown(
         resources,
-        {"manual_base_path", "planner_script", "completion_button_position"},
+        {"manual_base_path", "station_poses", "planner_script", "completion_button_position"},
         "resource fields",
     )
 
@@ -325,10 +331,13 @@ def load_task_config(path: str | Path = DEFAULT_TASK_CONFIG_FILE) -> TaskConfig:
             "grasp_clearance",
             "lift_height",
             "preshape_gripper_steps",
+            "align_preshape_finger_center",
             "descent_gripper_action",
             "close_gripper_action",
             "held_gripper_action",
             "grasp_yaw_offsets_deg",
+            "grasp_finger_offset_x",
+            "grasp_finger_offset_y",
             "allow_pregrasp_near_miss",
             "allow_grasp_near_miss",
             "pregrasp_settle_steps",
@@ -471,6 +480,7 @@ def resolve_action_config(*, episode: Any, operations: Mapping[str, Any]) -> Act
         "lift_height": float(pick_values.get("lift_height", 0.24)),
         "preshape_gripper_action": 1.0,
         "preshape_gripper_steps": int(pick_values.get("preshape_gripper_steps", 5)),
+        "align_preshape_finger_center": bool(pick_values.get("align_preshape_finger_center", False)),
         "descent_gripper_action": float(pick_values.get("descent_gripper_action", 0.0)),
         "close_gripper_action": float(pick_values.get("close_gripper_action", 1.0)),
         "held_gripper_action": float(pick_values.get("held_gripper_action", 1.0)),
@@ -478,6 +488,8 @@ def resolve_action_config(*, episode: Any, operations: Mapping[str, Any]) -> Act
             pick_values.get("grasp_yaw_offsets_deg", (0.0, 90.0, 180.0, 270.0))
         ),
         "allow_pregrasp_near_miss": bool(pick_values.get("allow_pregrasp_near_miss", True)),
+        "grasp_finger_offset_x": float(pick_values.get("grasp_finger_offset_x", 0.0)),
+        "grasp_finger_offset_y": float(pick_values.get("grasp_finger_offset_y", 0.0)),
         "allow_grasp_near_miss": bool(pick_values.get("allow_grasp_near_miss", True)),
         "pregrasp_settle_steps": int(pick_values.get("pregrasp_settle_steps", 0)),
         "grasp_settle_steps": int(pick_values.get("grasp_settle_steps", 0)),
@@ -594,6 +606,8 @@ def resolve_action_config(*, episode: Any, operations: Mapping[str, Any]) -> Act
         },
         handler_settings=dict(_section(operations, "handlers")),
         grasp_yaw_offsets_deg=pick["grasp_yaw_offsets_deg"],
+        grasp_finger_offset_x=pick["grasp_finger_offset_x"],
+        grasp_finger_offset_y=pick["grasp_finger_offset_y"],
     )
 
 
@@ -655,6 +669,7 @@ def _validate_resources(config: TaskConfig) -> None:
         "manual_base_path",
         "planner_script",
         "completion_button_position",
+        "station_poses",
     ):
         path = config.path(config.resources.get(name))
         if path is None or not path.is_file():

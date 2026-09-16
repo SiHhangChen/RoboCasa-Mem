@@ -21,6 +21,10 @@ from bench.tasks.ts01.domain.contracts import (
     TaskDefinition,
 )
 from bench.tasks.ts01.domain.geometry import SUGAR_RELEASE_REGION_NAMES
+from bench.tasks.ts01.materials import (
+    SAUCEPAN_ASSET_BY_TYPE, SAUCEPAN_TYPES, SAUCEPAN_MATERIALS,
+    SUGAR_PLATE_MATERIALS, SUGAR_CUBE_MATERIALS,
+)
 
 
 K_SALT = 0x54533031
@@ -28,6 +32,10 @@ N_SALT = 0x4E534330
 TARGET_ORDER_SALT = 0x54415247
 LAYOUT_SALT = 0x504C4154
 RELEASE_REGION_ORDER_SALT = 0x5245474E
+SAUCEPAN_TYPE_SALT = 0x53505459
+SAUCEPAN_MATERIAL_SALT = 0x53504D41
+SUGAR_PLATE_MATERIAL_SALT = 0x53504C54
+SUGAR_CUBE_MATERIAL_SALT = 0x53504355
 
 
 def normalize_target_sugar_count(value: Any | None) -> int | None:
@@ -192,6 +200,10 @@ def resolve_episode_plan(
     sugar_name_prefix: str = "sugar",
     target_sugar_names: Any | None = None,
     max_horizon: Any = 2400,
+    saucepan_type_candidates: Any = SAUCEPAN_TYPES,
+    saucepan_material_candidates: Any = SAUCEPAN_MATERIALS,
+    sugar_plate_material_candidates: Any = SUGAR_PLATE_MATERIALS,
+    sugar_cube_material_candidates: Any = SUGAR_CUBE_MATERIALS,
     **unknown: Any,
 ) -> EpisodePlan:
     """Freeze K, N, target order and all episode-level random decisions."""
@@ -246,6 +258,19 @@ def resolve_episode_plan(
     horizon = int(max_horizon)
     if horizon <= 0:
         raise ValueError("TS01 max_horizon must be positive")
+    appearance = {}
+    for name, candidates, allowed, salt in (
+        ("saucepan_type", saucepan_type_candidates, SAUCEPAN_TYPES, SAUCEPAN_TYPE_SALT),
+        ("saucepan_material", saucepan_material_candidates, SAUCEPAN_MATERIALS, SAUCEPAN_MATERIAL_SALT),
+        ("sugar_plate_material", sugar_plate_material_candidates, SUGAR_PLATE_MATERIALS, SUGAR_PLATE_MATERIAL_SALT),
+        ("sugar_cube_material", sugar_cube_material_candidates, SUGAR_CUBE_MATERIALS, SUGAR_CUBE_MATERIAL_SALT),
+    ):
+        if isinstance(candidates, (str, bytes)) or not hasattr(candidates, "__iter__"):
+            raise ValueError(f"TS01 {name}_candidates must be a non-empty sequence")
+        pool = tuple(str(value).strip() for value in candidates)
+        if not pool or len(set(pool)) != len(pool) or any(value not in allowed for value in pool):
+            raise ValueError(f"TS01 invalid {name}_candidates: {pool!r}")
+        appearance[name] = str(_rng(episode_seed, salt).choice(pool))
     return EpisodePlan(
         seed=episode_seed,
         target_sugar_count=int(target),
@@ -256,6 +281,8 @@ def resolve_episode_plan(
         sugar_release_region_orders=release_region_orders,
         sugar_plate_layout_seed=layout_seed,
         max_horizon=horizon,
+        saucepan_asset=SAUCEPAN_ASSET_BY_TYPE[appearance["saucepan_type"]],
+        **appearance,
     )
 
 

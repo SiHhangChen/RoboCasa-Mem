@@ -117,15 +117,20 @@ def _completion_button_xy(env: Any) -> np.ndarray | None:
 
 
 def build_navigation_config(
-    settings: dict[str, Any], *, manual_base_path_file: Path
+    settings: dict[str, Any], *, manual_base_path_file: Path | None = None,
+    station_base_pose_file: Path | None = None,
 ) -> NavigationConfig:
     values = dict(settings)
     allowed = {field.name for field in fields(NavigationConfig)}
     unknown = sorted(set(values) - allowed)
     if unknown:
         raise ValueError("unknown TS01 navigation settings: " + ", ".join(unknown))
-    values["manual_base_path_file"] = Path(manual_base_path_file)
-    values["station_base_pose_file"] = None
+    values["manual_base_path_file"] = (
+        None if manual_base_path_file is None else Path(manual_base_path_file)
+    )
+    values["station_base_pose_file"] = (
+        None if station_base_pose_file is None else Path(station_base_pose_file)
+    )
     return replace(NavigationConfig(), **values)
 
 

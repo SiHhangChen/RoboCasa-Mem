@@ -111,6 +111,11 @@ class EpisodePlan:
     sugar_release_region_orders: tuple[tuple[str, ...], ...]
     sugar_plate_layout_seed: int
     max_horizon: int
+    saucepan_type: str = "Saucepan002"
+    saucepan_asset: str = "lightwheel/saucepan/Saucepan002/model.xml"
+    saucepan_material: str = "original"
+    sugar_plate_material: str = "original"
+    sugar_cube_material: str = "original"
 
 
 @dataclass(frozen=True)
@@ -123,6 +128,8 @@ class ActionConfig:
     return_arm_metadata: Mapping[str, Any]
     handler_settings: Mapping[str, Any]
     grasp_yaw_offsets_deg: tuple[float, ...]
+    grasp_finger_offset_x: float = 0.0
+    grasp_finger_offset_y: float = 0.0
 
 
 @dataclass(frozen=True)

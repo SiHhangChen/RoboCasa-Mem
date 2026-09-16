@@ -7,9 +7,11 @@ from typing import Any
 import numpy as np
 
 
-SUGAR_PLATE_MIN_SPACING_SPARSE = 0.08
+SUGAR_PLATE_MIN_SPACING_SPARSE = 0.05
 SUGAR_PLATE_MIN_SPACING_DENSE = 0.045
 SUGAR_PLATE_EDGE_MARGIN = 0.012
+SUGAR_PLATE_SAMPLING_RADIUS_M = 0.005
+SUGAR_CUBE_YAW_SALT = 0x59415733
 SUGAR_RELEASE_REGIONS_XY = {
     "A": (
         (-0.0460, 0.0000),
@@ -28,13 +30,17 @@ SUGAR_RELEASE_REGIONS_XY = {
     ),
 }
 SUGAR_RELEASE_REGION_NAMES = tuple(SUGAR_RELEASE_REGIONS_XY)
+# Normalized tray-local slot centers. Outer X used to sit at 0.86 of the safe
+# half-extent (~10 cm), which put some cubes outside a comfortable Panda reach
+# from the sugar station. Pull X inward; keep Y so N=3 still clears the 5 cm
+# center-spacing floor after 5 mm disk jitter.
 GRASP_SAFE_SLOTS = np.array(
     [
-        (-0.86, -0.35),
+        (-0.64, -0.35),
         (0.0, -0.35),
-        (0.86, -0.35),
-        (-0.43, 0.35),
-        (0.43, 0.35),
+        (0.64, -0.35),
+        (-0.32, 0.35),
+        (0.32, 0.35),
     ],
     dtype=float,
 )
@@ -84,20 +90,25 @@ def sample_sugar_plate_offsets_xy(
     count: int,
     rng: Any,
     safe_half_extents_xy: Any,
+    sampling_radius_m: float = SUGAR_PLATE_SAMPLING_RADIUS_M,
 ) -> tuple[tuple[float, float], ...]:
-    """Sample reproducible grasp-safe positions inside a tray."""
+    """Sample positions uniformly in disks around grasp-safe slot centers."""
 
     safe = np.asarray(safe_half_extents_xy, dtype=float).reshape(2)
+    if not np.all(np.isfinite(safe)) or np.any(safe <= 0.0):
+        raise ValueError("tray bounds must be finite and positive")
+    radius = float(sampling_radius_m)
+    if not np.isfinite(radius) or radius < 0.0:
+        raise ValueError("sugar plate sampling radius must be finite and non-negative")
     if int(count) < 1 or int(count) > len(GRASP_SAFE_SLOTS):
         raise ValueError(f"total sugar count must be between 1 and {len(GRASP_SAFE_SLOTS)}, got {count}")
     last_error: ValueError | None = None
     for _ in range(256):
         slot_indices = np.asarray(rng.permutation(len(GRASP_SAFE_SLOTS)), dtype=int)[: int(count)]
-        jitter = np.asarray(
-            rng.uniform((-0.025, -0.03), (0.025, 0.03), size=(int(count), 2)),
-            dtype=float,
-        )
-        offsets = (GRASP_SAFE_SLOTS[slot_indices] + jitter) * safe
+        angles = rng.uniform(0.0, 2.0 * np.pi, size=int(count))
+        distances = radius * np.sqrt(rng.uniform(0.0, 1.0, size=int(count)))
+        jitter = distances[:, None] * np.column_stack((np.cos(angles), np.sin(angles)))
+        offsets = GRASP_SAFE_SLOTS[slot_indices] * safe + jitter
         try:
             checked = validate_sugar_plate_offsets_xy(
                 offsets,
@@ -116,6 +127,7 @@ def sample_sugar_plate_offsets_for_seed(
     count: int,
     seed: int,
     safe_half_extents_xy: Any,
+    sampling_radius_m: float = SUGAR_PLATE_SAMPLING_RADIUS_M,
 ) -> tuple[tuple[float, float], ...]:
     """Sample tray offsets from an isolated episode seed stream."""
 
@@ -124,7 +136,25 @@ def sample_sugar_plate_offsets_for_seed(
         count=count,
         rng=rng,
         safe_half_extents_xy=safe_half_extents_xy,
+        sampling_radius_m=sampling_radius_m,
     )
+
+
+def sample_sugar_cube_yaws_for_seed(
+    *,
+    count: int,
+    seed: int,
+    half_range_rad: float = np.pi,
+) -> tuple[float, ...]:
+    """Sample world yaw independently of tray XY rejection sampling."""
+
+    if int(count) < 1 or int(count) > len(GRASP_SAFE_SLOTS):
+        raise ValueError(f"sugar count must be between 1 and {len(GRASP_SAFE_SLOTS)}")
+    half_range = float(half_range_rad)
+    if not np.isfinite(half_range) or not 0.0 <= half_range <= np.pi:
+        raise ValueError("sugar cube yaw half-range must be finite and in [0, pi]")
+    rng = np.random.default_rng(np.random.SeedSequence([int(seed), SUGAR_CUBE_YAW_SALT]))
+    return tuple(float(yaw) for yaw in rng.uniform(-half_range, half_range, size=int(count)))
 
 
 def sugar_release_region_offsets_xy(region_name: str) -> tuple[tuple[float, float], ...]:
@@ -202,11 +232,13 @@ def point_is_inside_cylindrical_region(
 __all__ = [
     "GRASP_SAFE_SLOTS",
     "SUGAR_PLATE_EDGE_MARGIN",
+    "SUGAR_PLATE_SAMPLING_RADIUS_M",
     "SUGAR_PLATE_MIN_SPACING_DENSE",
     "SUGAR_PLATE_MIN_SPACING_SPARSE",
     "SUGAR_RELEASE_REGIONS_XY",
     "SUGAR_RELEASE_REGION_NAMES",
     "point_is_inside_cylindrical_region",
+    "sample_sugar_cube_yaws_for_seed",
     "sample_sugar_plate_offsets_for_seed",
     "sample_sugar_plate_offsets_xy",
     "sugar_plate_min_spacing",
