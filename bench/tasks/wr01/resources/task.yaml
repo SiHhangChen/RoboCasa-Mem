@@ -26,6 +26,14 @@ episode:
   # Expert recording order only; policy evaluation accepts either door first.
   close_order: null
   max_horizon: 15000
+  # One seeded finish is shared by both cabinets so appearance cannot reveal
+  # the requested item or its storage level.
+  cabinet_material_candidates:
+    - original
+    - light_wood
+    - walnut
+    - gray_wood
+    - warm_white
 
 initial_state:
   robot_base:

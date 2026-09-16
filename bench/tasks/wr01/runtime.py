@@ -37,6 +37,7 @@ def _environment(config: Any, scene: Any, plan: Any, resources: Mapping[str, Any
             "upper_cabinet_z_offset": float(cabinet["upper_z_offset"]),
             "object_scale": float(config.initial_state.objects.get("object_scale", 0.90)),
             "item_placement_seed": int(plan.seed),
+            "cabinet_material_id": str(plan.cabinet_material_id),
             "final_closed_threshold": float(semantics.get("final_closed_threshold", 0.08)),
             "cabinet_contains_margin": float(semantics.get("cabinet_contains_margin", 0.04)),
             "physical_event_dwell_steps": int(semantics.get("physical_event_dwell_steps", 3)),

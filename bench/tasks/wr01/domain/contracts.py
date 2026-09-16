@@ -92,6 +92,7 @@ class EpisodePlan:
     target_level: str
     close_order: tuple[str, str]
     max_horizon: int
+    cabinet_material_id: str = "original"
 
     @property
     def storage_order(self) -> tuple[str, str]:

@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
+import xml.etree.ElementTree as ET
 
 import numpy as np
 
@@ -17,6 +18,10 @@ from robocasa.utils.object_utils import (
 )
 
 from bench.tasks.wr01.domain.contracts import CABINET_LEVELS, ITEM_IDS
+from bench.tasks.wr01.cabinet_materials import (
+    CABINET_MATERIAL_TEXTURES,
+    apply_cabinet_material,
+)
 from bench.tasks.wr01.domain.geometry import (
     STORAGE_INTERIOR_LOCAL_CENTER,
     level_world_xyz,
@@ -155,6 +160,7 @@ class WR01RetrieveRememberedCan(Kitchen):
         upper_cabinet_z_offset: float = 0.40,
         object_scale: float = 0.90,
         item_placement_seed: int = 0,
+        cabinet_material_id: str = "original",
         final_closed_threshold: float = 0.08,
         cabinet_contains_margin: float = 0.04,
         physical_event_dwell_steps: int = 3,
@@ -167,6 +173,16 @@ class WR01RetrieveRememberedCan(Kitchen):
         self._upper_cabinet_z_offset = float(upper_cabinet_z_offset)
         self._object_scale = float(object_scale)
         self._item_placement_seed = int(item_placement_seed)
+        self.cabinet_material_id = str(cabinet_material_id)
+        if self.cabinet_material_id not in CABINET_MATERIAL_TEXTURES:
+            raise ValueError(
+                f"unknown WR-01 cabinet material: {self.cabinet_material_id!r}"
+            )
+        self.cabinet_material_randomization = {
+            "material": self.cabinet_material_id,
+            "fixtures": [LOWER_CABINET_NAME, UPPER_CABINET_NAME],
+            "applied": self.cabinet_material_id != "original",
+        }
         self.final_closed_threshold = float(final_closed_threshold)
         self.cabinet_contains_margin = float(cabinet_contains_margin)
         self.physical_event_dwell_steps = int(physical_event_dwell_steps)
@@ -200,6 +216,17 @@ class WR01RetrieveRememberedCan(Kitchen):
         }
         kwargs.setdefault("obj_registries", ("objaverse", "aigen", "lightwheel"))
         super().__init__(*args, **kwargs)
+
+    def edit_model_xml(self, xml_str: str) -> str:
+        xml_str = super().edit_model_xml(xml_str)
+        root = ET.fromstring(xml_str)
+        apply_cabinet_material(
+            root,
+            fixture_names=(LOWER_CABINET_NAME, UPPER_CABINET_NAME),
+            material_id=self.cabinet_material_id,
+            texture_root=Path(assets_root) / "textures",
+        )
+        return ET.tostring(root, encoding="unicode")
 
     # Scene construction -------------------------------------------------
 

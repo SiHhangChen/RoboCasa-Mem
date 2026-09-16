@@ -7,6 +7,12 @@ from typing import Any
 
 import numpy as np
 
+from bench.tasks.wr01.cabinet_materials import (
+    CABINET_MATERIAL_TEXTURES,
+    normalize_cabinet_material_candidates,
+    sample_cabinet_material,
+)
+
 from bench.tasks.wr01.domain.contracts import (
     CABINET_LEVELS,
     ENV_NAME,
@@ -128,6 +134,9 @@ def resolve_episode_plan(*, seed: int, **values: Any) -> EpisodePlan:
     horizon = int(values.get("max_horizon", 15000))
     if horizon <= 0:
         raise ValueError("episode.max_horizon must be positive")
+    material_candidates = normalize_cabinet_material_candidates(
+        values.get("cabinet_material_candidates", tuple(CABINET_MATERIAL_TEXTURES))
+    )
     return EpisodePlan(
         seed=int(seed),
         item_by_level=dict(assignment),
@@ -136,6 +145,7 @@ def resolve_episode_plan(*, seed: int, **values: Any) -> EpisodePlan:
         target_level=level_by_item[target],
         close_order=close_order,
         max_horizon=horizon,
+        cabinet_material_id=sample_cabinet_material(seed, material_candidates),
     )
 
 
