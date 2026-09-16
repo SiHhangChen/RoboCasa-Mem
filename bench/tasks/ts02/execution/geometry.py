@@ -49,6 +49,11 @@ def drawer_pull_target_positions(
     """Return the calibrated prehook, hook, and pull target positions."""
 
     handle = np.asarray(handle_world, dtype=float).reshape(3)
+    handle = (
+        handle
+        + frame.side_direction_world * float(handle_side_offset)
+        + np.asarray([0.0, 0.0, float(handle_vertical_offset)], dtype=float)
+    )
     hook = handle + frame.open_direction_world * float(hook_offset)
     return {
         "prehook": handle + frame.open_direction_world * float(prehook_distance),
@@ -56,10 +61,38 @@ def drawer_pull_target_positions(
         "pull": (
             hook
             + frame.open_direction_world * float(pull_distance)
-            + frame.side_direction_world * float(handle_side_offset)
-            + np.asarray([0.0, 0.0, float(handle_vertical_offset)], dtype=float)
         ),
     }
+
+
+def vary_drawer_grasp_targets(
+    targets: dict[str, np.ndarray],
+    frame: DrawerMotionFrame,
+    *,
+    handle_side_offset: float = 0.0,
+    handle_vertical_offset: float = 0.0,
+    prehook_rotation_offset_deg: tuple[float, float, float] = (0.0, 0.0, 0.0),
+) -> dict[str, np.ndarray]:
+    """Shift the whole approach along the handle; rotate only the prehook."""
+
+    angles = np.asarray(prehook_rotation_offset_deg, dtype=float)
+    if angles.shape != (3,) or not np.all(np.isfinite(angles)):
+        raise ValueError("TS02 prehook rotation offset must contain three finite angles")
+    offsets = np.asarray([handle_side_offset, handle_vertical_offset], dtype=float)
+    if not np.all(np.isfinite(offsets)):
+        raise ValueError("TS02 handle offsets must be finite")
+    translation = (
+        frame.side_direction_world * float(handle_side_offset)
+        + np.asarray([0.0, 0.0, float(handle_vertical_offset)], dtype=float)
+    )
+    result = {name: value.copy() for name, value in targets.items()}
+    for target in result.values():
+        target[:3, 3] += translation
+    rotation_offset = np.eye(3)
+    for axis, angle in zip(np.eye(3), np.radians(angles)):
+        rotation_offset = rotation_offset @ _rodrigues(axis, float(angle))
+    result["prehook"][:3, :3] = targets["prehook"][:3, :3] @ rotation_offset
+    return result
 
 
 def pose_matrix(position: np.ndarray, rotation: np.ndarray) -> np.ndarray:
@@ -140,4 +173,5 @@ __all__ = [
     "pose_matrix",
     "resolve_drawer_motion_frame",
     "rotation_z",
+    "vary_drawer_grasp_targets",
 ]

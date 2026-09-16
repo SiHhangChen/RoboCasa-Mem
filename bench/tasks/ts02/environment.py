@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
+from collections.abc import Mapping
+from pathlib import Path
 from typing import Any
 
 import numpy as np
 
 from robocasa.environments.kitchen.kitchen import FixtureType, Kitchen
+from robocasa.models import assets_root
 
 from bench.tasks.ts02.button_asset import (
     TS02_BUTTON_MAX_TRAVEL_M,
@@ -34,6 +37,7 @@ from bench.tasks.ts02.domain.semantics import (
     record_inspection_attempt,
     record_open_attempt,
 )
+from bench.tasks.ts02.drawer_materials import DRAWER_MATERIAL_TEXTURES, apply_drawer_material
 from bench.tasks.ts02.evaluation import TS02EvaluationSnapshot
 from bench.tasks.ts02.physical_events import PhysicalSample, TS02PhysicalObserver
 from bench.tasks.ts02.single_drawer import SingleTabletopDrawer
@@ -86,6 +90,7 @@ class TS02InspectThreeCabinets(Kitchen):
             DEFAULT_COMPLETION_BUTTON_WORLD_XYZ
         ),
         target_fixture: str = FIXTURE_NAMES[0],
+        drawer_material_by_fixture: Mapping[str, str] | None = None,
         open_threshold: float = 0.70,
         closed_threshold: float = 0.08,
         button_pressed_threshold_m: float = 0.004,
@@ -125,6 +130,14 @@ class TS02InspectThreeCabinets(Kitchen):
         self.target_fixture = str(target_fixture)
         if self.target_fixture not in names:
             raise ValueError("TS02 target_fixture must name one of the three drawers")
+        finishes = dict(drawer_material_by_fixture or {})
+        if set(finishes) - set(names):
+            raise ValueError("TS02 drawer materials name unknown fixtures")
+        self.drawer_material_by_fixture = {
+            fixture: str(finishes.get(fixture, "original")) for fixture in names
+        }
+        if set(self.drawer_material_by_fixture.values()) - DRAWER_MATERIAL_TEXTURES.keys():
+            raise ValueError("TS02 drawer materials contain unknown finishes")
         self._physical_observer = TS02PhysicalObserver(
             fixture_names=names,
             target_fixture=self.target_fixture,
@@ -161,6 +174,13 @@ class TS02InspectThreeCabinets(Kitchen):
 
         xml_str = super().edit_model_xml(xml_str)
         root = ET.fromstring(xml_str)
+        for fixture, material_id in self.drawer_material_by_fixture.items():
+            apply_drawer_material(
+                root,
+                fixture_name=self.drawer_fixture_names[fixture],
+                material_id=material_id,
+                texture_root=Path(assets_root) / "textures",
+            )
         worldbody = root.find("worldbody")
         if worldbody is None:
             return xml_str

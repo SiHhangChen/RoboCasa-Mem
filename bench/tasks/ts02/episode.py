@@ -17,7 +17,7 @@ def resolve_episode(request: EpisodeRequest | None = None, **kwargs: Any) -> Res
     return resolve_canonical_episode(
         request,
         task_id="TS02",
-        task_version="1.0.0",
+        task_version="1.1.0",
         default_task_config_file=DEFAULT_TASK_CONFIG_FILE,
         load_task_config=load_task_config,
         resolve_task_options=resolve_task_options,

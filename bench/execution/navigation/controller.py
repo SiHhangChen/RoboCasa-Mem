@@ -166,6 +166,7 @@ class BaseDriverAdapter:
                     self._nav_config, "manual_base_path_intermediate_yaw_tolerance", None
                 ),
                 velocity_limits=BaseVelocityLimits.from_navigation_config(self._nav_config),
+                seed=int(getattr(self._nav_config, "manual_base_path_seed", 0)),
             )
         return self._manual_base_path_executor
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 import numpy as np
@@ -12,6 +12,7 @@ from bench.tasks.ts02.domain.contracts import (
     FIXTURE_DISPLAY_NAMES,
     FIXTURE_NAMES,
     TASK_ID,
+    DrawerOpenVariation,
     EpisodePlan,
     SceneConfig,
     TaskDefinition,
@@ -21,10 +22,14 @@ from bench.tasks.ts02.domain.geometry import (
     DEFAULT_DRAWER_WORLD_YAW_DEG,
     normalize_drawer_world_xyzs,
 )
+from bench.tasks.ts02.drawer_materials import DRAWER_MATERIAL_TEXTURES
 
 
 DEMO_ORDER_SEED_SALT = 0x54533032
 TARGET_FIXTURE_SEED_SALT = 0x54534754
+DRAWER_MATERIAL_SEED_SALT = 0x54534D41
+PREHOOK_SEED_SALT = 0x54535048
+HANDLE_OFFSET_SEED_SALT = 0x5453484F
 DEFAULT_LAYOUT_ID = 24
 DEFAULT_STYLE_ID = 24
 DEFAULT_OPEN_THRESHOLD = 0.70
@@ -73,9 +78,7 @@ def normalize_target_fixture(value: Any | None) -> str | None:
     aliases = {display: fixture for fixture, display in FIXTURE_DISPLAY_NAMES.items()}
     resolved = aliases.get(name, name)
     if resolved not in FIXTURE_NAMES:
-        raise ValueError(
-            f"target_fixture must be one of {FIXTURE_NAMES}, got {value!r}"
-        )
+        raise ValueError(f"target_fixture must be one of {FIXTURE_NAMES}, got {value!r}")
     return resolved
 
 
@@ -183,18 +186,71 @@ def resolve_episode_plan(*, seed: int, **values: Any) -> EpisodePlan:
     max_horizon = int(values.get("max_horizon", 2200))
     if max_horizon <= 0:
         raise ValueError("TS02 episode.max_horizon must be positive")
+    material_candidates, prehook_candidates, side_half_range = (
+        normalize_drawer_randomization(values)
+    )
+    materials: dict[str, str] = {}
+    variations: dict[str, DrawerOpenVariation] = {}
+    for index, fixture in enumerate(FIXTURE_NAMES):
+        materials[fixture] = str(
+            _fixture_rng(seed, DRAWER_MATERIAL_SEED_SALT, index).choice(material_candidates)
+        )
+        variant = str(
+            _fixture_rng(seed, PREHOOK_SEED_SALT, index).choice(
+                tuple(prehook_candidates)
+            )
+        )
+        variations[fixture] = DrawerOpenVariation(
+            prehook_variant=variant,
+            prehook_rotation_offset_deg=prehook_candidates[variant],
+            handle_side_offset_m=float(
+                _fixture_rng(seed, HANDLE_OFFSET_SEED_SALT, index).uniform(
+                    -side_half_range, side_half_range
+                )
+            ),
+        )
     return EpisodePlan(
         seed=int(seed),
         demo_fixture_order=(
             sample_demo_fixture_order(seed) if configured is None else configured
         ),
         target_fixture=(
-            sample_target_fixture(seed)
-            if configured_target is None
-            else configured_target
+            sample_target_fixture(seed) if configured_target is None else configured_target
         ),
         max_horizon=max_horizon,
+        drawer_material_by_fixture=materials,
+        drawer_open_variation_by_fixture=variations,
     )
+
+
+def _fixture_rng(seed: int, salt: int, index: int) -> np.random.Generator:
+    return np.random.default_rng(np.random.SeedSequence([int(seed), salt, index]))
+
+
+def normalize_drawer_randomization(
+    values: Mapping[str, Any],
+) -> tuple[tuple[str, ...], dict[str, tuple[float, float, float]], float]:
+    materials = values.get("drawer_material_candidates", ("original",))
+    if isinstance(materials, (str, bytes)) or not isinstance(materials, Sequence):
+        raise ValueError("TS02 drawer_material_candidates must be a non-empty sequence")
+    candidates = tuple(str(item) for item in materials)
+    if not candidates or len(set(candidates)) != len(candidates):
+        raise ValueError("TS02 drawer_material_candidates must be non-empty and unique")
+    unknown = sorted(set(candidates) - DRAWER_MATERIAL_TEXTURES.keys())
+    if unknown:
+        raise ValueError("unknown TS02 drawer materials: " + ", ".join(unknown))
+    rotations = values.get("prehook_rotation_candidates_deg", {"baseline": (0.0, 0.0, 0.0)})
+    if not isinstance(rotations, Mapping) or not rotations:
+        raise ValueError("TS02 prehook_rotation_candidates_deg must be a non-empty mapping")
+    normalized: dict[str, tuple[float, float, float]] = {}
+    for name, rotation in rotations.items():
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("TS02 prehook candidate names must be non-empty strings")
+        normalized[name] = _finite_xyz(rotation, f"prehook candidate {name!r}")
+    half_range = float(values.get("handle_side_offset_half_range_m", 0.0))
+    if not np.isfinite(half_range) or not 0.0 <= half_range <= 0.04:
+        raise ValueError("TS02 handle_side_offset_half_range_m must be in [0, 0.04]")
+    return candidates, dict(sorted(normalized.items())), half_range
 
 
 def _finite_xyz(value: Any, label: str) -> tuple[float, float, float]:
@@ -214,6 +270,7 @@ __all__ = [
     "DEFAULT_STYLE_ID",
     "normalize_fixture_order",
     "normalize_target_fixture",
+    "normalize_drawer_randomization",
     "resolve_episode_plan",
     "resolve_scene_config",
     "resolve_task_definition",

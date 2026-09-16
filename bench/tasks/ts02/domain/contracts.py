@@ -97,6 +97,13 @@ class SceneConfig:
 
 
 @dataclass(frozen=True)
+class DrawerOpenVariation:
+    prehook_variant: str
+    prehook_rotation_offset_deg: tuple[float, float, float]
+    handle_side_offset_m: float
+
+
+@dataclass(frozen=True)
 class EpisodePlan:
     """All per-episode decisions, frozen before the environment is created."""
 
@@ -104,6 +111,10 @@ class EpisodePlan:
     demo_fixture_order: tuple[str, ...]
     target_fixture: str
     max_horizon: int
+    drawer_material_by_fixture: Mapping[str, str] = field(default_factory=dict)
+    drawer_open_variation_by_fixture: Mapping[str, DrawerOpenVariation] = field(
+        default_factory=dict
+    )
 
 
 @dataclass(frozen=True)
@@ -126,6 +137,7 @@ class RunContext:
 __all__ = [
     "AXIS",
     "ActionConfig",
+    "DrawerOpenVariation",
     "ENV_NAME",
     "EpisodePlan",
     "FIXTURE_DISPLAY_NAMES",

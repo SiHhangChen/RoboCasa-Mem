@@ -17,6 +17,7 @@ from bench.execution.navigation.base_motion import (
     world_xy_to_controller_action,
     world_vec_to_base,
 )
+from bench.execution.sampling.circle_sampling import sample_uniform_disk, sample_uniform_yaw
 from bench.execution.navigation.velocity_profile import (
     AxialVelocityProfile,
     BaseVelocityLimits,
@@ -32,6 +33,56 @@ class ManualBasePathSample:
     xy: np.ndarray
     yaw: float
     name: str | None = None
+
+
+def load_manual_path_samples(
+    path: str | Path, *, seed: int = 0
+) -> list[ManualBasePathSample]:
+    """Load a manual path and apply optional deterministic point sampling."""
+
+    payload = _load_payload(path)
+    raw_samples = list(payload.get("samples", []))
+    if len(raw_samples) < 2:
+        raise ValueError(f"manual base path {path} needs at least two samples")
+    samples: list[ManualBasePathSample] = []
+    for fallback, item in enumerate(raw_samples):
+        base = _sample_from_payload(item, fallback)
+        sampling = item.get("sampling") if isinstance(item, dict) else None
+        if isinstance(sampling, dict):
+            radius = float(sampling.get("radius_m", 0.0))
+            if radius < 0.0 or not np.isfinite(radius):
+                raise ValueError(
+                    f"manual base sample {base.index} has invalid sampling radius"
+                )
+            draw_seed = int(seed)
+            if radius > 0.0:
+                draw_seed = int(
+                    np.random.SeedSequence([int(seed), 0x54533032, int(base.index)])
+                    .generate_state(1, dtype=np.uint32)[0]
+                )
+                xy = sample_uniform_disk(
+                    base.xy, radius, seed=draw_seed, salt=0x504F5345
+                )
+            else:
+                xy = base.xy.copy()
+            half_range = float(sampling.get("yaw_half_range_rad", 0.0))
+            if not 0.0 <= half_range <= np.pi or not np.isfinite(half_range):
+                raise ValueError(
+                    f"manual base sample {base.index} has invalid yaw range"
+                )
+            yaw = sample_uniform_yaw(
+                base.yaw, half_range, seed=draw_seed, salt=0x59415750
+            )
+            base = ManualBasePathSample(base.index, xy, yaw, base.name)
+        samples.append(base)
+    samples.sort(key=lambda item: item.index)
+    expected = list(range(len(samples)))
+    actual = [item.index for item in samples]
+    if actual != expected:
+        raise ValueError(
+            f"manual base path indexes must be contiguous {expected}; got {actual}"
+        )
+    return samples
 
 
 def _clip_action_norm(values: np.ndarray, *, max_norm: float = 1.0) -> np.ndarray:
@@ -83,21 +134,12 @@ class ManualBasePathExecutor:
         intermediate_xy_tolerance: float | None = None,
         intermediate_yaw_tolerance: float | None = None,
         velocity_limits: BaseVelocityLimits | None = None,
+        seed: int = 0,
     ) -> None:
         self.env = env
         self.path_file = Path(path_file)
         payload = _load_payload(self.path_file)
-        raw_samples = list(payload.get("samples", []))
-        if len(raw_samples) < 2:
-            raise ValueError(f"manual base path {self.path_file} needs at least two samples")
-        samples = [_sample_from_payload(item, i) for i, item in enumerate(raw_samples)]
-        samples.sort(key=lambda item: item.index)
-        expected = list(range(len(samples)))
-        actual = [item.index for item in samples]
-        if actual != expected:
-            raise ValueError(f"manual base path indexes must be contiguous {expected}; got {actual}")
-
-        self.samples = samples
+        self.samples = load_manual_path_samples(self.path_file, seed=int(seed))
         self.station_targets = {
             _normalize_key(key): value for key, value in dict(payload.get("station_targets", {})).items()
         }

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +14,7 @@ from bench.execution.navigation.station_poses import (
     load_station_pose_payload,
     station_sample_records,
 )
+from bench.execution.navigation.manual_base_path import load_manual_path_samples
 from bench.execution.planning import NavigationConfig
 from bench.tasks.ts02.domain.contracts import RobotBaseConfig, RobotBaseMode
 
@@ -85,18 +85,14 @@ def apply_robot_base_initial_state(
                 "manual_path_sample requires a manual path and sample index"
             )
         path = Path(path_value)
-        payload = json.loads(path.read_text(encoding="utf-8"))
-        samples = {
-            int(item.get("index", fallback)): dict(item)
-            for fallback, item in enumerate(payload.get("samples", []))
-        }
-        sample = samples.get(config.sample_index)
-        if sample is None:
+        samples = load_manual_path_samples(path, seed=int(seed))
+        sample_obj = next((item for item in samples if item.index == config.sample_index), None)
+        if sample_obj is None:
             raise KeyError(
                 f"manual base sample {config.sample_index} not found in {path}"
             )
-        xy = np.asarray(sample.get("xy", []), dtype=float).reshape(-1)
-        yaw = float(sample.get("yaw"))
+        xy = np.asarray(sample_obj.xy, dtype=float).reshape(-1)
+        yaw = float(sample_obj.yaw)
         if xy.size != 2 or not np.all(np.isfinite(xy)) or not np.isfinite(yaw):
             raise ValueError(f"invalid manual base sample {config.sample_index}")
         updated, summary = _set_base_pose(
@@ -110,8 +106,13 @@ def apply_robot_base_initial_state(
             {
                 "manual_base_path_file": str(path),
                 "sample_index": config.sample_index,
-                "sample_name": sample.get("name"),
-                "sample": sample,
+                "sample_name": sample_obj.name,
+                "sample": {
+                    "index": sample_obj.index,
+                    "name": sample_obj.name,
+                    "xy": xy.tolist(),
+                    "yaw": yaw,
+                },
             }
         )
         return updated, summary

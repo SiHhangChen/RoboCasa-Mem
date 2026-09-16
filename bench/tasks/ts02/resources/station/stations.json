@@ -20,6 +20,18 @@
   },
   "stations": {
     "drawer_station": {
+      "circle": {
+        "center_xy": [4.85, -1.37],
+        "radius_m": 0.075,
+        "base_yaw": -1.5707963267948966,
+        "yaw_half_range_rad": 0.08726646259971647,
+        "record_source": "ts02_drawer_15cm_disk"
+      },
+      "sampling_region": {
+        "center_xy": [4.85, -1.37],
+        "radius_m": 0.075,
+        "shape": "disk"
+      },
       "samples": [
         {
           "station_id": "drawer_station",

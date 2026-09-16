@@ -654,6 +654,8 @@ class NavigationConfig:
     manual_base_path_yaw_gain: float = 0.8           # 2.0->0.8
     manual_base_path_nearest_yaw_weight: float = 0.20
     manual_base_path_rotate_xy_tolerance: float = 0.10
+    # Episode seed used for optional per-waypoint manual-path sampling.
+    manual_base_path_seed: int = 0
 
     # --- velocity profile（梯形速度剖面；False 时回退 P 控制）---
     base_velocity_profile_enabled: bool = True

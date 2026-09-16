@@ -20,6 +20,7 @@ from bench.tasks.ts02.domain.contracts import (
     RunContext,
     TaskConfig,
 )
+from bench.tasks.ts02.domain.episode import normalize_drawer_randomization
 
 
 PACKAGE_ROOT = Path(__file__).resolve().parent
@@ -82,9 +83,14 @@ def load_task_config(path: str | Path = DEFAULT_TASK_CONFIG_FILE) -> TaskConfig:
     episode = dict(_mapping(payload, "episode", config_path))
     _reject_unknown(
         episode,
-        {"demo_fixture_order", "target_fixture", "max_horizon"},
+        {
+            "demo_fixture_order", "target_fixture", "max_horizon",
+            "drawer_material_candidates", "prehook_rotation_candidates_deg",
+            "handle_side_offset_half_range_m",
+        },
         "episode fields",
     )
+    normalize_drawer_randomization(episode)
 
     initial = _mapping(payload, "initial_state", config_path)
     _reject_unknown(initial, {"robot_base", "drawers"}, "initial_state fields")

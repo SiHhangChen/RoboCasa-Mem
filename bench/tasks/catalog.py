@@ -42,7 +42,7 @@ _ENTRIES: tuple[CatalogEntry, ...] = (
     CatalogEntry("TM03", "tm03", "TM03BoilWaterInspectDrawersAndRunToasterOven", "1.0.0", 4800),
     CatalogEntry("TM04", "tm04", "TM04FillPotRetrieveCanAndAddTwoSugars", "1.0.0", 5200),
     CatalogEntry("TS01", "ts01", "TS01AddKSugarToHotChocolate", "1.0.0", 2800),
-    CatalogEntry("TS02", "ts02", "TS02InspectThreeCabinets", "1.0.0", 2200),
+    CatalogEntry("TS02", "ts02", "TS02InspectThreeCabinets", "1.1.0", 2200),
     CatalogEntry("TS03", "ts03", "TS03HierarchicalAddKSugarToHotChocolate", "1.0.0", 2800),
     CatalogEntry("TS04", "ts04", "TS04InspectTwoDrawers", "1.0.0", 1800),
     CatalogEntry("WA-01", "wa01", "WA01SortSugaredAndUnsugaredCoffee", "2.0.0", 5000),

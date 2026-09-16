@@ -39,7 +39,7 @@ def test_leaf_task_layout_and_public_exports_are_uniform() -> None:
         validate_placeholder_resources(path)
         module = importlib.import_module(f"bench.tasks.{package}")
         assert module.TASK.task_id == task_id
-        assert module.TASK.version == "1.0.0"
+        assert module.TASK.version == TaskCatalog.get(task_id).version
         for name in (
             "config", "episode", "environment", "initialization", "observation",
             "semantics", "prompts", "expert.spec", "expert.stations", "expert.targets", "expert.operations",
