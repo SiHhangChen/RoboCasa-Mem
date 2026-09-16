@@ -11,11 +11,7 @@ import numpy as np
 
 from bench.execution.navigation.base_motion import set_base_pose_kinematic
 from bench.runtime.contracts import InitializationReport
-from bench.execution.navigation.station_poses import (
-    StationPoseSelector,
-    load_station_pose_payload,
-    station_sample_records,
-)
+from bench.execution.navigation.station_poses import quat_xyzw_to_yaw
 from bench.execution.planning import NavigationConfig
 from bench.tasks.wa02.domain.contracts import (
     CUP_IDS,
@@ -30,6 +26,7 @@ from bench.tasks.wa02.domain.geometry import (
     sample_service_slot_relative_xy,
     validate_cup_region_layout,
 )
+from bench.tasks.wa02.execution.navigation import build_episode_station_sampler
 
 
 def apply_sampled_initial_object_regions(
@@ -233,30 +230,23 @@ def apply_robot_base_initial_state(
         path = nav_config.station_base_pose_file
         if path is None or config.station_id is None:
             raise ValueError("station_sample requires a station pose resource and station id")
-        payload = load_station_pose_payload(path)
-        station = (payload.get("stations", {}) or {}).get(config.station_id)
-        if station is None:
-            raise KeyError(f"initial station {config.station_id!r} not found")
-        records = station_sample_records(list(station.get("samples", ())))
-        if not records:
-            raise ValueError(f"initial station {config.station_id!r} has no samples")
-        selector = StationPoseSelector.from_config(nav_config, seed=int(seed))
-        reset_xy = np.asarray(obs["robot0_base_pos"][:2], dtype=float)
-        record, selection = selector.select(config.station_id, records, base_xy=reset_xy)
+        sampler = build_episode_station_sampler(nav_config, seed=int(seed))
+        pose = sampler.sample(config.station_id)
+        selection_summary = dict(sampler.last_summary(config.station_id) or {})
         new_obs, result = _set_base_pose(
             env,
             obs,
-            target_xy=np.asarray(record["target_xy"], dtype=float),
-            target_yaw=float(record["target_yaw"]),
+            target_xy=np.asarray(pose.position[:2], dtype=float),
+            target_yaw=quat_xyzw_to_yaw(pose.quaternion),
             mode=config.mode.value,
         )
         result.update(
             {
                 "station_id": config.station_id,
                 "station_base_pose_file": str(path),
-                "selection": selection,
-                "sample_index": int(record["sample_index"]),
-                "sample": dict(record["sample"]),
+                "selection": selection_summary.get("station_pose_selection", {}),
+                "sample_index": int(selection_summary.get("sample_index", 0)),
+                "sample": dict(selection_summary.get("sample", {})),
                 "first_fill_temperature": first_temperature,
             }
         )
