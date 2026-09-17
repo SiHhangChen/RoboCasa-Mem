@@ -17,7 +17,7 @@ from bench.execution.planning.mplib_planner import run_mplib_planner_subprocess
 from bench.tasks.tm02.domain.contracts import COMPLETION_BUTTON
 from bench.tasks.tm02.execution.water import operate_tm02_water_button
 from bench.tasks.tm02.execution.completion_button import press_completion_button_physically
-from bench.tasks.tm02.execution.door import move_slide_door
+from bench.tasks.tm02.execution.door import move_slide_door, return_arm_after_cabinet_open
 from bench.tasks.tm02.execution.retrieval import retrieve_item_from_cabinet
 
 
@@ -41,6 +41,17 @@ class ManipulationAssembly:
 
 class TM02ManipulationController(ManipulationController):
     """Execute calibrated probe operations and reject uncalibrated ones."""
+
+    def return_arm_to_regular_pose(self, **kwargs: Any) -> dict[str, Any]:
+        if (
+            kwargs.get("stage") == "return_arm_after_cabinet_open"
+            and self.runtime_config.execute
+        ):
+            return return_arm_after_cabinet_open(
+                self,
+                lambda: super(TM02ManipulationController, self).return_arm_to_regular_pose(**kwargs),
+            )
+        return super().return_arm_to_regular_pose(**kwargs)
 
     def __init__(
         self,
@@ -134,6 +145,16 @@ def build_manipulation_assembly(
     def pick_can(target: str, **kwargs: Any) -> dict[str, Any]:
         if not controller.runtime_config.execute:
             return _dry_run("retrieve_item_from_cabinet", str(target))
+        controller.refresh_obs()
+        fraction = float(env.cabinet_open_fraction())
+        threshold = float(env.physical_observer.config.cabinet_open_threshold)
+        if fraction < threshold or env.semantic_state.absorbing_failure:
+            return {
+                "primitive": "retrieve_item_from_cabinet",
+                "cabinet_open_fraction_after_navigation": fraction,
+                "pass": False,
+                "reason": "tm02_cabinet_not_open_after_navigation",
+            }
         values = dict(kwargs)
         values.pop("mode", None)
         values.pop("require_physical_grasp", None)
@@ -174,6 +195,7 @@ def build_manipulation_assembly(
         )
         if values:
             result["unused_metadata"] = values
+        result["cabinet_open_fraction_after_navigation"] = fraction
         return result
 
     def place_can(target: str, **kwargs: Any) -> dict[str, Any]:

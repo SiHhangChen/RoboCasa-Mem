@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 from pathlib import Path
+from dataclasses import replace
 from typing import Any
 
 import numpy as np
+
+from bench.execution.planning import matrix_from_base_obs
 
 from bench.tasks.tm02.execution.calibration import (
     matrix_with_pose,
@@ -98,7 +101,7 @@ def move_slide_door(
             stages.append(stage)
             if not bool(stage.get("pass", False)):
                 break
-    final = _joint_metrics(env, fixture, joint_name)
+    after_motion = _joint_metrics(env, fixture, joint_name)
     if approached:
         commands["release_handle"] = without_obs(
             controller.run_gripper_command(-1.0, int(gripper_release_steps))
@@ -117,6 +120,7 @@ def move_slide_door(
             settle_steps=int(retreat_settle_steps),
         )
         stages.append(retreat)
+    final = _joint_metrics(env, fixture, joint_name)
     stages_pass = bool(stages) and all(bool(stage.get("pass", False)) for stage in stages)
     state_pass = (
         float(final["open_fraction"]) >= float(opened_threshold)
@@ -130,6 +134,7 @@ def move_slide_door(
         "level": str(level),
         "initial_metrics": initial,
         "final_metrics": final,
+        "metrics_before_release": after_motion,
         "axis": axis_info,
         "grasp": grasp_info,
         "motion_targets": list(motion_names),
@@ -145,6 +150,75 @@ def move_slide_door(
         "pass": bool(all(checks.values())),
         "reason": None if all(checks.values()) else "physical_door_motion_failed",
     }
+
+
+def return_arm_after_cabinet_open(controller, arm_return, *, inward_distance=0.10):
+    """Clear the open handle horizontally before changing the arm posture."""
+    controller.refresh_obs()
+    env = controller.env
+    threshold = float(env.physical_observer.config.cabinet_open_threshold)
+    before = float(env.cabinet_open_fraction())
+    result = {
+        "primitive": "cabinet_post_open_inward_and_return",
+        "cabinet_open_fraction_before_inward": before,
+        "opened_threshold": threshold,
+    }
+    if before < threshold or env.semantic_state.absorbing_failure:
+        return {**result, "pass": False, "reason": "tm02_cabinet_not_open_before_arm_return"}
+    current = np.asarray(controller.stage_executor.current_eef_site_world(), dtype=float)
+    target = _inward_target(current, matrix_from_base_obs(controller.obs), inward_distance)
+    executor = controller.stage_executor
+    original = executor.config
+    stage_name = "tm02_cabinet_post_open_inward"
+    planner_args = dict(original.planner_args)
+    planner_args["preserve_ik_branch_stages"] = [
+        *planner_args.get("preserve_ik_branch_stages", []), stage_name,
+    ]
+    executor.config = replace(original, planner_args=planner_args)
+    try:
+        inward = controller.run_planned_stage(
+            target_in_current_base(controller, target),
+            stage=stage_name,
+            gripper_action=-1.0,
+        )
+    finally:
+        executor.config = original
+    after_inward = float(env.cabinet_open_fraction())
+    result.update({
+        "inward": inward,
+        "inward_distance": float(inward_distance),
+        "cabinet_open_fraction_after_inward": after_inward,
+    })
+    if not inward.get("pass", False) or after_inward < threshold or env.semantic_state.absorbing_failure:
+        return {**result, "pass": False, "reason": "tm02_cabinet_post_open_inward_failed"}
+    returned = arm_return()
+    after_return = float(env.cabinet_open_fraction())
+    checks = {
+        "inward_executed": bool(inward.get("pass", False)),
+        "arm_returned": bool(returned.get("pass", False)),
+        "cabinet_remains_open": after_return >= threshold,
+        "no_semantic_failure": not env.semantic_state.absorbing_failure,
+    }
+    result.update({
+        "arm_return": returned,
+        "cabinet_open_fraction_after_return": after_return,
+        "checks": checks,
+        "pass": all(checks.values()),
+        "reason": None if all(checks.values()) else "tm02_cabinet_post_open_return_failed",
+    })
+    return result
+
+
+def _inward_target(current_world, base_world, distance):
+    distance = float(distance)
+    if not np.isfinite(distance) or distance < 0:
+        raise ValueError("cabinet inward distance must be nonnegative and finite")
+    target = np.asarray(current_world, dtype=float).copy()
+    delta = np.asarray(base_world, dtype=float)[:2, 3] - target[:2, 3]
+    length = float(np.linalg.norm(delta))
+    if length > 1e-9:
+        target[:2, 3] += delta / length * min(distance, length)
+    return target
 
 
 def _single_joint_name(fixture: Any) -> str:

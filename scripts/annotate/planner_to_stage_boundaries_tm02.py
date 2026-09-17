@@ -196,23 +196,30 @@ def build_stage_names(route: str) -> list[str]:
     return names
 
 
-def expected_stage_contract(name: str) -> tuple[str, str]:
+def expected_stage_contract(name: str) -> tuple[str, frozenset[str]]:
     if name.startswith("navigate_"):
-        return "navigate", "manual_base_path_navigate"
+        return "navigate", frozenset({"manual_base_path_navigate"})
     if name.startswith("press_blue_water_button_"):
-        return "operate", "operate_water_button"
+        return "operate", frozenset({"operate_water_button"})
+    if name == "return_arm_after_cabinet_open":
+        return "operate", frozenset(
+            {
+                "return_arm_to_regular_pose",
+                "cabinet_post_open_inward_and_return",
+            }
+        )
     if name.startswith("return_arm_"):
-        return "operate", "return_arm_to_regular_pose"
+        return "operate", frozenset({"return_arm_to_regular_pose"})
     if name == "open_cabinet_door_B1":
-        return "operate", "open_storage_door"
+        return "operate", frozenset({"open_storage_door"})
     if name == "pick_can_from_cabinet_B1":
-        return "operate", "retrieve_item_from_cabinet"
+        return "operate", frozenset({"retrieve_item_from_cabinet"})
     if name == "place_and_release_can_B1":
-        return "operate", "place_can_in_marked_region"
+        return "operate", frozenset({"place_can_in_marked_region"})
     if name == "close_cabinet_door_B2":
-        return "operate", "close_storage_door"
+        return "operate", frozenset({"close_storage_door"})
     if name == "press_red_completion_button":
-        return "operate", "physical_tm02_completion_button_press"
+        return "operate", frozenset({"physical_tm02_completion_button_press"})
     raise ValueError(f"unknown TM02 stage name {name!r}")
 
 
@@ -285,9 +292,14 @@ def build_boundary_record(episode_dir: Path) -> dict[str, Any]:
         details = stage.get("details")
         require(isinstance(details, Mapping), f"seed {seed}: stage {index} missing details")
         assert isinstance(details, Mapping)
-        kind, primitive = expected_stage_contract(name)
+        kind, allowed_primitives = expected_stage_contract(name)
+        primitive = str(details.get("primitive", ""))
         require(stage.get("stage_kind") == kind, f"seed {seed}: stage {index} kind mismatch")
-        require(details.get("primitive") == primitive, f"seed {seed}: stage {index} primitive mismatch")
+        require(
+            primitive in allowed_primitives,
+            f"seed {seed}: stage {index} primitive {primitive!r} not in "
+            f"{sorted(allowed_primitives)}",
+        )
         validate_stage_details(details, name=name, seed=seed, index=index)
         steps, fields = count_stage_steps(details, seed=seed, index=index)
         start = cumulative
