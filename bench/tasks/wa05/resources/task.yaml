@@ -44,10 +44,10 @@ initial_state:
       sampling_inset_xy: [0.003, 0.003]
     service_slots:
       # Fixed 12 x 12 cm service region on the counter outer-edge strip.
-      # slot_1 is shifted 5 cm farther left along counter-local X.
+      # Move slot_1 3 cm toward the sink along positive counter-local X.
       regions:
         slot_1:
-          region_center_xy: [-1.145, -0.500]
+          region_center_xy: [-1.095, -0.500]
           region_size_xy: [0.1200, 0.120]
       # Retained for configuration-schema compatibility. Placement targets are
       # now fixed at each region center, so this margin is not used for sampling.

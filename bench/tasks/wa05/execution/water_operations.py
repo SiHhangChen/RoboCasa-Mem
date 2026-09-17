@@ -287,6 +287,34 @@ def place_cup_on_service_slot(
     values.setdefault(
         "retreat_height", float(values.get("placement_exit_z_offset", 0.22))
     )
+    raw_approach_angles = values.pop("placement_approach_angles_deg")
+    if isinstance(raw_approach_angles, (int, float)):
+        approach_angles = [float(raw_approach_angles)]
+    else:
+        approach_angles = [float(angle) for angle in raw_approach_angles]
+    placement_reference = values.get(
+        "placement_reference", values.get("place_reference")
+    )
+    placement_object_upright = bool(values.get("placement_object_upright", False))
+    target_world = target.astype(float).tolist()
+    candidate_groups = [
+        {
+            "group_name": "service_slot_approach",
+            "candidates": [
+                {
+                    "target_pos_world": target_world,
+                    "placement_approach_angle_deg": angle,
+                    "placement_reference": placement_reference,
+                    "placement_object_upright": placement_object_upright,
+                    "metadata": {
+                        "approach_angle_deg": angle,
+                        "fixed_candidate_order": index,
+                    },
+                }
+                for index, angle in enumerate(approach_angles)
+            ],
+        }
+    ]
     env = controller.env
     missing = object()
     previous_distance = getattr(env, "_wa05_release_separation_distance", missing)
@@ -302,10 +330,10 @@ def place_cup_on_service_slot(
     env._wa05_release_separation_trace = trace
 
     try:
-        result = controller.place_at_world_pose(
+        result = controller.place_at_world_pose_candidates(
             cup_id,
             target_name=f"{cup_id}_{slot}_service_slot",
-            target_pos_world=target.tolist(),
+            candidate_groups=candidate_groups,
             **values,
         )
     finally:

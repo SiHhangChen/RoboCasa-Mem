@@ -59,7 +59,7 @@ def test_expert_plan_uses_one_fill_one_slot_and_matching_answer() -> None:
         ]
         assert descriptor.config.initial_state.objects["service_slots"]["regions"][
             "slot_1"
-        ]["region_center_xy"] == [-1.145, -0.5]
+        ]["region_center_xy"] == [-1.095, -0.5]
         assert len(answers) == 1
         assert answers[0].metadata["temperature"] == temperature
         assert all(stage.operation != "record_final_take" for stage in operations)
@@ -109,7 +109,7 @@ def test_service_place_releases_before_the_independent_physical_check() -> None:
             self.env = FakeEnv()
             self.call: dict[str, object] | None = None
 
-        def place_at_world_pose(
+        def place_at_world_pose_candidates(
             self,
             object_name: str,
             **kwargs: object,
@@ -125,9 +125,37 @@ def test_service_place_releases_before_the_independent_physical_check() -> None:
         require_pre_release_check=True,
         pre_release_min_height_from_slot=0.0,
         pre_release_max_height_from_slot=0.1,
+        placement_approach_angles_deg=[180.0, 165.0, 150.0, 135.0, 124.0],
+        placement_reference="bbox_bottom_center",
+        placement_object_upright=True,
     )
 
     assert result["pass"] is True
     assert result["semantic_event_deferred"] == "record_verified_staging"
     assert controller.call is not None
     assert "pre_release_check" not in controller.call
+    assert "placement_approach_angles_deg" not in controller.call
+    candidate_groups = controller.call["candidate_groups"]
+    assert isinstance(candidate_groups, list)
+    assert len(candidate_groups) == 1
+    candidates = candidate_groups[0]["candidates"]
+    assert [candidate["placement_approach_angle_deg"] for candidate in candidates] == [
+        180.0,
+        165.0,
+        150.0,
+        135.0,
+        124.0,
+    ]
+    assert [candidate["metadata"]["fixed_candidate_order"] for candidate in candidates] == [
+        0,
+        1,
+        2,
+        3,
+        4,
+    ]
+    assert all(
+        candidate["target_pos_world"] == [2.0, -2.0, 0.9]
+        and candidate["placement_reference"] == "bbox_bottom_center"
+        and candidate["placement_object_upright"] is True
+        for candidate in candidates
+    )
