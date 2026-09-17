@@ -25,6 +25,7 @@ EXPECTED_STAGE_COUNT = 20
 EPISODE_DIR_PATTERN = re.compile(r"^seed_(\d{6})_attempt_00$")
 STEP_KEYS = frozenset({"steps", "executed_steps", "release_settle_steps"})
 NAVIGATE_STAGE_INDICES = frozenset({0, 1, 4, 7, 10, 14, 17})
+OPTIONAL_NAVIGATION_PRIMITIVE_INDICES = frozenset({0, 7})
 ITEM_IDS = frozenset({"red_can", "blue_can"})
 LEVELS = ("lower", "upper")
 
@@ -129,6 +130,15 @@ def _expected_primitives() -> list[str]:
     ]
 
 
+def _validate_stage_primitive(
+    *, seed: int, index: int, details: Mapping[str, Any], expected: str
+) -> None:
+    actual = details.get("primitive")
+    if actual is None and index in OPTIONAL_NAVIGATION_PRIMITIVE_INDICES:
+        return
+    _require(actual == expected, f"seed {seed}: stage {index} primitive mismatch")
+
+
 def _episode_seed(episode_dir: Path) -> int:
     match = EPISODE_DIR_PATTERN.fullmatch(episode_dir.name)
     if match is None:
@@ -218,7 +228,12 @@ def build_boundary_record(episode_dir: Path) -> dict[str, Any]:
         details = stage.get("details")
         _require(isinstance(details, Mapping), f"seed {seed}: stage {index} missing details")
         assert isinstance(details, Mapping)
-        _require(details.get("primitive") == primitive, f"seed {seed}: stage {index} primitive mismatch")
+        _validate_stage_primitive(
+            seed=seed,
+            index=index,
+            details=details,
+            expected=primitive,
+        )
         steps, fields = count_recorded_steps(details, path=f"seed[{seed}].stage[{index}].details")
         start = cumulative
         cumulative += steps

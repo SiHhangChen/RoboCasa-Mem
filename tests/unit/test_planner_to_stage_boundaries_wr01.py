@@ -6,6 +6,7 @@ import pytest
 
 from scripts.annotate.apply_subtask_labels import label_episode, load_config, match_subtask
 from scripts.annotate.planner_to_stage_boundaries_wr01 import (
+    _validate_stage_primitive,
     build_stage_names,
     count_recorded_steps,
 )
@@ -23,6 +24,26 @@ def test_wr01_step_count_does_not_double_count_nested_aggregates() -> None:
     )
     assert total == 67
     assert fields == {"executed_steps": 9, "release_settle_steps": 0, "steps": 58}
+
+
+@pytest.mark.parametrize("index", [0, 7])
+def test_wr01_accepts_station_navigation_without_primitive(index: int) -> None:
+    _validate_stage_primitive(
+        seed=0,
+        index=index,
+        details={"steps": 12},
+        expected="manual_base_path_navigate",
+    )
+
+
+def test_wr01_rejects_other_missing_primitives() -> None:
+    with pytest.raises(ValueError, match="stage 1 primitive mismatch"):
+        _validate_stage_primitive(
+            seed=0,
+            index=1,
+            details={"steps": 12},
+            expected="manual_base_path_navigate",
+        )
 
 
 @pytest.mark.parametrize(
