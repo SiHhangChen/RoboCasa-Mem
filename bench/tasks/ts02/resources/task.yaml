@@ -57,12 +57,10 @@ episode:
     - flat/blue_gray
     - flat/green
     - steel-brushed
-  # Intrinsic tool-frame XYZ rotations relative to the calibrated prehook.
+  # Keep calibrated orientations; randomize positions only.
   # Hook and pull orientations are unchanged.
   prehook_rotation_candidates_deg:
     baseline: [0.0, 0.0, 0.0]
-    pitch_minus_5: [0.0, -5.0, 0.0]
-    pitch_plus_3: [0.0, 3.0, 0.0]
   handle_side_offset_half_range_m: 0.015
 
 initial_state:
@@ -162,7 +160,7 @@ operations:
     actuation_mode: contact
     open_fraction: 1.0
     enforce_proximity: true
-    # Include the 7.5 cm station radius and 3 cm navigation tolerance.
+    # Include the 3 cm navigation tolerance around the fixed station.
     max_base_distance: 1.15
     hook_orientation_blend: 0.90
     handle_side_offset: 0.0

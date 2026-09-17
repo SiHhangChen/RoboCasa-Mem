@@ -51,6 +51,9 @@ def test_episode_randomization_is_seeded_bounded_and_covers_candidates() -> None
     assert {v.prehook_variant for v in variations} == set(
         config.episode["prehook_rotation_candidates_deg"]
     )
+    assert {v.prehook_rotation_offset_deg for v in variations} == {
+        (0.0, 0.0, 0.0)
+    }
     assert all(abs(v.handle_side_offset_m) <= 0.015 for v in variations)
     assert any(v.handle_side_offset_m < -0.014 for v in variations)
     assert any(v.handle_side_offset_m > 0.014 for v in variations)
@@ -132,23 +135,26 @@ def test_finish_covers_cabinet_and_drawer_body_but_not_handle(material_id: str) 
         assert len(root.findall(f"./asset/texture[@name='{fixture}_finish_texture']")) == 1
 
 
-def test_drawer_station_samples_15cm_disk_each_time() -> None:
+def test_drawer_station_uses_fixed_point_each_time() -> None:
     config = load_task_config()
     path = config.path(config.resources["station_poses"])
     sampler = StationPoseSampler.from_file(path, seed=2)
     repeated = StationPoseSampler.from_file(path, seed=2)
+    fixed_heading = StationPoseSampler.from_file(path, seed=2)
+    for _ in range(100):
+        fixed_heading.sample("drawer_station")
+        assert fixed_heading.last_summary("drawer_station")["target_yaw"] == pytest.approx(-np.pi / 2)
     points = np.asarray([sampler.sample("drawer_station").position[:2] for _ in range(400)])
     same = np.asarray([repeated.sample("drawer_station").position[:2] for _ in range(400)])
     np.testing.assert_array_equal(points, same)
     distances_squared = np.sum((points - [4.85, -1.37]) ** 2, axis=1)
-    assert np.all(distances_squared <= 0.075**2)
-    assert np.mean(distances_squared) / 0.075**2 == pytest.approx(0.5, abs=0.08)
-    assert len(np.unique(points, axis=0)) == 400
+    assert np.all(distances_squared == 0.0)
+    assert len(np.unique(points, axis=0)) == 1
     different = StationPoseSampler.from_file(path, seed=3).sample("drawer_station")
-    assert different.position[:2] != tuple(points[0])
+    assert different.position[:2] == tuple(points[0])
     summary = sampler.last_summary("drawer_station")
-    assert abs(summary["target_yaw"] + np.pi / 2) <= np.deg2rad(5.0)
-    assert summary["sample"]["circle"]["yaw_half_range_rad"] == pytest.approx(np.deg2rad(5.0))
+    assert summary["target_yaw"] == pytest.approx(-np.pi / 2)
+    assert summary["sample"]["circle"]["yaw_half_range_rad"] == 0.0
     assert sampler.sample("completion_button_station") == sampler.sample(
         "completion_button_station"
     )
@@ -159,7 +165,6 @@ def test_drawer_station_samples_15cm_disk_each_time() -> None:
             np.linalg.norm(np.asarray(xyz[:2]) - [4.85, -1.37])
             for xyz in config.scene["drawer_world_xyzs"]
         )
-        + 0.075
         + config.navigation["manual_base_path_xy_tolerance"]
     )
     assert config.operations["drawer_open"]["max_base_distance"] >= maximum_distance

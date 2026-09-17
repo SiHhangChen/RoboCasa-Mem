@@ -246,6 +246,8 @@ def open_drawer_physically(
             "trace_summary": {
                 "sample_count": len(trace),
                 "contact_sample_count": contact_samples,
+                "drawer_qpos_min": min((item["drawer_qpos"] for item in trace), default=initial_qpos),
+                "drawer_qpos_max": max((item["drawer_qpos"] for item in trace), default=initial_qpos),
             },
             "checks": checks,
             "pass": bool(all(checks.values())),

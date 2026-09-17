@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import xml.etree.ElementTree as ET
+from types import SimpleNamespace
 
 import pytest
 
@@ -161,6 +162,54 @@ def test_expert_plan_stops_at_target_and_presses_k_times() -> None:
     assert plan.metadata["search_count"] == search_count
     assert navigation_targets[:-1] == [DRAWER_STATION] * search_count
     assert navigation_targets[-1] == "completion_button_station"
+
+
+def test_physical_observer_does_not_reopen_an_active_drawer_on_threshold_chatter() -> None:
+    observer = TS02PhysicalObserver(
+        target_fixture=FIXTURE_NAMES[0],
+        drawer_open_threshold=0.70,
+        drawer_closed_threshold=0.08,
+        button_pressed_threshold_m=0.004,
+    )
+    for step, fraction in enumerate([0.0, 0.75, 0.65, 0.76]):
+        fractions = {name: 0.0 for name in FIXTURE_NAMES}
+        fractions[FIXTURE_NAMES[0]] = fraction
+        observer.observe(PhysicalSample(step, fractions, 0.0))
+    assert observer.state.open_attempt_history == [FIXTURE_NAMES[0]]
+    assert observer.state.active_fixture == FIXTURE_NAMES[0]
+    assert not observer.state.invalid_open_detected
+
+
+def test_open_handler_does_not_commit_again_after_observed_open_rebounds(monkeypatch) -> None:
+    from bench.tasks.ts02.execution import handlers
+
+    fixture = FIXTURE_NAMES[0]
+    observer = TS02PhysicalObserver(
+        target_fixture=fixture,
+        drawer_open_threshold=0.70,
+        drawer_closed_threshold=0.08,
+        button_pressed_threshold_m=0.004,
+    )
+    fractions = {name: 0.0 for name in FIXTURE_NAMES}
+
+    def actuate(*args, **kwargs):
+        for step, fraction in enumerate([0.0, 0.75, 0.4]):
+            observer.observe(PhysicalSample(step, {**fractions, fixture: fraction}, 0.0))
+        env.semantic_state = observer.state
+        return {"pass": False, "reason": "drawer_open_fraction_below_threshold"}
+
+    monkeypatch.setattr(handlers, "open_drawer_physically", actuate)
+    env = SimpleNamespace(
+        semantic_state=observer.state,
+        open_threshold=0.7,
+        slot_open_fraction=lambda name: 0.4,
+        inspection_diagnostics=lambda: {},
+    )
+    result = handlers.open_fixture(SimpleNamespace(env=env), fixture,
+                                   actuation_mode="contact", enforce_proximity=False)
+    assert not result["pass"]
+    assert observer.state.open_attempt_history == [fixture]
+    assert not observer.state.invalid_open_detected
 
 
 def test_physical_observer_debounces_a_long_button_hold() -> None:

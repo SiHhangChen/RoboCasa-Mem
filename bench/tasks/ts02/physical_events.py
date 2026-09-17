@@ -108,7 +108,8 @@ class TS02PhysicalObserver:
                 previous_fractions[fixture] < self.drawer_open_threshold
                 and fractions[fixture] >= self.drawer_open_threshold
             )
-            if crossed_open:
+            # Oscillation around the open threshold is still the same cycle.
+            if crossed_open and self.state.active_fixture != fixture:
                 report = record_open_attempt(
                     self.state,
                     fixture,

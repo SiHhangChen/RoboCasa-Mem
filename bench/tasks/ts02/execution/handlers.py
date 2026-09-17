@@ -1,6 +1,7 @@
 """Thin adapters from TS02 workflow operations to physical and semantic events."""
 
 from __future__ import annotations
+from dataclasses import replace
 
 from collections.abc import Callable
 from typing import Any
@@ -91,6 +92,7 @@ def open_fixture(
             }
             return result
 
+    open_attempts_before = len(env.semantic_state.open_attempt_history)
     mode = str(actuation_mode).strip().lower()
     if mode == "semantic":
         env.set_slot_open_fraction(fixture_name, float(open_fraction))
@@ -129,6 +131,16 @@ def open_fixture(
     )
     if physically_open and env.semantic_state.active_fixture == fixture_name:
         result = _observer_committed_result(env, "open_fixture", fixture_name)
+    elif fixture_name in env.semantic_state.open_attempt_history[open_attempts_before:]:
+        # The observer may have committed an open before the drawer rebounded.
+        result = {
+            "primitive": "open_fixture",
+            "fixture": fixture_name,
+            "checks": {**preconditions, "drawer_open": physically_open},
+            "pass": False,
+            "reason": str(env.semantic_state.failure_reason or actuation.get("reason") or "drawer_not_open"),
+            "diagnostics": env.inspection_diagnostics(),
+        }
     else:
         result = env.record_open_event(
             fixture_name,
@@ -277,7 +289,8 @@ def retreat_and_return_arm_after_drawer(
     controller: Any,
     fixture_name: str,
     *,
-    retreat_distance: float = 0.125,
+    retreat_distance: float = 0.05,
+    inward_distance: float = 0.15,
     release_steps: int = 10,
     **kwargs: Any,
 ) -> dict[str, Any]:
@@ -308,6 +321,21 @@ def retreat_and_return_arm_after_drawer(
 
     controller.refresh_obs()
     fixture = env.cabinet_for_slot(fixture_name)
+    if float(env.slot_open_fraction(fixture_name)) > float(env.closed_threshold):
+        return {
+            "primitive": "drawer_post_close_retreat_and_return",
+            "fixture": fixture_name,
+            "pass": False,
+            "reason": "ts02_drawer_not_closed_before_retreat",
+        }
+    release = controller.driver.run_gripper(
+        arm_qpos=controller.driver.current_arm_qpos(),
+        gripper_action=-1.0,
+        steps=max(0, int(release_steps)),
+        post_step_callback=locked_base_post_step_callback(env),
+    )
+    controller._sync_obs(release["obs"])
+    controller.refresh_obs()
     current_world = np.asarray(matrix_from_site_pose(env, env.robots[0]), dtype=float)
     frame = resolve_drawer_motion_frame(
         fixture_yaw=float(fixture.rot),
@@ -317,14 +345,28 @@ def retreat_and_return_arm_after_drawer(
     retreat_world = current_world.copy()
     retreat_world[:3, 3] += frame.open_direction_world * max(0.0, float(retreat_distance))
     target_base = np.linalg.inv(matrix_from_base_obs(controller.obs)) @ retreat_world
-    retreat = controller.stage_executor.run(
-        pose_from_matrix(target_base),
-        stage=f"ts02_{fixture_name}_post_close_retreat",
-        gripper_action=-1.0,
-        post_step_callback=locked_base_post_step_callback(env),
-    )
+    executor = controller.stage_executor
+    stage_name = f"ts02_{fixture_name}_post_close_retreat"
+    original_config = executor.config
+    planner_args = dict(original_config.planner_args)
+    planner_args["preserve_ik_branch_stages"] = [
+        *planner_args.get("preserve_ik_branch_stages", []), stage_name,
+    ]
+    executor.config = replace(original_config, planner_args=planner_args)
+    try:
+        retreat = executor.run(
+            pose_from_matrix(target_base),
+            stage=stage_name,
+            gripper_action=-1.0,
+            post_step_callback=locked_base_post_step_callback(env),
+        )
+    finally:
+        executor.config = original_config
     controller._sync_obs(controller.stage_executor.obs)
-    if not bool(retreat.get("pass", False)):
+    if (
+        not bool(retreat.get("pass", False))
+        or float(env.slot_open_fraction(fixture_name)) > float(env.closed_threshold)
+    ):
         return {
             "primitive": "drawer_post_close_retreat_and_return",
             "fixture": fixture_name,
@@ -332,13 +374,31 @@ def retreat_and_return_arm_after_drawer(
             "pass": False,
             "reason": "ts02_drawer_post_close_retreat_failed",
         }
-    release = controller.driver.run_gripper(
-        arm_qpos=controller.driver.current_arm_qpos(),
+    controller.refresh_obs()
+    inward_world = _drawer_inward_target(
+        matrix_from_site_pose(env, env.robots[0]),
+        matrix_from_base_obs(controller.obs),
+        inward_distance,
+    )
+    inward = executor.run(
+        pose_from_matrix(np.linalg.inv(matrix_from_base_obs(controller.obs)) @ inward_world),
+        stage=f"ts02_{fixture_name}_post_close_inward",
         gripper_action=-1.0,
-        steps=max(0, int(release_steps)),
         post_step_callback=locked_base_post_step_callback(env),
     )
-    controller._sync_obs(release["obs"])
+    controller._sync_obs(executor.obs)
+    inward_fraction = float(env.slot_open_fraction(fixture_name))
+    if not bool(inward.get("pass", False)) or inward_fraction > float(env.closed_threshold):
+        return {
+            "primitive": "drawer_post_close_retreat_and_return",
+            "fixture": fixture_name,
+            "release_gripper": {key: value for key, value in release.items() if key != "obs"},
+            "retreat": retreat,
+            "inward": inward,
+            "drawer_open_fraction_after_inward": inward_fraction,
+            "pass": False,
+            "reason": "ts02_drawer_post_close_inward_failed",
+        }
     arm_return = controller.return_arm_to_regular_pose(
         stage=f"ts02_post_close_return_to_regular_pose_{fixture_name}",
         gripper_action=-1.0,
@@ -348,17 +408,35 @@ def retreat_and_return_arm_after_drawer(
         "retreat_executed": bool(retreat.get("pass", False)),
         "release_executed": int(release.get("steps", 0)) == max(0, int(release_steps)),
         "arm_returned": bool(arm_return.get("pass", False)),
+        "inward_executed": bool(inward.get("pass", False)),
+        "drawer_still_closed": float(env.slot_open_fraction(fixture_name)) <= float(env.closed_threshold),
     }
     return {
         "primitive": "drawer_post_close_retreat_and_return",
         "fixture": fixture_name,
         "retreat": retreat,
         "release_gripper": {key: value for key, value in release.items() if key != "obs"},
+        "inward": inward,
+        "drawer_open_fraction_after_inward": inward_fraction,
+        "retreat_distance": float(retreat_distance),
+        "inward_distance": float(inward_distance),
         "arm_return": arm_return,
         "checks": checks,
         "pass": bool(all(checks.values())),
         "reason": None if all(checks.values()) else "ts02_drawer_post_close_return_failed",
     }
+
+
+def _drawer_inward_target(current_world, base_world, distance):
+    distance = float(distance)
+    if not np.isfinite(distance) or distance < 0:
+        raise ValueError("drawer inward distance must be nonnegative and finite")
+    target = np.asarray(current_world, dtype=float).copy()
+    delta = np.asarray(base_world, dtype=float)[:2, 3] - target[:2, 3]
+    length = float(np.linalg.norm(delta))
+    if length > 1e-9:
+        target[:2, 3] += delta / length * min(distance, length)
+    return target
 
 
 def press_completion_button(
