@@ -26,6 +26,63 @@ EPISODE_DIR_PATTERN = re.compile(r"^seed_(\d{6})_attempt_00$")
 STEP_KEYS = frozenset({"steps", "executed_steps", "release_settle_steps"})
 
 
+def pick_close_start_offset(details: Mapping[str, Any], *, path: str) -> int:
+    """Return the pick-local frame where the closing gripper command begins."""
+    open_gripper = details.get("open_gripper")
+    preshape = details.get("preshape_gripper")
+    close_gripper = details.get("close_gripper")
+    stages = details.get("stages")
+    _require(isinstance(open_gripper, Mapping), f"{path}: missing open_gripper")
+    _require(isinstance(preshape, Mapping), f"{path}: missing preshape_gripper")
+    _require(isinstance(close_gripper, Mapping), f"{path}: missing close_gripper")
+    _require(isinstance(stages, list) and len(stages) == 3, f"{path}: invalid pick stages")
+    assert isinstance(open_gripper, Mapping)
+    assert isinstance(preshape, Mapping)
+    assert isinstance(close_gripper, Mapping)
+    assert isinstance(stages, list)
+    _require(
+        [stage.get("stage") for stage in stages if isinstance(stage, Mapping)]
+        == ["pregrasp", "grasp", "lift"],
+        f"{path}: unexpected pick-stage order",
+    )
+
+    def steps(mapping: Mapping[str, Any], key: str, field_path: str) -> int:
+        value = mapping.get(key)
+        _require(
+            isinstance(value, int) and not isinstance(value, bool) and value >= 0,
+            f"{field_path} must be a non-negative integer",
+        )
+        return int(value)
+
+    pregrasp = stages[0]
+    grasp = stages[1]
+    _require(isinstance(pregrasp, Mapping) and isinstance(grasp, Mapping), f"{path}: invalid pick stages")
+    assert isinstance(pregrasp, Mapping) and isinstance(grasp, Mapping)
+    pregrasp_execution = pregrasp.get("execution")
+    grasp_execution = grasp.get("execution")
+    _require(isinstance(pregrasp_execution, Mapping), f"{path}: missing pregrasp execution")
+    _require(isinstance(grasp_execution, Mapping), f"{path}: missing grasp execution")
+    assert isinstance(pregrasp_execution, Mapping) and isinstance(grasp_execution, Mapping)
+    close_steps = steps(close_gripper, "steps", f"{path}.close_gripper.steps")
+    _require(close_steps >= 7, f"{path}: close command is too short for evidence")
+    return sum(
+        (
+            steps(open_gripper, "steps", f"{path}.open_gripper.steps"),
+            steps(
+                pregrasp_execution,
+                "executed_steps",
+                f"{path}.stages[0].execution.executed_steps",
+            ),
+            steps(preshape, "steps", f"{path}.preshape_gripper.steps"),
+            steps(
+                grasp_execution,
+                "executed_steps",
+                f"{path}.stages[1].execution.executed_steps",
+            ),
+        )
+    )
+
+
 def _require(condition: bool, message: str) -> None:
     if not condition:
         raise ValueError(message)
@@ -205,6 +262,7 @@ def build_boundary_record(episode_dir: Path) -> dict[str, Any]:
     cumulative = 0
     field_totals = {key: 0 for key in sorted(STEP_KEYS)}
     placed_sugars = 0
+    sugar_close_frames: list[int] = []
     for index, (stage, name) in enumerate(zip(stages, stage_names)):
         _require(isinstance(stage, Mapping), f"seed {seed}: stage {index} is invalid")
         assert isinstance(stage, Mapping)
@@ -241,6 +299,15 @@ def build_boundary_record(episode_dir: Path) -> dict[str, Any]:
                 "end_frame": cumulative,
             }
         )
+        if name.startswith("pick_"):
+            close_frame = start_frame + pick_close_start_offset(
+                details, path=f"seed[{seed}].stage[{index}].details"
+            )
+            _require(
+                start_frame <= close_frame < cumulative,
+                f"seed {seed}: close frame lies outside pick stage {index}",
+            )
+            sugar_close_frames.append(close_frame)
         if name.startswith("return_after_") and name.endswith("_place"):
             placed_sugars += 1
             _require(steps > 0, f"seed {seed}: completed sugar cycle is empty")
@@ -256,6 +323,10 @@ def build_boundary_record(episode_dir: Path) -> dict[str, Any]:
         placed_sugars == target_count,
         f"seed {seed}: found {placed_sugars} placements, expected K={target_count}",
     )
+    _require(
+        len(sugar_close_frames) == target_count,
+        f"seed {seed}: found {len(sugar_close_frames)} closes, expected K={target_count}",
+    )
     return {
         "task_id": TASK_ID,
         "seed": seed,
@@ -264,6 +335,7 @@ def build_boundary_record(episode_dir: Path) -> dict[str, Any]:
         "profile_id": f"k{target_count}_n{total_count}",
         "target_sugar_count": target_count,
         "total_sugar_count": total_count,
+        "sugar_close_frames": sugar_close_frames,
         "total_frames": cumulative,
         "recorded_total_frames": recorded_total,
         "step_field_totals": field_totals,

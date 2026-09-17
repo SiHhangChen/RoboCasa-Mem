@@ -7,7 +7,10 @@ from scripts.annotate.apply_subtask_labels import (
     load_config,
     match_subtask,
 )
-from scripts.annotate.planner_to_stage_boundaries_ts03 import build_stage_names
+from scripts.annotate.planner_to_stage_boundaries_ts03 import (
+    build_stage_names,
+    pick_close_start_offset,
+)
 
 
 def test_ts03_stage_names_repeat_sugar_subtask_then_button() -> None:
@@ -43,3 +46,17 @@ def test_ts03_keeps_two_labels_and_one_keyframe_per_sugar_cycle() -> None:
     ]
     assert labeled["subtask_indices"] == [0] * 24 + [1] * 4
     assert labeled["keyframes"] == [11, 23, 24]
+
+
+def test_ts03_pick_close_offset_uses_executed_pick_sequence() -> None:
+    details = {
+        "open_gripper": {"steps": 10},
+        "preshape_gripper": {"steps": 5},
+        "close_gripper": {"steps": 20},
+        "stages": [
+            {"stage": "pregrasp", "execution": {"executed_steps": 48}},
+            {"stage": "grasp", "execution": {"executed_steps": 37}},
+            {"stage": "lift", "execution": {"executed_steps": 38}},
+        ],
+    }
+    assert pick_close_start_offset(details, path="pick") == 100
