@@ -50,6 +50,19 @@ def _sequence(order=ITEM_IDS):
     ]
 
 
+def test_policy_reset_report_uses_physical_stages_without_color_latches():
+    result = WR08Evaluator().reset(_snapshot(0))
+    report = validate_report_stages(
+        result.to_report_stages(), expected_task_id="WR-08",
+        expected_profile_id="WR-08/report-v3", expected_success=False,
+    )
+    assert report["order"] == [
+        "one_item_picked", "one_item_placed", "one_item_matched",
+        "two_items_picked", "two_items_placed", "two_items_matched", "success",
+    ]
+    assert not any(stage.qualified for stage in result.stages.values())
+
+
 @pytest.mark.parametrize("order", (ITEM_IDS, ITEM_IDS[::-1]))
 def test_both_transport_orders_work_without_expert_memory_or_callbacks(order):
     evaluator = _evaluator()
