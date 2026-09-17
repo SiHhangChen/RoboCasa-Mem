@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -565,6 +565,8 @@ def _close_drawer_with_tm01_contact(
     actuation_mode: str = "contact",
     close_overshoot: float = 0.005,
     closed_fraction_threshold: float = 0.08,
+    max_joint_step: float = 0.01,
+    settle_steps: int = 30,
     **kwargs: Any,
 ) -> dict[str, Any]:
     del kwargs
@@ -582,6 +584,8 @@ def _close_drawer_with_tm01_contact(
         config=DrawerPushCloseConfig(
             close_overshoot=float(close_overshoot),
             closed_fraction_threshold=float(closed_fraction_threshold),
+            max_joint_step=float(max_joint_step),
+            settle_steps=int(settle_steps),
         ),
     )
     result.update(
@@ -600,6 +604,7 @@ def _retreat_and_return_arm_after_drawer(
     drawer: str,
     *,
     retreat_distance: float = 0.125,
+    inward_distance: float = 0.15,
     release_steps: int = 10,
     **kwargs: Any,
 ) -> dict[str, Any]:
@@ -647,11 +652,22 @@ def _retreat_and_return_arm_after_drawer(
     retreat_world[:3, 3] += (
         frame.open_direction_world * max(0.0, float(retreat_distance))
     )
-    retreat = controller.run_planned_stage(
-        _world_target_in_current_base(controller, retreat_world),
-        stage=f"tm01_{drawer}_post_close_retreat",
-        gripper_action=-1.0,
-    )
+    stage_name = f"tm01_{drawer}_post_close_retreat"
+    executor = controller.stage_executor
+    original_config = executor.config
+    planner_args = dict(original_config.planner_args)
+    planner_args["preserve_ik_branch_stages"] = [
+        *planner_args.get("preserve_ik_branch_stages", []), stage_name,
+    ]
+    executor.config = replace(original_config, planner_args=planner_args)
+    try:
+        retreat = controller.run_planned_stage(
+            _world_target_in_current_base(controller, retreat_world),
+            stage=stage_name,
+            gripper_action=-1.0,
+        )
+    finally:
+        executor.config = original_config
     if not bool(retreat.get("pass", False)):
         return {
             "primitive": "drawer_post_close_retreat_and_return",
@@ -660,6 +676,34 @@ def _retreat_and_return_arm_after_drawer(
             "retreat": retreat,
             "pass": False,
             "reason": "tm01_drawer_post_close_retreat_failed",
+        }
+
+    controller.refresh_obs()
+    inward_world = _drawer_inward_target(
+        np.asarray(matrix_from_site_pose(env, env.robots[0]), dtype=float),
+        np.asarray(matrix_from_base_obs(controller.obs), dtype=float),
+        inward_distance,
+    )
+    inward = controller.run_planned_stage(
+        _world_target_in_current_base(controller, inward_world),
+        stage=f"tm01_{drawer}_post_close_inward",
+        gripper_action=-1.0,
+    )
+    inward_fraction = float(env.drawer_open_fraction(drawer))
+    if (
+        not bool(inward.get("pass", False))
+        or inward_fraction > closed_threshold
+        or tuple(env.semantic_state.failure_labels) != failures_before
+    ):
+        return {
+            "primitive": "drawer_post_close_retreat_and_return",
+            "fixture": drawer,
+            "release_gripper": _without_obs(release),
+            "retreat": retreat,
+            "inward": inward,
+            "drawer_open_fraction_after_inward": inward_fraction,
+            "pass": False,
+            "reason": "tm01_drawer_post_close_inward_failed",
         }
 
     arm_return = controller.return_arm_to_regular_pose(gripper_action=-1.0)
@@ -673,6 +717,7 @@ def _retreat_and_return_arm_after_drawer(
             0, int(release_steps)
         ),
         "retreat_executed": bool(retreat.get("pass", False)),
+        "inward_executed": bool(inward.get("pass", False)),
         "arm_returned": bool(arm_return.get("pass", False)),
         "drawer_remains_closed": final_fraction <= closed_threshold,
         "no_new_semantic_failure": not new_failures,
@@ -682,8 +727,11 @@ def _retreat_and_return_arm_after_drawer(
         "primitive": "drawer_post_close_retreat_and_return",
         "fixture": drawer,
         "retreat_distance": float(retreat_distance),
+        "inward_distance": float(inward_distance),
         "release_gripper": _without_obs(release),
         "retreat": retreat,
+        "inward": inward,
+        "drawer_open_fraction_after_inward": inward_fraction,
         "arm_return": arm_return,
         "drawer_open_fraction_initial": initial_fraction,
         "drawer_open_fraction_final": final_fraction,
@@ -693,6 +741,18 @@ def _retreat_and_return_arm_after_drawer(
         "pass": passed,
         "reason": None if passed else "tm01_drawer_post_close_return_failed",
     }
+
+
+def _drawer_inward_target(current_world, base_world, distance):
+    distance = float(distance)
+    if not np.isfinite(distance) or distance < 0:
+        raise ValueError("drawer inward distance must be nonnegative and finite")
+    target = np.asarray(current_world, dtype=float).copy()
+    delta = np.asarray(base_world, dtype=float)[:2, 3] - target[:2, 3]
+    length = float(np.linalg.norm(delta))
+    if length > 1e-9:
+        target[:2, 3] += delta / length * min(distance, length)
+    return target
 
 
 def _press_completion_button(

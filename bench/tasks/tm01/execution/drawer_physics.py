@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
+from contextlib import contextmanager
 from dataclasses import dataclass, fields, replace
 from pathlib import Path
 from typing import Any
@@ -53,6 +54,26 @@ class DrawerPullConfig:
 class DrawerPushCloseConfig:
     close_overshoot: float = 0.005
     closed_fraction_threshold: float = 0.08
+    max_joint_step: float = 0.01
+    settle_steps: int = 30
+
+
+@contextmanager
+def _drawer_close_execution_config(executor, config: DrawerPushCloseConfig):
+    if not np.isfinite(config.max_joint_step) or config.max_joint_step <= 0:
+        raise ValueError("drawer close max_joint_step must be positive and finite")
+    if config.settle_steps < 0:
+        raise ValueError("drawer close settle_steps must be nonnegative")
+    original = executor.config
+    executor.config = replace(
+        original,
+        max_joint_step=min(original.max_joint_step, config.max_joint_step),
+        settle_steps=max(original.settle_steps, config.settle_steps),
+    )
+    try:
+        yield
+    finally:
+        executor.config = original
 
 
 def build_manipulation_assembly(
@@ -347,12 +368,13 @@ def close_drawer_physically(
             return _restore_locked_base(env, locked_base)
 
         target_base = np.linalg.inv(matrix_from_base_obs(controller.obs)) @ target_world
-        stage = controller.stage_executor.run(
-            pose_from_matrix(target_base),
-            stage="tm01_drawer_push_close",
-            gripper_action=-1.0,
-            post_step_callback=post_step,
-        )
+        with _drawer_close_execution_config(controller.stage_executor, config):
+            stage = controller.stage_executor.run(
+                pose_from_matrix(target_base),
+                stage="tm01_drawer_push_close",
+                gripper_action=-1.0,
+                post_step_callback=post_step,
+            )
         controller._sync_obs(controller.stage_executor.obs)
         final_qpos = _joint_qpos(env, joint_name)
         final_fraction = float(fixture.open_fraction(env))
