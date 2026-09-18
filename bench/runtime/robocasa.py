@@ -116,7 +116,10 @@ class RoboCasaEpisodeRuntime:
     def diagnostics(self) -> TaskDiagnostics:
         values = self._runtime_api.diagnostics(self._initialized)
         details = dict(values or {}) if isinstance(values, Mapping) else {}
-        success = bool(details.get("success", self._runtime_api.check_success(self._initialized, {})))
+        if "success" in details:
+            success = bool(details["success"])
+        else:
+            success = bool(self._runtime_api.check_success(self._initialized, {}))
         failure = details.get("failure_code")
         stop_execution = bool(details.get("stop_execution", False))
         self._execution_stopped = self._execution_stopped or stop_execution

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 import numpy as np
@@ -20,27 +21,44 @@ def get_object_hold_status(
     object_name: str,
     *,
     max_end_effector_distance: float = 0.18,
+    contact_checker: Callable[..., bool] | None = None,
 ) -> dict[str, Any]:
-    """Inspect whether an object is physically held near the right gripper."""
+    """Inspect a hold, optionally reusing contact evidence for this sim state."""
     from robocasa.utils import object_utils as OU
 
     grasp_status: dict[str, Any] = {}
+    contact_error = None
+    joint_positions = None
     try:
         grasp_status["contact"] = bool(
-            env.check_contact(
+            (contact_checker or env.check_contact)(
                 env.robots[0].gripper["right"],
                 env.objects[object_name],
             )
         )
     except Exception as exc:
+        contact_error = exc
         grasp_status["contact_error"] = f"{type(exc).__name__}: {exc}"
 
     for threshold in (0.035, 0.6):
         key = f"grasped_threshold_{threshold:g}"
         try:
-            grasp_status[key] = bool(
-                OU.check_obj_grasped(env, object_name, threshold=threshold)
-            )
+            if contact_checker is None:
+                grasp_status[key] = bool(
+                    OU.check_obj_grasped(env, object_name, threshold=threshold)
+                )
+            else:
+                # Preserve RoboCasa's signed joint threshold, not WR08's abs check.
+                if joint_positions is None:
+                    joint_positions = [
+                        env.sim.data.qpos[env.sim.model.get_joint_qpos_addr(joint)]
+                        for joint in ("gripper0_right_finger_joint1", "gripper0_right_finger_joint2")
+                    ]
+                if contact_error is not None:
+                    raise contact_error
+                grasp_status[key] = bool(
+                    grasp_status["contact"] and all(pos < threshold for pos in joint_positions)
+                )
         except Exception as exc:
             grasp_status[f"{key}_error"] = f"{type(exc).__name__}: {exc}"
 

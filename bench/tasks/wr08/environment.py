@@ -11,6 +11,7 @@ from robocasa.environments.kitchen.kitchen import Kitchen
 from robocasa.models import assets_root
 from robocasa.utils import object_utils as OU
 
+from bench.tasks.wr08.contact_evidence import ContactIndex
 from bench.tasks.wr08.domain.contracts import (
     CARTON_ASSET_BY_ITEM,
     COLOR_RGBA,
@@ -201,6 +202,9 @@ class WR08MatchMilkCartonsToColoredSugarPlates(Kitchen):
         self.require_expert_protocol = True
         self._physical_event_diagnostics: dict[str, Any] = {}
         self._evaluation_initial_item_positions: dict[str, np.ndarray] = {}
+        self._policy_snapshot_cache = None
+        self._policy_snapshot_key = None
+        self._policy_geom_ids: dict[str, int] = {}
         self._source_plate_centers: dict[str, np.ndarray] = {}
         self._target_plate_centers: dict[str, np.ndarray] = {}
         self._source_surface_z = 0.93
@@ -314,6 +318,7 @@ class WR08MatchMilkCartonsToColoredSugarPlates(Kitchen):
             raise RuntimeError("WR-08 initial source verification failed")
 
     def _reset_internal(self) -> None:
+        self.invalidate_policy_evidence(model_changed=True)
         super()._reset_internal()
         self._source_plate_centers = {
             slot: self._obj_pos(self.source_plate_name(slot)).copy()
@@ -336,6 +341,7 @@ class WR08MatchMilkCartonsToColoredSugarPlates(Kitchen):
         self._update_task_state()
 
     def configure_episode(self, episode: Any) -> None:
+        self.invalidate_policy_evidence()
         fields = (
             "source_plate_color_by_slot",
             "target_plate_color_by_slot",
@@ -384,6 +390,7 @@ class WR08MatchMilkCartonsToColoredSugarPlates(Kitchen):
         )
 
     def set_object_body_position(self, obj_name: str, pos: Any) -> None:
+        self.invalidate_policy_evidence()
         obj = self.objects[str(obj_name)]
         target = np.asarray(pos, dtype=float).reshape(-1)[:3]
         qpos = np.asarray(
@@ -395,6 +402,7 @@ class WR08MatchMilkCartonsToColoredSugarPlates(Kitchen):
         self.sim.forward()
 
     def set_object_pose(self, obj_name: str, pos: Any, yaw: float) -> None:
+        self.invalidate_policy_evidence()
         obj = self.objects[str(obj_name)]
         qpos = np.asarray(
             self.sim.data.get_joint_qpos(obj.joints[0]), dtype=float
@@ -616,6 +624,7 @@ class WR08MatchMilkCartonsToColoredSugarPlates(Kitchen):
 
     def reset_evaluation(self, *, expert_recording: bool = False) -> WR08Evaluator:
         """Select policy or recording evaluation independently of the data split."""
+        self.invalidate_policy_evidence()
         self.require_expert_protocol = bool(expert_recording)
         self._evaluation_initial_item_positions = {
             item: self._obj_pos(item).copy() for item in ITEM_IDS
@@ -687,7 +696,9 @@ class WR08MatchMilkCartonsToColoredSugarPlates(Kitchen):
             },
         )
 
-    def _policy_grasp_evidence(self, item: str) -> dict[str, Any]:
+    def _policy_grasp_evidence(
+        self, item: str, contacts: ContactIndex | None = None,
+    ) -> dict[str, Any]:
         """Use the same closed-gripper, contact, and 2 cm lift check as WR-07."""
         try:
             from bench.execution.manipulation.object_interactions import get_object_hold_status
@@ -697,7 +708,8 @@ class WR08MatchMilkCartonsToColoredSugarPlates(Kitchen):
             ).reshape(-1)
             if qpos.size < 2 or not np.all(np.isfinite(qpos[:2])):
                 raise ValueError("invalid gripper joint positions")
-            hold = get_object_hold_status(self, item, max_end_effector_distance=0.18)
+            kwargs = {} if contacts is None else {"contact_checker": contacts.check}
+            hold = get_object_hold_status(self, item, max_end_effector_distance=0.18, **kwargs)
             baseline = self._evaluation_initial_item_positions.get(item)
             current = self._obj_pos(item)
             lift = None if baseline is None else float(current[2] - baseline[2])
@@ -722,16 +734,27 @@ class WR08MatchMilkCartonsToColoredSugarPlates(Kitchen):
                 "reason": f"{type(exc).__name__}: {exc}",
             }
 
-    def _policy_support_evidence(self, item: str) -> dict[str, Any]:
+    def _policy_support_evidence(
+        self, item: str, contacts: ContactIndex | None = None,
+    ) -> dict[str, Any]:
         """Read actual source/target tray and counter contacts, as in WR-07."""
         plate_names = [self.source_plate_name(slot) for slot in SOURCE_SLOTS]
         plate_names += [self.target_plate_name(slot) for slot in TARGET_SLOTS]
         try:
+            check = self.check_contact if contacts is None else contacts.check
             support = {
-                name: bool(self.check_contact(self.objects[item], self.objects[name]))
+                name: bool(check(self.objects[item], self.objects[name]))
                 for name in plate_names
             }
-            on_counter = bool(OU.check_obj_any_counter_contact(self, item))
+            if contacts is None:
+                on_counter = bool(OU.check_obj_any_counter_contact(self, item))
+            else:
+                from robocasa.models.fixtures import Counter
+
+                on_counter = any(
+                    check(self.objects[item], fixture)
+                    for fixture in self.fixtures.values() if isinstance(fixture, Counter)
+                )
             return {
                 "supported": bool(any(support.values()) or on_counter),
                 "plate_support": support,
@@ -745,9 +768,16 @@ class WR08MatchMilkCartonsToColoredSugarPlates(Kitchen):
                 "reason": f"{type(exc).__name__}: {exc}",
             }
 
-    def _policy_evaluation_snapshot(self) -> WR08EvaluationSnapshot:
-        grasp = {item: self._policy_grasp_evidence(item) for item in ITEM_IDS}
-        support = {item: self._policy_support_evidence(item) for item in ITEM_IDS}
+    def _policy_evaluation_snapshot(
+        self, *, use_contact_index: bool = True,
+    ) -> WR08EvaluationSnapshot:
+        contacts = None
+        if use_contact_index and hasattr(self.sim, "model"):
+            if not hasattr(self, "_policy_geom_ids"):
+                self._policy_geom_ids = {}
+            contacts = ContactIndex(self.sim, self._policy_geom_ids)
+        grasp = {item: self._policy_grasp_evidence(item, contacts) for item in ITEM_IDS}
+        support = {item: self._policy_support_evidence(item, contacts) for item in ITEM_IDS}
         placed = {
             item: bool(grasp[item]["released"] and support[item]["supported"])
             for item in ITEM_IDS
@@ -798,9 +828,27 @@ class WR08MatchMilkCartonsToColoredSugarPlates(Kitchen):
             },
         )
 
+    def invalidate_policy_evidence(self, *, model_changed: bool = False) -> None:
+        """Invalidate after out-of-band simulation/model edits (including forward)."""
+        self._policy_snapshot_cache = None
+        self._policy_snapshot_key = None
+        if model_changed:
+            self._policy_geom_ids = {}
+
     def evaluation_snapshot(self) -> WR08EvaluationSnapshot:
         if not self.require_expert_protocol:
-            return self._policy_evaluation_snapshot()
+            data = self.sim.data
+            # Time catches direct sim.step(); qpos catches direct pose edits at
+            # the same timestep. Other out-of-band edits require invalidation.
+            qpos = getattr(data, "qpos", None)
+            key = (
+                int(getattr(self, "timestep", 0)), getattr(data, "time", None),
+                None if qpos is None else np.asarray(qpos).tobytes(),
+            )
+            if getattr(self, "_policy_snapshot_key", None) != key:
+                self._policy_snapshot_cache = self._policy_evaluation_snapshot()
+                self._policy_snapshot_key = key
+            return self._policy_snapshot_cache
         self._update_task_state()
         state = self._semantic_state
         target_slots = {item: self.target_slot_for_item(item) for item in ITEM_IDS}
@@ -874,6 +922,7 @@ class WR08MatchMilkCartonsToColoredSugarPlates(Kitchen):
 
     def step(self, action: Any):
         # Recorded actions pass through unchanged; contacts determine transport.
+        self.invalidate_policy_evidence()
         result = super().step(action)
         self._update_task_state()
         return result
@@ -989,7 +1038,12 @@ class WR08MatchMilkCartonsToColoredSugarPlates(Kitchen):
         for item_id in ITEM_IDS:
             entries: list[dict[str, Any]] = []
             for geom_name in self.objects[item_id].contact_geoms or ():
-                geom_id = int(self.sim.model.geom_name2id(geom_name))
+                if not self.require_expert_protocol and hasattr(self, "_policy_geom_ids"):
+                    if geom_name not in self._policy_geom_ids:
+                        self._policy_geom_ids[geom_name] = int(self.sim.model.geom_name2id(geom_name))
+                    geom_id = self._policy_geom_ids[geom_name]
+                else:
+                    geom_id = int(self.sim.model.geom_name2id(geom_name))
                 contype = int(self.sim.model.geom_contype[geom_id])
                 conaffinity = int(self.sim.model.geom_conaffinity[geom_id])
                 entries.append(

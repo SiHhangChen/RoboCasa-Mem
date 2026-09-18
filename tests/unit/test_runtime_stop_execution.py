@@ -103,3 +103,24 @@ def test_execution_stop_implies_a_terminal_transition():
         observation={}, diagnostics=TaskDiagnostics(success=False, stop_execution=True),
     )
     assert transition.terminal
+
+
+@pytest.mark.parametrize("success", (False, True))
+def test_diagnostics_does_not_recheck_explicit_success(success):
+    runtime = _runtime(hard_stop=False, success=success)
+    runtime.env.steps = 2
+
+    def unexpected_check(*args):
+        raise AssertionError("explicit diagnostic success must not be recomputed")
+
+    runtime._runtime_api.check_success = unexpected_check
+    assert runtime.diagnostics().success is success
+
+
+def test_diagnostics_checks_success_when_not_provided():
+    runtime = _runtime(hard_stop=False, success=True)
+    calls = []
+    runtime._runtime_api.diagnostics = lambda initialized: {}
+    runtime._runtime_api.check_success = lambda *args: calls.append(args) or True
+    assert runtime.diagnostics().success
+    assert len(calls) == 1

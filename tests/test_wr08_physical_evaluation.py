@@ -219,6 +219,77 @@ def test_policy_history_does_not_create_recording_events(physical_env):
     assert not env._semantic_state.protocol_violation
 
 
+def test_policy_snapshot_is_built_once_per_state(physical_env, monkeypatch):
+    env, _ = physical_env
+    original = env._policy_evaluation_snapshot
+    calls = []
+
+    def counted(**kwargs):
+        calls.append(env.timestep)
+        return original(**kwargs)
+
+    monkeypatch.setattr(env, "_policy_evaluation_snapshot", counted)
+    env.reset_evaluation()
+    snapshot = env.evaluation_snapshot()
+    for _ in range(5):
+        assert env.evaluation_snapshot() is snapshot
+        env._check_success()
+        env.task_diagnostics()
+    assert calls == [0]
+    env.timestep += 1
+    assert env.evaluation_snapshot() is not snapshot
+    assert calls == [0, 1]
+    env.invalidate_policy_evidence()
+    env.evaluation_snapshot()
+    assert calls == [0, 1, 1]
+    env.reset_evaluation()
+    env.evaluation_snapshot()
+    assert calls == [0, 1, 1, 1]
+
+
+def test_direct_simulation_edits_invalidate_snapshot_key(physical_env):
+    env, _ = physical_env
+    env.sim.data.qpos = np.zeros(2)
+    env.sim.data.time = 0.0
+    initial = env.evaluation_snapshot()
+    env.sim.data.qpos[0] = 1.0
+    moved = env.evaluation_snapshot()
+    assert moved is not initial
+    env.sim.data.time = 0.01
+    assert env.evaluation_snapshot() is not moved
+
+
+@pytest.mark.parametrize("positions", ([0.02, 0.02], [0.035, 0.035], [0.6, 0.6], [-0.1, -0.1], [np.nan, 0.02]))
+@pytest.mark.parametrize("contact", (False, True, "error"))
+def test_contact_reuse_preserves_hold_diagnostics(positions, contact):
+    from bench.execution.manipulation.object_interactions import get_object_hold_status
+
+    calls = []
+
+    def check(*args):
+        calls.append(args)
+        if contact == "error":
+            raise RuntimeError("contact unavailable")
+        return contact
+
+    env = SimpleNamespace(
+        objects={"box": "box"}, obj_body_id={"box": 0}, check_contact=check,
+        robots=[SimpleNamespace(gripper={"right": "gripper"}, eef_site_id={"right": 0})],
+        sim=SimpleNamespace(
+            model=SimpleNamespace(get_joint_qpos_addr=lambda name: int(name.endswith("2"))),
+            data=SimpleNamespace(
+                qpos=np.array(positions), body_xpos=np.array([[0.0, 0.0, 1.0]]),
+                site_xpos=np.array([[0.0, 0.0, 1.05]]),
+            ),
+        ),
+    )
+    legacy = get_object_hold_status(env, "box")
+    assert len(calls) == 3
+    calls.clear()
+    assert get_object_hold_status(env, "box", contact_checker=check) == legacy
+    assert len(calls) == 1
+
+
 @pytest.mark.parametrize("split", ("train", "evaluation"))
 def test_expert_attachment_reenables_recording_observer_in_either_split(
     physical_env, monkeypatch, split,
