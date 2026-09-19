@@ -217,8 +217,9 @@ WR08_REPORT_PROFILE = _profile(
 WX01_REPORT_PROFILE = _profile(
     "WX-01",
     "wipe_completed",
-    "cleaning_completed",
+    "cleaning_tool_released",
     "success",
+    version=2,
 )
 WX02_REPORT_PROFILE = _profile(
     "WX-02",

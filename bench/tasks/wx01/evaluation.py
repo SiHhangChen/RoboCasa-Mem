@@ -16,8 +16,8 @@ from bench.evaluation.report_profiles import WX01_REPORT_PROFILE
 STAGE_ORDER = WX01_REPORT_PROFILE.stage_ids
 STAGE_PREREQUISITES: dict[str, str | None] = {
     "wipe_completed": None,
-    "cleaning_completed": "wipe_completed",
-    "success": "cleaning_completed",
+    "cleaning_tool_released": "wipe_completed",
+    "success": "cleaning_tool_released",
 }
 REPORT_STAGE_ORDER = STAGE_ORDER
 REPORT_STAGE_PROFILE_ID = WX01_REPORT_PROFILE.profile_id
@@ -62,13 +62,13 @@ class WX01EvaluationSnapshot:
         object.__setattr__(self, "details", dict(self.details or {}))
 
     @property
-    def cleaning_completed(self) -> bool:
+    def cleaning_tool_released_after_wipe(self) -> bool:
         return bool(self.remembered_area_wiped and self.cleaning_tool_released)
 
     def raw_stage_values(self) -> dict[str, bool]:
         return {
             "wipe_completed": self.remembered_area_wiped,
-            "cleaning_completed": self.cleaning_completed,
+            "cleaning_tool_released": self.cleaning_tool_released_after_wipe,
             "success": self.domain_success,
         }
 
@@ -202,7 +202,7 @@ class WX01Evaluator:
             )
 
         raw = snapshot.raw_stage_values()
-        for name in ("wipe_completed", "cleaning_completed"):
+        for name in ("wipe_completed", "cleaning_tool_released"):
             if raw[name] and self._first_observed_steps[name] is None:
                 self._first_observed_steps[name] = snapshot.step_id
             if self._latched[name] or not raw[name] or self._previous_raw[name]:
@@ -220,13 +220,13 @@ class WX01Evaluator:
         if raw["success"] and self._first_observed_steps["success"] is None:
             self._first_observed_steps["success"] = snapshot.step_id
         success_current = bool(
-            raw["success"] and self._latched["cleaning_completed"]
+            raw["success"] and self._latched["cleaning_tool_released"]
         )
         if raw["success"] and not success_current:
             self._reject(
                 "success",
                 snapshot.step_id,
-                "prerequisite_not_qualified:cleaning_completed",
+                "prerequisite_not_qualified:cleaning_tool_released",
             )
         if success_current:
             self._ever_success = True

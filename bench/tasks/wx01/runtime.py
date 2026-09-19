@@ -40,7 +40,7 @@ def _environment(config: Any, scene: Any, plan: Any, resources: Mapping[str, Any
     semantics = dict(config.semantics)
     return {"cup_material_id": str(plan.cup_material_id),
             "sponge_type": str(plan.sponge_type),
-            "origin_threshold": float(semantics.get("origin_threshold", 0.01)),
+            "origin_threshold": float(semantics.get("origin_threshold", 0.03)),
             "wipe_radius": float(semantics.get("wipe_radius", 0.20)),
             "contact_separation": float(semantics.get("contact_separation", 0.02)),
             "minimum_contact_count": int(semantics.get("minimum_contact_count", 2)),

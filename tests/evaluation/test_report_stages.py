@@ -255,7 +255,7 @@ def test_frozen_profile_catalog_covers_all_report_tasks() -> None:
             frozenset(),
         ),
         "WX-01": (
-            ("wipe_completed", "cleaning_completed", "success"),
+            ("wipe_completed", "cleaning_tool_released", "success"),
             frozenset(),
         ),
         "WX-02": (
