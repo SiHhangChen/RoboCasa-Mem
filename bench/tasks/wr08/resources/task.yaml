@@ -19,7 +19,7 @@ scene:
   scene_seed: 0
 
 episode:
-  max_horizon: 5200
+  max_horizon: 2000
   color_count: 3
   item_sample_radius_m: 0.045
   # Appearance randomization pools (align with WR-07).

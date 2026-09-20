@@ -46,7 +46,8 @@ episode:
   # policy metadata, never a target-order success condition.
   # target_fixture is intentionally unset. It is sampled from a separate RNG
   # stream so the expert order cannot leak the red cube's hidden location.
-  max_horizon: 2200
+  # Covers the longest 2,709-frame expert trajectory with a 91-step margin.
+  max_horizon: 2800
   # Cabinet-and-drawer appearance only. Handle and physics stay fixed.
   drawer_material_candidates:
     - wood/light_wood_planks

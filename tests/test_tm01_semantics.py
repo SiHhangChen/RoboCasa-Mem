@@ -213,17 +213,22 @@ def test_tm01_observer_commits_open_inspect_close_attempts() -> None:
     assert observer.event_steps[StageEvent.B1.value] == 4
 
 
-def test_tm01_observer_rejects_an_opening_that_never_reaches_threshold() -> None:
+def test_tm01_observer_allows_retry_after_partial_opening_returns_closed() -> None:
     observer = _drawer_ready_observer()
 
     first = observer.observe(_sample(1, left=0.20))
     second = observer.observe(_sample(2, left=0.0))
+    observer.observe(_sample(3, left=0.20))
+    observer.observe(_sample(4, left=0.80))
+    observer.observe(_sample(5, left=0.80))
+    retry = observer.observe(_sample(6, left=0.0))
 
     assert first.diagnostics["pending_drawer"] == DRAWER_NAMES[0]
-    assert second.failure_labels == ("drawer_not_open",)
+    assert second.failure_labels == ()
     assert observer.state.open_attempt_history == [DRAWER_NAMES[0]]
-    assert observer.state.invalid_open_detected
-    assert observer.state.failure_reason == "drawer_not_open"
+    assert not observer.state.invalid_open_detected
+    assert observer.state.failure_reason is None
+    assert retry.semantic_events == (StageEvent.B1.value,)
 
 
 def test_tm01_observer_does_not_commit_a2_while_drawer_is_pending() -> None:

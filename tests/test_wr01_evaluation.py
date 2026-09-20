@@ -30,6 +30,7 @@ def _snapshot(
     upper_closed: bool = False,
     lower_closed: bool = False,
     opened: str | None = None,
+    wrong_opened: bool = False,
     retrieved: str | None = None,
     distractor_stored: bool = True,
     storage_hidden: bool = False,
@@ -46,6 +47,7 @@ def _snapshot(
         upper_door_closed=upper_closed,
         lower_door_closed=lower_closed,
         opened_level=opened,
+        wrong_retrieval_level_opened=wrong_opened,
         retrieved_item_id=retrieved,
         distractor_still_stored=distractor_stored,
         final_placement_verified=final_placement_verified,
@@ -273,7 +275,7 @@ def test_wr01_closing_doors_at_separate_times_does_not_count_both_closed(
     assert both.stages["close_second_door"].qualified_step == 5
 
 
-def test_wr01_non_target_cabinet_can_be_opened_before_the_target() -> None:
+def test_wr01_non_target_cabinet_opening_terminates_the_episode() -> None:
     evaluator = _evaluator()
     both_stored = _close_both_doors(evaluator)
 
@@ -283,13 +285,13 @@ def test_wr01_non_target_cabinet_can_be_opened_before_the_target() -> None:
             stored=both_stored,
             storage_hidden=True,
             lower_closed=True,
-            opened="upper",
+            wrong_opened=True,
         )
     )
 
-    assert not result.terminal
+    assert result.terminal
     assert not result.success
-    assert result.failure_code is None
+    assert result.failure_code == "wrong_retrieval_cabinet"
     assert not result.stages["open_cabinet"].qualified
 
     report = result.to_report_stages()
@@ -299,16 +301,12 @@ def test_wr01_non_target_cabinet_can_be_opened_before_the_target() -> None:
     assert report["stages"]["correct_cabinet_opened"]["first_pass_step"] is None
     assert report["stages"]["success"]["first_pass_step"] is None
 
-    # No intermediate "no door open" observation is required before recovery.
+    # A later target-cabinet opening cannot recover the latched violation.
     target_open = _snapshot(4, stored=both_stored, storage_hidden=True, opened="lower")
     opened = evaluator.observe(target_open)
-    assert opened.stages["open_cabinet"].qualified_step == 4
-    evaluator.observe(replace(target_open, step_id=5, retrieved_item_id="blue_can"))
-    completed = evaluator.observe(
-        replace(target_open, step_id=6, retrieved_item_id="blue_can", final_placement_verified=True)
-    )
-    assert completed.success
-    assert completed.failure_code is None
+    assert opened is result
+    assert not opened.stages["open_cabinet"].qualified
+    assert opened.failure_code == "wrong_retrieval_cabinet"
 
 
 def test_wr01_opening_still_requires_a_physical_memory_barrier() -> None:
@@ -474,6 +472,31 @@ def test_wr01_runtime_callbacks_share_one_evaluator_result() -> None:
     report = report_stages_for_runtime(runtime)
     assert report["order"] == list(REPORT_STAGE_ORDER)
     assert report["stages"]["success"]["passed"] is False
+
+
+def test_wr01_runtime_reports_wrong_cabinet_as_terminal_failure() -> None:
+    evaluator = _evaluator()
+    both_stored = _close_both_doors(evaluator)
+
+    class FakeEnv:
+        def evaluation_snapshot(self) -> WR01EvaluationSnapshot:
+            return _snapshot(
+                3,
+                stored=both_stored,
+                storage_hidden=True,
+                wrong_opened=True,
+            )
+
+    runtime = SimpleNamespace(
+        env=FakeEnv(),
+        metadata={TASK_EVALUATOR_METADATA_KEY: evaluator},
+    )
+
+    diagnostics = diagnostics_for_runtime(runtime)
+    assert diagnostics["terminal"] is True
+    assert diagnostics["success"] is False
+    assert diagnostics["failure_code"] == "wrong_retrieval_cabinet"
+    assert success_for_runtime(runtime, {}) is False
 
 
 def test_wr01_runtime_registers_public_report_stage_projector() -> None:

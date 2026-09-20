@@ -87,7 +87,7 @@ def test_wr01_memory_barrier_requires_both_items_and_closed_doors(
     assert observer.phase == observer.CLOSE
 
 
-def test_wr01_observer_can_open_the_other_cabinet_then_retrieve_the_target() -> None:
+def test_wr01_observer_latches_wrong_cabinet_opening_as_a_failure() -> None:
     state = SemanticState("blue_can", "lower")
     observer = WR01PhysicalObserver(state, dwell_steps=1)
     observer.reset(_sample(0, lower_open=True, upper_open=True))
@@ -106,13 +106,13 @@ def test_wr01_observer_can_open_the_other_cabinet_then_retrieve_the_target() -> 
     observer.observe(_sample(6, red="upper", upper_open=True, lower_open=True))
     assert state.retrieved_item_id == "blue_can"
     report = evaluate_success(state, PhysicalState(distractor_still_stored=True))
-    assert report.success
-    assert "no_wrong_retrieval_door" not in report.checks()
+    assert not report.success
+    assert not report.checks()["no_wrong_retrieval_door"]
 
 
 @pytest.mark.parametrize("target_level", ["lower", "upper"])
 @pytest.mark.parametrize("both_open", [False, True])
-def test_wr01_observer_accepts_the_target_door_with_or_without_the_other_door_open(
+def test_wr01_observer_records_target_and_wrong_door_when_both_are_open(
     target_level: str, both_open: bool,
 ) -> None:
     other = "upper" if target_level == "lower" else "lower"
@@ -133,6 +133,7 @@ def test_wr01_observer_accepts_the_target_door_with_or_without_the_other_door_op
     )
 
     assert state.retrieval_level_opened == target_level
+    assert state.wrong_retrieval_level_opened is both_open
     assert observer.phase == observer.RETRIEVE
 
 

@@ -138,11 +138,11 @@ def test_wr08_uses_wr07_motion_and_station_calibration() -> None:
     assert aliases["target_plates"] == "plate_station"
 
 
-def test_wr08_horizon_covers_recorded_rollouts() -> None:
-    # The two pre-validation recordings took 2065 and 2063 action steps.
+def test_wr08_horizon_covers_final_training_rollouts() -> None:
+    # The longest episode in data/final/wr08-final contains 1674 frames.
     horizon = int(load_task_config().episode["max_horizon"])
-    assert horizon == 5200
-    assert horizon > 2065
+    assert horizon == 2000
+    assert horizon > 1674
     assert resolve_episode_plan(seed=0).max_horizon == horizon
     assert TaskCatalog.get("WR-08").default_horizon == horizon
     assert (

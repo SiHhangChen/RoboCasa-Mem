@@ -115,7 +115,7 @@ def resolve_episode_plan(*, seed: int, **values: Any) -> EpisodePlan:
     item_radius = _nonnegative_scalar(
         values.pop("item_sample_radius_m", 0.045), label="item_sample_radius_m"
     )
-    horizon = int(values.pop("max_horizon", 5200))
+    horizon = int(values.pop("max_horizon", 2000))
     carton_types = _candidate_pool(
         values.pop("carton_type_candidates", MILK_CARTON_TYPES),
         allowed=MILK_CARTON_TYPES,

@@ -833,6 +833,9 @@ class WR01RetrieveRememberedCan(Kitchen):
             upper_door_closed=self.is_door_closed("upper"),
             lower_door_closed=self.is_door_closed("lower"),
             opened_level=self._semantic_state.retrieval_level_opened,
+            wrong_retrieval_level_opened=bool(
+                self._semantic_state.wrong_retrieval_level_opened
+            ),
             retrieved_item_id=self._semantic_state.retrieved_item_id,
             distractor_still_stored=report.distractor_still_stored,
             final_placement_verified=bool(

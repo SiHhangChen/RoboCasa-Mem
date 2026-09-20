@@ -337,12 +337,8 @@ class TM01PhysicalObserver:
                     return None
                 active = pending
             elif fraction <= self.config.drawer_closed_threshold:
-                record_open_attempt(
-                    self.state,
-                    pending,
-                    drawer_open=False,
-                    failure_reason="drawer_not_open",
-                )
+                # A partial pull that returns closed is not a semantic drawer check.
+                # Clear the candidate and allow a later attempt to reach the open threshold.
                 self._pending_drawer = None
                 return None
 

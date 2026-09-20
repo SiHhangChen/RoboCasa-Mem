@@ -183,7 +183,7 @@ def resolve_scene_config(*, seed: int, env_split: str, **values: Any) -> SceneCo
 def resolve_episode_plan(*, seed: int, **values: Any) -> EpisodePlan:
     configured = normalize_fixture_order(values.get("demo_fixture_order"))
     configured_target = normalize_target_fixture(values.get("target_fixture"))
-    max_horizon = int(values.get("max_horizon", 2200))
+    max_horizon = int(values.get("max_horizon", 2800))
     if max_horizon <= 0:
         raise ValueError("TS02 episode.max_horizon must be positive")
     material_candidates, prehook_candidates, side_half_range = (

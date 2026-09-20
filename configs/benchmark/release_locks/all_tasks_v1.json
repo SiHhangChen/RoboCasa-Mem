@@ -2049,13 +2049,35 @@
     {
       "action_schema": "membench.pandaomron_hybrid13.v2",
       "allow_partial_calibration": false,
-      "config_hash": "sha256:7b94724b4209d3b409e4b0b3405510bc51f8608577421ead0cdc5eefa7a096c1",
+      "config_hash": "sha256:ee0278d0ef740cdace5e7584891debf7f5445f2b855167dafeaa369c07349fc7",
       "control_frequency_hz": 20,
       "env_split": "pretrain",
-      "episode_identity": "sha256:daa04b838df7ee7082ccd85c7c18cea41d18f19c01c601bc81d6aa5eac9d38da",
+      "episode_identity": "sha256:c51d80434dd490b969ba0adeb4b5d8cbe47305dcc4299cf7aafdf8384b785392",
       "facts": {
+        "carton_asset_by_item": {
+          "boxed_food_a": "objaverse/milk/milk_0/model.xml",
+          "boxed_food_b": "objaverse/milk/milk_1/model.xml"
+        },
+        "carton_material_by_item": {
+          "boxed_food_a": "matte",
+          "boxed_food_b": "glossy"
+        },
+        "carton_material_candidates": [
+          "matte",
+          "satin",
+          "glossy",
+          "foil"
+        ],
+        "carton_type_by_item": {
+          "boxed_food_a": "milk_0",
+          "boxed_food_b": "milk_1"
+        },
+        "carton_type_candidates": [
+          "milk_0",
+          "milk_1"
+        ],
         "item_sample_radius_m": 0.045,
-        "max_horizon": 5200,
+        "max_horizon": 2000,
         "seed": 0,
         "source_color_by_item": {
           "boxed_food_a": "orange",
@@ -2118,15 +2140,29 @@
           "boxed_food_a": "objaverse/milk/milk_0/model.xml",
           "boxed_food_b": "objaverse/milk/milk_1/model.xml"
         },
-        "config_hash": "sha256:7b94724b4209d3b409e4b0b3405510bc51f8608577421ead0cdc5eefa7a096c1",
+        "carton_material_by_item": {
+          "boxed_food_a": "matte",
+          "boxed_food_b": "glossy"
+        },
+        "carton_material_candidates": [
+          "matte",
+          "satin",
+          "glossy",
+          "foil"
+        ],
+        "carton_type_candidates": [
+          "milk_0",
+          "milk_1"
+        ],
+        "config_hash": "sha256:ee0278d0ef740cdace5e7584891debf7f5445f2b855167dafeaa369c07349fc7",
         "controller": {
           "max_joint_step": 0.025
         },
-        "resource_hash": "sha256:b7ccb5c2867c80b0402207ac285d4d3ecbfcc71833c4ed852e9cd3554e839ea7",
+        "resource_hash": "sha256:c3013da178bc0f8bd5e4d91cce19490c3c45e07e9a283dec1ecc4bf09212128b",
         "task_id": "WR-08",
         "task_revision": "WR08-v3-distinct-carton-assets"
       },
-      "max_horizon": 5200,
+      "max_horizon": 2000,
       "observation": {
         "camera_aliases": [
           "agentview_left",
@@ -2165,15 +2201,29 @@
           "boxed_food_a": "objaverse/milk/milk_0/model.xml",
           "boxed_food_b": "objaverse/milk/milk_1/model.xml"
         },
-        "config_hash": "sha256:7b94724b4209d3b409e4b0b3405510bc51f8608577421ead0cdc5eefa7a096c1",
+        "carton_material_by_item": {
+          "boxed_food_a": "matte",
+          "boxed_food_b": "glossy"
+        },
+        "carton_material_candidates": [
+          "matte",
+          "satin",
+          "glossy",
+          "foil"
+        ],
+        "carton_type_candidates": [
+          "milk_0",
+          "milk_1"
+        ],
+        "config_hash": "sha256:ee0278d0ef740cdace5e7584891debf7f5445f2b855167dafeaa369c07349fc7",
         "controller": {
           "max_joint_step": 0.025
         },
-        "resource_hash": "sha256:b7ccb5c2867c80b0402207ac285d4d3ecbfcc71833c4ed852e9cd3554e839ea7",
+        "resource_hash": "sha256:c3013da178bc0f8bd5e4d91cce19490c3c45e07e9a283dec1ecc4bf09212128b",
         "task_id": "WR-08",
         "task_revision": "WR08-v3-distinct-carton-assets"
       },
-      "resource_hash": "sha256:b7ccb5c2867c80b0402207ac285d4d3ecbfcc71833c4ed852e9cd3554e839ea7",
+      "resource_hash": "sha256:c3013da178bc0f8bd5e4d91cce19490c3c45e07e9a283dec1ecc4bf09212128b",
       "resources": {
         "planner_script": "bench/execution/planning/mplib_planner.py",
         "stations": "bench/tasks/wr08/resources/calibration/stations.json"
@@ -2666,7 +2716,7 @@
       "variant": "memory"
     }
   ],
-  "lock_hash": "sha256:bcb5b8ea1d6bc578a9d9794d3c42b4e0904120ea2fe38d159fc540a0ce45cbbd",
+  "lock_hash": "sha256:3221b731f43bd0f1a1c53748378833d1b544de9c1ecb3809e97a22afa37ea090",
   "release_id": "all_tasks_v1",
   "schema_version": "membench.release_lock/v2"
 }

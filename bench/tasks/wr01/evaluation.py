@@ -3,7 +3,7 @@
 The simulator supplies physical grasp, cabinet occupancy, door, and retrieval
 facts. This module owns task prerequisites, diagnostics, and the final verdict
 for policy evaluation and recorded-action replay. Either cabinet may be closed
-or opened first; the target still has to be retrieved after storage was hidden.
+first; after storage is hidden, the target cabinet must be opened first.
 The non-target can must remain in its initial cabinet from reset until success;
 any observed departure is a terminal failure, even if the can is later returned.
 """
@@ -85,6 +85,7 @@ class WR01EvaluationSnapshot:
     upper_door_closed: bool = False
     lower_door_closed: bool = False
     opened_level: str | None = None
+    wrong_retrieval_level_opened: bool = False
     retrieved_item_id: str | None = None
     distractor_still_stored: bool = False
     final_placement_verified: bool = False
@@ -118,6 +119,11 @@ class WR01EvaluationSnapshot:
         object.__setattr__(self, "upper_door_closed", bool(self.upper_door_closed))
         object.__setattr__(self, "lower_door_closed", bool(self.lower_door_closed))
         object.__setattr__(self, "opened_level", opened)
+        object.__setattr__(
+            self,
+            "wrong_retrieval_level_opened",
+            bool(self.wrong_retrieval_level_opened),
+        )
         object.__setattr__(self, "retrieved_item_id", retrieved)
         object.__setattr__(
             self,
@@ -378,6 +384,8 @@ class WR01Evaluator:
 
     @staticmethod
     def _episode_validation_failure(snapshot: WR01EvaluationSnapshot) -> str | None:
+        if snapshot.wrong_retrieval_level_opened:
+            return "wrong_retrieval_cabinet"
         if not snapshot.distractor_still_stored:
             return "distractor_not_stored"
         return None

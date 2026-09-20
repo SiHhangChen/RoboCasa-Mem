@@ -42,7 +42,7 @@ _ENTRIES: tuple[CatalogEntry, ...] = (
     CatalogEntry("TM03", "tm03", "TM03BoilWaterInspectDrawersAndRunToasterOven", "1.0.0", 4800),
     CatalogEntry("TM04", "tm04", "TM04FillPotRetrieveCanAndAddTwoSugars", "1.0.0", 5200),
     CatalogEntry("TS01", "ts01", "TS01AddKSugarToHotChocolate", "1.0.0", 2800),
-    CatalogEntry("TS02", "ts02", "TS02InspectThreeCabinets", "1.1.0", 2200),
+    CatalogEntry("TS02", "ts02", "TS02InspectThreeCabinets", "1.1.0", 2800),
     CatalogEntry("TS03", "ts03", "TS03HierarchicalAddKSugarToHotChocolate", "1.0.0", 2800),
     CatalogEntry("TS04", "ts04", "TS04InspectTwoDrawers", "1.1.0", 1800),
     CatalogEntry("WA-01", "wa01", "WA01SortSugaredAndUnsugaredCoffee", "2.0.0", 5000),
@@ -57,7 +57,7 @@ _ENTRIES: tuple[CatalogEntry, ...] = (
     CatalogEntry("WR-05", "wr05", "WR05ReturnCondimentPair", "1.0.0", 5000),
     CatalogEntry("WR-06", "wr06", "WR06ReturnSingleBottleToOriginalLevel", "1.0.0", 3200),
     CatalogEntry("WR-07", "wr07", "WR07MatchMilkCartonToColoredSugarPlate", "3.0.0", 3600),
-    CatalogEntry("WR-08", "wr08", "WR08MatchMilkCartonsToColoredSugarPlates", "2.0.0", 5200),
+    CatalogEntry("WR-08", "wr08", "WR08MatchMilkCartonsToColoredSugarPlates", "2.0.0", 2000),
     CatalogEntry("WX-01", "wx01", "WX01ReturnObjectToOriginalPlace", "1.0.0", 3200),
     CatalogEntry("WX-02", "wx02", "WX02CleanUnderCupAndReturnIt", "1.0.0", 5200),
 )

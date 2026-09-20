@@ -19,7 +19,7 @@ class SemanticState:
     canonical_reset_complete: bool = False
     # Latches opening the target cabinet after the memory barrier.
     retrieval_level_opened: str | None = None
-    # Diagnostic history only: opening the other cabinet never invalidates a run.
+    # Latched protocol violation: opening the other cabinet invalidates the run.
     wrong_retrieval_level_opened: bool = False
     retrieved_item_id: str | None = None
 
@@ -38,6 +38,7 @@ class SuccessReport:
     storage_assignment_complete: bool
     storage_was_hidden: bool
     correct_retrieval_door: bool
+    no_wrong_retrieval_door: bool
     correct_target_retrieved: bool
     distractor_still_stored: bool
 
@@ -50,6 +51,7 @@ class SuccessReport:
             "storage_assignment_complete": self.storage_assignment_complete,
             "storage_was_hidden": self.storage_was_hidden,
             "correct_retrieval_door": self.correct_retrieval_door,
+            "no_wrong_retrieval_door": self.no_wrong_retrieval_door,
             "correct_target_retrieved": self.correct_target_retrieved,
             "distractor_still_stored": self.distractor_still_stored,
         }
@@ -88,7 +90,7 @@ def mark_canonical_reset(state: SemanticState, *, valid: bool) -> bool:
 
 
 def record_retrieval_door_open(state: SemanticState, level: str) -> bool:
-    """Latch target-cabinet opening independently of any other door operation."""
+    """Latch target opening or an irreversible wrong-cabinet violation."""
 
     level = _level(level)
     if not state.storage_hidden:
@@ -115,6 +117,7 @@ def evaluate_success(state: SemanticState, physical: PhysicalState) -> SuccessRe
         storage_assignment_complete=assignment_complete,
         storage_was_hidden=bool(state.storage_hidden),
         correct_retrieval_door=state.retrieval_level_opened == state.target_level,
+        no_wrong_retrieval_door=not state.wrong_retrieval_level_opened,
         correct_target_retrieved=state.retrieved_item_id == state.target_item_id,
         distractor_still_stored=bool(physical.distractor_still_stored),
     )

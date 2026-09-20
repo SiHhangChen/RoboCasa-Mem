@@ -8,7 +8,8 @@ task:
     observation_profile_file: configs/benchmark/observation_profiles/rgbd_v3.yaml
 seeds: {start: 1050, stop: 1100}
 rollout:
-  replan_steps: 50
+  replan_steps: 40
+  max_steps: 2600
   action_repeat: 1
   stop_on_success: true
   ignore_done: true
