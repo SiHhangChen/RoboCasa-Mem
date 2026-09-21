@@ -48,7 +48,7 @@ class WX01ReturnObjectToOriginalPlace(Kitchen):
     def __init__(
         self,
         *,
-        origin_threshold: float = 0.03,
+        origin_threshold: float = 0.015,
         wipe_radius: float = 0.20,
         contact_separation: float = 0.02,
         minimum_contact_count: int = 2,

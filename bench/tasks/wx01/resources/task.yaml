@@ -220,7 +220,7 @@ operations:
     blocking_object_max_base_x: 0.66
 
 semantics:
-  origin_threshold: 0.03
+  origin_threshold: 0.015
   wipe_radius: 0.20
   contact_separation: 0.02
   minimum_contact_count: 2

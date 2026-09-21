@@ -170,9 +170,9 @@ WR01_REPORT_PROFILE = _profile(
     "WR-01",
     "one_can_stored",
     "two_cans_stored",
-    "storage_hidden",
     "correct_cabinet_opened",
     "success",
+    version=2,
 )
 WR03_REPORT_PROFILE = _profile(
     "WR-03",

@@ -70,7 +70,7 @@ def test_wx01_owns_topdown_single_wall_grasp_candidates() -> None:
 
 def test_wx01_expert_uses_single_wall_pick_and_vertical_place() -> None:
     descriptor, plan = _wx01_descriptor_and_plan()
-    assert descriptor.config.semantics["origin_threshold"] == 0.03
+    assert descriptor.config.semantics["origin_threshold"] == 0.015
     pick = next(
         stage
         for stage in plan.stages
