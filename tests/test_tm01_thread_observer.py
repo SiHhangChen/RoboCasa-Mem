@@ -5,7 +5,7 @@ from dataclasses import replace
 import pytest
 
 from bench.tasks.tm01.config import load_task_config, resolve_observer_config
-from bench.tasks.tm01.domain.contracts import COMPLETION_BUTTON_NAMES, DRAWER_NAMES
+from bench.tasks.tm01.domain.contracts import COMPLETION_BUTTON_NAMES, DRAWER_NAMES, StageEvent
 from bench.tasks.tm01.domain.semantics import PhysicalState, evaluate_success
 from bench.tasks.tm01.evaluation import TM01EvaluationSnapshot, TM01Evaluator
 from bench.tasks.tm01.physical_events import PhysicalSample, TM01PhysicalObserver
@@ -96,3 +96,60 @@ def test_tm01_physical_sample_routes_preserve_independent_thread_progress(
     steps = observer.event_steps
     assert result.stages["one_thread_completed"].qualified_step == min(steps["A2"], steps["B2"])
     assert result.stages["both_threads_completed"].qualified_step == max(steps["A2"], steps["B2"])
+
+
+def test_tm01_a1_commits_at_angle_without_contact_or_dwell() -> None:
+    config = resolve_observer_config(load_task_config())
+    observer = TM01PhysicalObserver(config)
+    initial = PhysicalSample(
+        step_id=0, knob_qpos_rad=0.0, knob_qvel_rad_s=0.0,
+        knob_gripper_contact=False, knob_any_robot_contact=False,
+        target_burner_on=False, other_burners_on=False,
+        drawer_open_fraction=dict.fromkeys(DRAWER_NAMES, 0.0),
+        completion_button_press_depth_m=dict.fromkeys(COMPLETION_BUTTON_NAMES, 0.0),
+    )
+    observer.reset(initial)
+
+    below = observer.observe(replace(
+        initial, step_id=1, knob_qpos_rad=config.on_commit_min_rad - 0.01,
+        knob_qvel_rad_s=1.0, target_burner_on=True,
+    ))
+    assert below.semantic_events == ()
+    assert not observer.state.a1_complete
+
+    reached = observer.observe(replace(
+        initial, step_id=2, knob_qpos_rad=config.on_commit_min_rad,
+        knob_qvel_rad_s=1.0,
+    ))
+    assert reached.semantic_events == (StageEvent.A1.value,)
+    assert observer.event_steps[StageEvent.A1.value] == 2
+    assert reached.diagnostics["knob_contact_steps"] == 0
+    assert not observer.state.absorbing_failure
+
+
+def test_tm01_a2_still_requires_contact_after_angle_only_a1() -> None:
+    config = resolve_observer_config(load_task_config())
+    observer = TM01PhysicalObserver(config)
+    initial = PhysicalSample(
+        step_id=0, knob_qpos_rad=0.0, knob_qvel_rad_s=0.0,
+        knob_gripper_contact=False, knob_any_robot_contact=False,
+        target_burner_on=False, other_burners_on=False,
+        drawer_open_fraction=dict.fromkeys(DRAWER_NAMES, 0.0),
+        completion_button_press_depth_m=dict.fromkeys(COMPLETION_BUTTON_NAMES, 0.0),
+    )
+    observer.reset(initial)
+    observer.observe(replace(
+        initial, step_id=1, knob_qpos_rad=1.0,
+        knob_qvel_rad_s=1.0, target_burner_on=True,
+    ))
+    observer.state.b1_complete = True
+    observer.state.boiling_ready = True
+    observer.state.event_history.append(StageEvent.B1)
+
+    for step in range(2, 2 + config.commit_dwell_steps):
+        update = observer.observe(replace(
+            initial, step_id=step, knob_qpos_rad=0.0,
+            knob_qvel_rad_s=-1.0,
+        ))
+    assert update.semantic_events == ()
+    assert not observer.state.a2_complete

@@ -247,32 +247,22 @@ class TM01PhysicalObserver:
             state.fail("A2_during_active_drawer")
             return None
 
-        target_on = not state.a1_complete
-        in_target = (
-            qpos >= self.config.on_commit_min_rad
-            if target_on
-            else qpos <= self.config.off_commit_max_rad
-        )
+        if not state.a1_complete:
+            return (StageEvent.A1, None) if qpos >= self.config.on_commit_min_rad else None
+
+        in_target = qpos <= self.config.off_commit_max_rad
         evidence.target_dwell_steps = (
             evidence.target_dwell_steps + 1 if in_target else 0
         )
         if evidence.target_dwell_steps < self.config.commit_dwell_steps:
             return None
 
-        motion = (
-            evidence.max_qpos - evidence.anchor_qpos
-            if target_on
-            else evidence.anchor_qpos - evidence.min_qpos
-        )
+        motion = evidence.anchor_qpos - evidence.min_qpos
         contact_ok = (
             evidence.gripper_contact_steps >= self.config.min_gripper_contact_steps
         )
         motion_ok = motion >= self.config.min_interaction_motion_rad
-        burner_ok = (
-            bool(sample.target_burner_on)
-            if target_on
-            else not bool(sample.target_burner_on)
-        )
+        burner_ok = not bool(sample.target_burner_on)
         if not contact_ok or not motion_ok or not burner_ok:
             if (
                 evidence.any_robot_contact_steps > 0
@@ -281,7 +271,7 @@ class TM01PhysicalObserver:
             ):
                 state.fail("invalid_knob_contact")
             return None
-        return (StageEvent.A1 if target_on else StageEvent.A2, None)
+        return (StageEvent.A2, None)
 
     def _observe_drawers(
         self,
