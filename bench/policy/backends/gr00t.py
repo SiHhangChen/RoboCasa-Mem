@@ -1,7 +1,7 @@
 """GR00T N1.7 backend for the membench policy protocol.
 
-Loads a WA01 LoRA checkpoint trained by the NVIDIA Isaac-GR00T stack through the
-LeRobot integration shipped in `policy/lerobot-0.6.1` (see its groot README):
+Loads a LoRA checkpoint trained by the NVIDIA Isaac-GR00T stack through the
+LeRobot 0.6.1 integration (installed package or local source checkout):
 the checkpoint directory carries a PEFT adapter plus serialized pre/post
 processors, and the adapter keys are prefixed with `_groot_model.` because the
 adapter was trained on a `GrootPolicy` wrapper. Loading therefore goes through
@@ -11,7 +11,11 @@ adapter was trained on a `GrootPolicy` wrapper. Loading therefore goes through
 from __future__ import annotations
 
 import json
+import logging
+import random
+import re
 import time
+from dataclasses import fields
 from pathlib import Path
 from typing import Any
 
@@ -39,6 +43,7 @@ CAMERA_KEY_MAP: dict[str, str] = {
     "eye_in_hand": "robot0_eye_in_hand",
 }
 REQUIRED_CAMERAS: tuple[str, ...] = tuple(CAMERA_KEY_MAP)
+LOGGER = logging.getLogger(__name__)
 
 
 class Gr00TBackend:
@@ -55,17 +60,20 @@ class Gr00TBackend:
         state_schema: str = STATE_SCHEMA,
         server_id: str | None = None,
         code_revision: dict[str, str] | None = None,
+        seed_by_episode: bool = False,
     ) -> None:
         self.policy = policy
         self.preprocessor = preprocessor
         self.postprocessor = postprocessor
         self.config_name = config_name
+        self.seed_by_episode = bool(seed_by_episode)
         self._contract = PolicyContract(
             server_id=server_id or f"gr00t-{config_name}",
             policy={
                 "family": "gr00t",
                 "name": config_name,
                 "config": config_name,
+                "seed_policy": "episode_seed_v1" if seed_by_episode else "unseeded",
             },
             checkpoint=checkpoint,
             observation=ObservationContract(
@@ -95,7 +103,8 @@ class Gr00TBackend:
         pytorch_device: str | None = None,
         server_id: str | None = None,
         code_revision: dict[str, str] | None = None,
-    ) -> "Gr00TBackend":
+        seed_by_episode: bool = False,
+    ) -> Gr00TBackend:
         try:
             from lerobot.configs import FeatureType, PolicyFeature
             from lerobot.policies.groot.configuration_groot import GrootConfig
@@ -103,18 +112,15 @@ class Gr00TBackend:
             from lerobot.policies.groot.processor_groot import (
                 make_groot_pre_post_processors_from_pretrained,
             )
-            from lerobot.utils.constants import ACTION
         except ImportError as exc:
             raise RuntimeError(
-                "LeRobot (Isaac-GR00T fork) is not importable. Run serve_gr00t.py "
-                "with the lerobot061 environment (policy/lerobot-0.6.1)."
+                "LeRobot with GR00T N1.7 support is not importable. Run "
+                "serve_gr00t.py in the LeRobot 0.6.1 serving environment."
             ) from exc
 
         ckpt = checkpoint_dir.expanduser().resolve()
         if not (ckpt / "train_config.json").is_file():
-            raise FileNotFoundError(
-                f"GR00T checkpoint must contain train_config.json: {ckpt}"
-            )
+            raise FileNotFoundError(f"GR00T checkpoint must contain train_config.json: {ckpt}")
         train_config = json.loads((ckpt / "train_config.json").read_text(encoding="utf-8"))
         policy_section = train_config["policy"]
         base_model = base_model_dir.expanduser().resolve()
@@ -133,23 +139,38 @@ class Gr00TBackend:
         }
         features.update(output_features)
 
-        config = GrootConfig(
-            base_model_path=str(base_model),
-            backbone_model_path=(
-                None
-                if vlm_model_dir is None
-                else str(vlm_model_dir.expanduser().resolve())
-            ),
-            embodiment_tag=policy_section.get("embodiment_tag", "robocasa_panda_omron"),
-            chunk_size=int(policy_section.get("chunk_size", 40)),
-            n_action_steps=int(policy_section.get("n_action_steps", 40)),
-            max_state_dim=int(policy_section.get("max_state_dim", 132)),
-            max_action_dim=int(policy_section.get("max_action_dim", 132)),
-            model_params_fp32=False,  # inference: keep bf16 weights
-            use_flash_attention=False,  # SDPA fallback (no flash_attn installed)
-            input_features=features,
-            output_features=output_features,
-        )
+        config_kwargs = {
+            "base_model_path": str(base_model),
+            "embodiment_tag": policy_section.get("embodiment_tag", "robocasa_panda_omron"),
+            "chunk_size": int(policy_section.get("chunk_size", 40)),
+            "n_action_steps": int(policy_section.get("n_action_steps", 40)),
+            "max_state_dim": int(policy_section.get("max_state_dim", 132)),
+            "max_action_dim": int(policy_section.get("max_action_dim", 132)),
+            "model_params_fp32": False,  # inference: keep bf16 weights
+            "use_flash_attention": False,  # SDPA fallback
+            "input_features": features,
+            "output_features": output_features,
+        }
+        # Some Isaac-GR00T forks expose this override, while released LeRobot
+        # 0.6.1 reads the backbone path from the base model's own config.json.
+        # The tokenizer override below is independent and works on both.
+        supported_fields = {item.name for item in fields(GrootConfig)}
+        if "backbone_model_path" in supported_fields:
+            config_kwargs["backbone_model_path"] = (
+                None if vlm_model_dir is None else str(vlm_model_dir.expanduser().resolve())
+            )
+        for name in (
+            "n_obs_steps",
+            "use_bf16",
+            "use_relative_actions",
+            "relative_exclude_joints",
+            "num_inference_timesteps",
+            "rtc_ramp_rate",
+            "action_decode_transform",
+        ):
+            if name in supported_fields and name in policy_section:
+                config_kwargs[name] = policy_section[name]
+        config = GrootConfig(**config_kwargs)
 
         policy = GrootPolicy(config)
         from peft import PeftModel
@@ -157,6 +178,7 @@ class Gr00TBackend:
         policy = PeftModel.from_pretrained(policy, ckpt)
         device = pytorch_device or ("cuda" if torch.cuda.is_available() else "cpu")
         policy = policy.to(device, dtype=torch.bfloat16)
+        policy.eval()
 
         # The serialized vlm_encode step points at the training machine's
         # Cosmos-Reason2-2B path; override it with the local copy when the
@@ -165,7 +187,9 @@ class Gr00TBackend:
         serialized_path = _serialized_vlm_model_dir(ckpt)
         if vlm_model_dir is not None:
             preprocessor_overrides = {
-                "groot_n1_7_vlm_encode_v1": {"model_name": str(vlm_model_dir)}
+                "groot_n1_7_vlm_encode_v1": {
+                    "model_name": str(vlm_model_dir.expanduser().resolve())
+                }
             }
         elif serialized_path is not None and not serialized_path.exists():
             raise FileNotFoundError(
@@ -184,13 +208,14 @@ class Gr00TBackend:
             policy,
             preprocessor=preprocessor,
             postprocessor=postprocessor,
-            checkpoint=resolve_checkpoint_identity(ckpt),
+            checkpoint=resolve_checkpoint_identity(ckpt, step=_checkpoint_step(ckpt)),
             config_name=config_name,
             action_horizon=int(policy_section.get("chunk_size", 40)),
             image_size=image_size,
             state_schema=state_schema,
             server_id=server_id,
             code_revision=code_revision,
+            seed_by_episode=seed_by_episode,
         )
 
     @property
@@ -198,11 +223,20 @@ class Gr00TBackend:
         return self._contract
 
     def reset(self, episode_id: str) -> None:
-        del episode_id
+        if self.seed_by_episode:
+            seed = _episode_seed(episode_id)
+            random.seed(seed)
+            np.random.seed(seed % (2**32))
+            # torch.manual_seed also seeds the CUDA generators. Do this for
+            # every episode, not just process startup, so resume is independent
+            # of the number of previous requests or warmup calls.
+            torch.manual_seed(seed)
+            LOGGER.info("Reset episode %s with model seed %d", episode_id, seed)
         reset = getattr(self.policy, "reset", None)
         if callable(reset):
             reset()
 
+    @torch.inference_mode()
     def infer(self, request: InferenceRequest) -> InferenceResponse:
         observation = request.observation
         batch: dict[str, Any] = {}
@@ -223,7 +257,9 @@ class Gr00TBackend:
         elapsed_ms = (time.monotonic() - start) * 1000.0
 
         if torch.is_tensor(decoded):
-            actions = decoded.detach().cpu().numpy()
+            # NumPy has no native bfloat16 dtype. Cast before crossing the
+            # torch/NumPy boundary, including when postprocessing kept bf16.
+            actions = decoded.detach().to(device="cpu", dtype=torch.float32).numpy()
         else:
             actions = np.asarray(decoded)
         actions = np.asarray(actions, dtype=np.float32)
@@ -232,6 +268,8 @@ class Gr00TBackend:
         actions = validate_action_chunk(
             actions,
             expected_horizon=self.contract.action.horizon,
+            expected_dim=self.contract.action.dim,
+            action_schema=self.contract.action.schema,
         )
         return InferenceResponse(
             request_id=request.request_id,
@@ -246,6 +284,26 @@ class Gr00TBackend:
             close()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
+
+
+def _episode_seed(episode_id: str) -> int:
+    match = re.search(r"(?:^|-)seed-(\d+)(?:-|$)", episode_id)
+    if match is None:
+        raise ValueError(
+            f"seed_by_episode requires an episode ID containing 'seed-<integer>': {episode_id!r}"
+        )
+    return int(match.group(1))
+
+
+def _checkpoint_step(checkpoint_dir: Path) -> int | None:
+    state_path = checkpoint_dir.parent / "training_state" / "training_step.json"
+    if state_path.is_file():
+        step = json.loads(state_path.read_text(encoding="utf-8"))["step"]
+        if isinstance(step, bool) or not isinstance(step, int) or step < 0:
+            raise ValueError(f"Invalid checkpoint training step in {state_path}")
+        return step
+    name = checkpoint_dir.parent.name if checkpoint_dir.name == "pretrained_model" else ""
+    return int(name) if name.isdecimal() else None
 
 
 def _serialized_vlm_model_dir(checkpoint_dir: Path) -> Path | None:

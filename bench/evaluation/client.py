@@ -146,6 +146,8 @@ class RemotePolicyClient:
         actions = validate_action_chunk(
             response.actions,
             expected_horizon=self.contract.action.horizon,
+            expected_dim=self.contract.action.dim,
+            action_schema=self.contract.action.schema,
         )
         return InferenceResponse(
             request_id=response.request_id,

@@ -8,14 +8,16 @@ from typing import Any
 
 import numpy as np
 
-from .errors import ErrorCode, ProtocolError
 from bench.runtime.data_contract import (
-    ACTION_DIM,
-    ACTION_SCHEMA,
+    ACTION_DIM,  # noqa: F401
+    ACTION_SCHEMA,  # noqa: F401
     POLICY_PROTOCOL_VERSION,
-    STATE_DIM,
+    STATE_DIM,  # noqa: F401
     STATE_SCHEMA,
 )
+
+from .errors import ErrorCode, ProtocolError
+from .profiles import SIM_RUNTIME_PROFILE, get_runtime_profile
 
 REQUIRED_CAMERA_ALIASES = ("agentview_left", "agentview_right", "eye_in_hand")
 
@@ -34,7 +36,7 @@ class CheckpointIdentity:
     step: int | None = None
 
     @classmethod
-    def from_wire(cls, payload: Mapping[str, Any]) -> "CheckpointIdentity":
+    def from_wire(cls, payload: Mapping[str, Any]) -> CheckpointIdentity:
         return cls(
             uri=_required_string(payload, "uri", fallback_key="path"),
             fingerprint=_required_string(payload, "fingerprint"),
@@ -54,7 +56,7 @@ class ObservationContract:
     required_modalities: tuple[str, ...] = ("rgb", "state", "prompt")
 
     @classmethod
-    def from_wire(cls, payload: Mapping[str, Any]) -> "ObservationContract":
+    def from_wire(cls, payload: Mapping[str, Any]) -> ObservationContract:
         image_size = _int_tuple(payload.get("image_size"), "image_size", length=2)
         return cls(
             state_schema=_required_string(payload, "state_schema"),
@@ -84,7 +86,7 @@ class ActionContract:
     horizon: int
 
     @classmethod
-    def from_wire(cls, payload: Mapping[str, Any]) -> "ActionContract":
+    def from_wire(cls, payload: Mapping[str, Any]) -> ActionContract:
         return cls(
             schema=_required_string(payload, "schema"),
             dim=_required_int(payload, "dim"),
@@ -105,9 +107,11 @@ class PolicyContract:
     control_frequency_hz: float
     code_revision: Mapping[str, str] = field(default_factory=dict)
     protocol_version: str = PROTOCOL_VERSION
+    runtime_profile: str = SIM_RUNTIME_PROFILE
+    hardware_execution_semantics: str | None = None
 
     @classmethod
-    def from_hello(cls, payload: Mapping[str, Any]) -> "PolicyContract":
+    def from_hello(cls, payload: Mapping[str, Any]) -> PolicyContract:
         if payload.get("op") != "hello":
             raise ProtocolError(ErrorCode.INVALID_REQUEST, "Expected server hello message")
         version = _required_string(payload, "protocol_version")
@@ -125,6 +129,14 @@ class PolicyContract:
             ),
             action=ActionContract.from_wire(_required_mapping(payload, "action")),
             control_frequency_hz=_required_float(payload, "control_frequency_hz"),
+            runtime_profile=_optional_string(
+                payload,
+                "runtime_profile",
+                default=SIM_RUNTIME_PROFILE,
+            ),
+            hardware_execution_semantics=_optional_nullable_string(
+                payload.get("hardware_execution_semantics")
+            ),
             code_revision={
                 str(key): str(value)
                 for key, value in _required_mapping(
@@ -137,7 +149,7 @@ class PolicyContract:
         return contract
 
     def to_hello(self) -> dict[str, Any]:
-        return {
+        payload = {
             "op": "hello",
             "protocol_version": self.protocol_version,
             "server_id": self.server_id,
@@ -146,8 +158,12 @@ class PolicyContract:
             "observation": self.observation.to_wire(),
             "action": self.action.to_wire(),
             "control_frequency_hz": self.control_frequency_hz,
+            "runtime_profile": self.runtime_profile,
             "code_revision": dict(self.code_revision),
         }
+        if self.hardware_execution_semantics is not None:
+            payload["hardware_execution_semantics"] = self.hardware_execution_semantics
+        return payload
 
 
 @dataclass(frozen=True)
@@ -194,7 +210,7 @@ class InferenceRequest:
         }
 
     @classmethod
-    def from_wire(cls, payload: Mapping[str, Any]) -> "InferenceRequest":
+    def from_wire(cls, payload: Mapping[str, Any]) -> InferenceRequest:
         if payload.get("op") != "infer":
             raise ProtocolError(ErrorCode.INVALID_REQUEST, "Expected infer request")
         observation = _required_mapping(payload, "observation")
@@ -246,7 +262,7 @@ class InferenceResponse:
         }
 
     @classmethod
-    def from_wire(cls, payload: Mapping[str, Any]) -> "InferenceResponse":
+    def from_wire(cls, payload: Mapping[str, Any]) -> InferenceResponse:
         if payload.get("op") != "infer_result":
             raise ProtocolError(ErrorCode.INVALID_REQUEST, "Expected infer_result response")
         actions = _require_ndarray(payload.get("actions"), "actions")
@@ -262,34 +278,45 @@ class InferenceResponse:
 def validate_contract(contract: PolicyContract) -> None:
     if contract.protocol_version != PROTOCOL_VERSION:
         raise ProtocolError(ErrorCode.UNSUPPORTED_PROTOCOL, contract.protocol_version)
-    if contract.observation.state_dim != STATE_DIM:
+    try:
+        profile = get_runtime_profile(contract.runtime_profile)
+    except ValueError as exc:
+        raise ProtocolError(ErrorCode.CONTRACT_MISMATCH, str(exc)) from exc
+    if contract.observation.state_dim != profile.state_dim:
         raise ProtocolError(
             ErrorCode.CONTRACT_MISMATCH,
-            f"MobileMemBench requires state_dim={STATE_DIM}, got {contract.observation.state_dim}",
+            f"Runtime profile {profile.name} requires state_dim={profile.state_dim}, "
+            f"got {contract.observation.state_dim}",
         )
-    if contract.observation.state_schema not in STATE_SCHEMAS:
+    if contract.observation.state_schema != profile.state_schema:
         raise ProtocolError(
             ErrorCode.CONTRACT_MISMATCH,
-            f"Unsupported state schema: {contract.observation.state_schema}",
+            (
+                f"Unsupported state schema: {contract.observation.state_schema}"
+                if profile.name == SIM_RUNTIME_PROFILE
+                else f"Runtime profile {profile.name} requires "
+                f"state_schema={profile.state_schema}, got {contract.observation.state_schema}"
+            ),
         )
-    if contract.action.dim != ACTION_DIM or contract.action.schema != ACTION_SCHEMA:
+    if contract.action.dim != profile.action_dim or contract.action.schema != profile.action_schema:
         raise ProtocolError(
             ErrorCode.CONTRACT_MISMATCH,
-            f"MobileMemBench requires {ACTION_SCHEMA} with dim={ACTION_DIM}",
+            f"Runtime profile {profile.name} requires {profile.action_schema} "
+            f"with dim={profile.action_dim}",
         )
     if contract.action.horizon <= 0:
         raise ProtocolError(ErrorCode.CONTRACT_MISMATCH, "Action horizon must be positive")
     if any(size <= 0 for size in contract.observation.image_size):
         raise ProtocolError(ErrorCode.CONTRACT_MISMATCH, "Image size must be positive")
-    if tuple(contract.observation.required_cameras) != REQUIRED_CAMERA_ALIASES:
+    if tuple(contract.observation.required_cameras) != profile.required_cameras:
         raise ProtocolError(
             ErrorCode.CONTRACT_MISMATCH,
-            f"required_cameras must be exactly {list(REQUIRED_CAMERA_ALIASES)}",
+            f"required_cameras must be exactly {list(profile.required_cameras)}",
         )
-    if tuple(contract.observation.image_size) != (224, 224):
+    if tuple(contract.observation.image_size) != profile.image_size:
         raise ProtocolError(
             ErrorCode.CONTRACT_MISMATCH,
-            "MobileMemBench v2 requires image_size=[224,224]",
+            f"Runtime profile {profile.name} requires image_size={list(profile.image_size)}",
         )
     modalities = contract.observation.required_modalities
     if len(set(modalities)) != len(modalities):
@@ -304,8 +331,17 @@ def validate_contract(contract: PolicyContract) -> None:
             "Missing core observation modalities: "
             + ", ".join(sorted(missing_modalities)),
         )
-    if contract.control_frequency_hz <= 0:
-        raise ProtocolError(ErrorCode.CONTRACT_MISMATCH, "Control frequency must be positive")
+    if not np.isclose(contract.control_frequency_hz, profile.control_frequency_hz):
+        raise ProtocolError(
+            ErrorCode.CONTRACT_MISMATCH,
+            f"Runtime profile {profile.name} requires "
+            f"control_frequency_hz={profile.control_frequency_hz:g}",
+        )
+    if profile.name != SIM_RUNTIME_PROFILE and contract.hardware_execution_semantics != "unverified":
+        raise ProtocolError(
+            ErrorCode.CONTRACT_MISMATCH,
+            "Real-robot runtime profiles require hardware_execution_semantics='unverified'",
+        )
 
 
 def validate_observation(
@@ -386,6 +422,24 @@ def _required_int(payload: Mapping[str, Any], key: str) -> int:
     value = payload.get(key)
     if isinstance(value, bool) or not isinstance(value, int):
         raise ProtocolError(ErrorCode.INVALID_REQUEST, f"{key} must be an integer")
+    return value
+
+
+def _optional_string(payload: Mapping[str, Any], key: str, *, default: str) -> str:
+    value = payload.get(key, default)
+    if not isinstance(value, str) or not value:
+        raise ProtocolError(ErrorCode.INVALID_REQUEST, f"{key} must be a non-empty string")
+    return value
+
+
+def _optional_nullable_string(value: Any) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value:
+        raise ProtocolError(
+            ErrorCode.INVALID_REQUEST,
+            "hardware_execution_semantics must be a non-empty string or null",
+        )
     return value
 
 

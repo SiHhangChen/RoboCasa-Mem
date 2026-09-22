@@ -1,0 +1,212 @@
+{
+  "schema_version": "membench.gr00t_joint_manifest/v1",
+  "release_id": "release15_v1",
+  "aggregate": {
+    "repo_id": "membench_release15_v1",
+    "canonical_features_repo_id": "tm01_200seeds_v061",
+    "codebase_version": "v3.0",
+    "lerobot_version": "0.6.1",
+    "robot_type": "mobile_manipulator",
+    "fps": 20,
+    "state_dim": 37,
+    "action_dim": 13,
+    "video_cameras": 3,
+    "action_horizon": 40,
+    "sampling": "frame_uniform",
+    "expected_episodes": 3000,
+    "expected_frames": 5523856,
+    "expected_source_task_prompts": 20,
+    "expected_aggregate_task_prompts": 18
+  },
+  "datasets": [
+    {
+      "task_id": "TM01",
+      "repo_id": "tm01_200seeds_v061",
+      "path": "tm01_200seeds_v061",
+      "expected_episodes": 200,
+      "expected_frames": 676350,
+      "expected_task_prompts": 1,
+      "info_sha256": "f290c5db7fa48f77cdc391a83bc297ee14251fbe81565f737f648a3b7e160187",
+      "tasks_sha256": "78a80a76c8add2f2fe0e8b773025bf14a14ac06fc88d7c65204927909db6a788",
+      "stats_sha256": "81a5562c7319a8180ce2a16ac324399a8a714aa41d066a8691c3d02c53bd2db5"
+    },
+    {
+      "task_id": "TM02",
+      "repo_id": "tm02_200seeds_v061",
+      "path": "tm02_200seeds_v061",
+      "expected_episodes": 200,
+      "expected_frames": 649500,
+      "expected_task_prompts": 1,
+      "info_sha256": "1e2729df5dcff9d41df0881c04705e6e3b860e3af8d9f6179b177b465443d137",
+      "tasks_sha256": "31873222a2794d590b422939c9bd5892588da46d306e03b86d4618013b433ff6",
+      "stats_sha256": "d8f51db61492f58f53f53bb19753ac87d5e005e72eefcbbe093a54fabad20597"
+    },
+    {
+      "task_id": "TS01",
+      "repo_id": "ts01_200seeds_v061",
+      "path": "ts01_200seeds_v061",
+      "expected_episodes": 200,
+      "expected_frames": 221171,
+      "expected_task_prompts": 3,
+      "info_sha256": "2fcbdaed3b7b31af1f4d7ab26e667fb9708c97e1c5ac67b8f0db4400a6e053d9",
+      "tasks_sha256": "3163ccd900ad0e3c54d402e48166dc3aeb9803444719cfd40788db87380a6e29",
+      "stats_sha256": "27279a0c13cfc078b383339a2924a3faf75b5182e7c8b8c612cffc29e4254a76",
+      "metadata_overrides": {
+        "features.action.info.gripper_convention": {
+          "open": -1.0,
+          "closed": 1.0,
+          "hold": 0.0,
+          "deadband": 0.1
+        }
+      }
+    },
+    {
+      "task_id": "TS02",
+      "repo_id": "ts02_200seeds_v061",
+      "path": "ts02_200seeds_v061",
+      "expected_episodes": 200,
+      "expected_frames": 292749,
+      "expected_task_prompts": 1,
+      "info_sha256": "431e04e40dabec2dd16ef76dfdc621c9f4c278d59760ac68b24bf2433e589468",
+      "tasks_sha256": "a6315b9cff3813a926efe1f6c97243bc11fc4e8a235d08cca28e34521d233ae7",
+      "stats_sha256": "093a0a31a1eb618cad1853428d9e4eb1a6253ac0ea0a3eeed8cbf06555ffcb6d"
+    },
+    {
+      "task_id": "TS03",
+      "repo_id": "ts03_200seeds_v061",
+      "path": "ts03_200seeds_v061",
+      "expected_episodes": 200,
+      "expected_frames": 181493,
+      "expected_task_prompts": 2,
+      "info_sha256": "1c8fc0b592b47c3150ce8db770199ae678170232b32df85e900942284c7cdf52",
+      "tasks_sha256": "4d9dbacd50d7a08ed3b77e04413e327542d76df91ea45d25ed80c1d6c120d95c",
+      "stats_sha256": "6f11daf8164ea6a449209254d7595c1100a3bdc33795bff1366a938563128807",
+      "metadata_overrides": {
+        "features.action.info.gripper_convention": {
+          "open": -1.0,
+          "closed": 1.0,
+          "hold": 0.0,
+          "deadband": 0.1
+        }
+      }
+    },
+    {
+      "task_id": "TS04",
+      "repo_id": "ts04_200seeds_v061",
+      "path": "ts04_200seeds_v061",
+      "expected_episodes": 200,
+      "expected_frames": 230373,
+      "expected_task_prompts": 1,
+      "info_sha256": "0fa8b9d076e1da1015eed4121d7929c0210b982fd068bff060ae636490d3a4c3",
+      "tasks_sha256": "81050dd965849543ebfcdabbdf97fd1fd58db268ea390bfc2d1556eec86a0fe2",
+      "stats_sha256": "0429d92f82ac46551ab381623474a139c00b22eee990f912d192a0e36789c5f2"
+    },
+    {
+      "task_id": "WA-01",
+      "repo_id": "wa01_200seeds_v061",
+      "path": "wa01_200seeds_v061",
+      "expected_episodes": 200,
+      "expected_frames": 400366,
+      "expected_task_prompts": 1,
+      "info_sha256": "f70aa5686d0e09cd4b425428e6ebf9677814547207f61899c73a8777b63f818f",
+      "tasks_sha256": "28c50134b15bbdc4f47fccf8776ef208dd622b49576d99b618170e28d42a3c2d",
+      "stats_sha256": "6afc7956a953421a602501cbaa2093248c81e9018a3a338a629dad2db4052102"
+    },
+    {
+      "task_id": "WA-02",
+      "repo_id": "wa02_200seeds_v062",
+      "path": "wa02_200seeds_v062",
+      "expected_episodes": 200,
+      "expected_frames": 477923,
+      "expected_task_prompts": 2,
+      "info_sha256": "a376209bd1ee00e491a5a3d88af22021c44deced758ca6f4625d9fc7dd6f4ed0",
+      "tasks_sha256": "bc0f35126ecd9d2dfaf49e14dae9ce3433155b218fa5f5490c5d72a42da95fa6",
+      "stats_sha256": "e85022bee787035efe0a1c771994b1df6d49601c817521a2dbdba63a7f88423e"
+    },
+    {
+      "task_id": "WA-03",
+      "repo_id": "wa03_200seeds_v061",
+      "path": "wa03_200seeds_v061",
+      "expected_episodes": 200,
+      "expected_frames": 607138,
+      "expected_task_prompts": 1,
+      "info_sha256": "57d7507f919001c22c62ea2a7317213f65124378523f51565de00536eaf72da4",
+      "tasks_sha256": "d8a7466475f7aac9507dac2745b665571b93d7e8f2a35f04df2d14057354d1a6",
+      "stats_sha256": "c93e8c64b43a2ae6966c4b8897532502f484ed0e0dbd00b53b33200cd555ba98"
+    },
+    {
+      "task_id": "WA-05",
+      "repo_id": "wa05_200seeds_v061",
+      "path": "wa05_200seeds_v061",
+      "expected_episodes": 200,
+      "expected_frames": 234789,
+      "expected_task_prompts": 1,
+      "info_sha256": "4e84875a43d2ceac3f8f8fbdfa4930fbc914490462e3991f0c547bcf4a7ad0b7",
+      "tasks_sha256": "3a2037c7f1a0e19f36325e3aa8e7d062d4e7fed341b21092ae58ab5995d9bc93",
+      "stats_sha256": "c5c9a357f44b3ce60616d05b1ae65175743a8e78ba649f746e08c5e47173eb99"
+    },
+    {
+      "task_id": "WR-01",
+      "repo_id": "wr01_v063_200seeds",
+      "path": "wr01_v063_200seeds",
+      "expected_episodes": 200,
+      "expected_frames": 467963,
+      "expected_task_prompts": 2,
+      "info_sha256": "9dd6a2f0de9d84c5b1c230054be70c8dba77a9358da439a54d7a69f721bc1519",
+      "tasks_sha256": "79f01085147a8d9c312e5de221acea7399b3a1d751e63516274b8529eb069d54",
+      "stats_sha256": "1d3670c1316e3a5470dc273e61ddf2eedf49faac7529aa41d0618492264b477e"
+    },
+    {
+      "task_id": "WR-03",
+      "repo_id": "wr03_200seeds_v061",
+      "path": "wr03_200seeds_v061",
+      "expected_episodes": 200,
+      "expected_frames": 467350,
+      "expected_task_prompts": 1,
+      "info_sha256": "095080882dcd840444ffac8c07140e49b3ab8a4c7b6aed2bf576920491a0de1a",
+      "tasks_sha256": "f62bc85d4001e5c3cb162a5d61d1ae29fff68d142aeb304e54cc1beac47f61ab",
+      "stats_sha256": "76832dcc87cccc7fa33fbc07f44ead364966b6747fbfc7d1d4b0617002fa9ddc"
+    },
+    {
+      "task_id": "WR-07",
+      "repo_id": "wr07_200seeds_v061",
+      "path": "wr07_200seeds_v061",
+      "expected_episodes": 200,
+      "expected_frames": 146827,
+      "expected_task_prompts": 1,
+      "info_sha256": "28d37965e90a06430511a74f918376a5a40bec5d8ea2410ef504214879763084",
+      "tasks_sha256": "1bdf642f12eb6ce42fb102fdc5206a4a5f0970bb364be73b65515f84f6265af4",
+      "stats_sha256": "38227166116b856f60d1ec4dc49b9c7520102a25dad56cb02f7cf34659f1565a"
+    },
+    {
+      "task_id": "WR-08",
+      "repo_id": "wr08_200seeds_v061",
+      "path": "wr08_200seeds_v061",
+      "expected_episodes": 200,
+      "expected_frames": 307223,
+      "expected_task_prompts": 1,
+      "info_sha256": "5eaa5d0612cc64220c8875998f14282a6d8118172861cc8f2918762fd1626de4",
+      "tasks_sha256": "46a7b88f735f50305f1587b64de0cef1175d087b34a2a62327f84c8e7ab38e61",
+      "stats_sha256": "15688c375d9483ae32bfff10f8586d8b8ae6118b3b70e3d1b6d7e4f3719378f1"
+    },
+    {
+      "task_id": "WX-01",
+      "repo_id": "wx01_200seeds_v061",
+      "path": "wx01_200seeds_v061",
+      "expected_episodes": 200,
+      "expected_frames": 162641,
+      "expected_task_prompts": 1,
+      "info_sha256": "885959989e73d7cc33e098e5dda25873e0ec008312d1183355bb102dcf531ab4",
+      "tasks_sha256": "36be95aedab1409ebfced1733ad262e238ab66ce3c5721d5d2af564fb404e9a4",
+      "stats_sha256": "7114dac6a394afa1bfd9a361f75c6bd32cde1c2c1177daacd9d81b16071284af",
+      "metadata_overrides": {
+        "features.action.info.gripper_convention": {
+          "open": -1.0,
+          "closed": 1.0,
+          "hold": 0.0,
+          "deadband": 0.1
+        }
+      }
+    }
+  ]
+}

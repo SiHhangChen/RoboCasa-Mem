@@ -27,7 +27,6 @@ def _serve(port: int) -> None:
     WebsocketPolicyServer(
         FakePolicyBackend(
             horizon=2,
-            image_size=(2, 2),
             required_cameras=("agentview_left", "agentview_right", "eye_in_hand"),
         ),
         host="127.0.0.1",
@@ -67,9 +66,9 @@ class _Adapter:
             task_id=self.task_id,
             state=np.zeros(37, dtype=np.float32),
             images={
-                "agentview_left": np.zeros((2, 2, 3), dtype=np.uint8),
-                "agentview_right": np.zeros((2, 2, 3), dtype=np.uint8),
-                "eye_in_hand": np.zeros((2, 2, 3), dtype=np.uint8),
+                "agentview_left": np.zeros((224, 224, 3), dtype=np.uint8),
+                "agentview_right": np.zeros((224, 224, 3), dtype=np.uint8),
+                "eye_in_hand": np.zeros((224, 224, 3), dtype=np.uint8),
             },
             prompt=runtime.prompt,
         )

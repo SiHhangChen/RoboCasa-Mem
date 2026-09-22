@@ -106,7 +106,10 @@ class RolloutRunner:
                         raise ValueError("subtask scheduler returned an empty initial prompt")
                     runtime.prompt = prompt
             self.client.reset(episode_id)
-            queue = ActionChunkQueue()
+            queue = ActionChunkQueue(
+                expected_dim=self.client.contract.action.dim,
+                action_schema=self.client.contract.action.schema,
+            )
             while env_steps < self.suite.rollout.max_steps:
                 if len(queue) == 0:
                     observation = adapter.build_observation(runtime)

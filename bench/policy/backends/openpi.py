@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import dataclasses
+import logging
 from pathlib import Path
+import random
+import re
 import time
 from typing import Any
 
@@ -20,6 +23,8 @@ from bench.policy.protocol import (
 )
 from bench.policy.checkpoint import resolve_checkpoint_identity
 from bench.runtime.data_contract import ACTION_DIM, ACTION_SCHEMA, STATE_DIM, STATE_SCHEMA
+
+LOGGER = logging.getLogger(__name__)
 
 # Fallback camera subset forwarded to the policy, used only when a config's
 # repack does not declare an images mapping. The wire contract always requires
@@ -61,9 +66,11 @@ class OpenPIBackend:
         policy_cameras: tuple[str, ...] = _DEFAULT_POLICY_CAMERAS,
         server_id: str | None = None,
         code_revision: dict[str, str] | None = None,
+        seed_by_episode: bool = False,
     ) -> None:
         self.policy = policy
         self.config_name = config_name
+        self.seed_by_episode = bool(seed_by_episode)
         policy_cameras = tuple(policy_cameras)
         required_cameras = ("agentview_left", "agentview_right", "eye_in_hand")
         if not policy_cameras or not set(policy_cameras) <= set(required_cameras):
@@ -78,6 +85,7 @@ class OpenPIBackend:
                 "family": "openpi",
                 "name": config_name,
                 "config": config_name,
+                "seed_policy": "episode_seed_v1" if seed_by_episode else "unseeded",
             },
             checkpoint=checkpoint,
             observation=ObservationContract(
@@ -109,6 +117,7 @@ class OpenPIBackend:
         checkpoint_uri: str | None = None,
         server_id: str | None = None,
         code_revision: dict[str, str] | None = None,
+        seed_by_episode: bool = False,
     ) -> "OpenPIBackend":
         try:
             from openpi.policies import policy_config
@@ -149,6 +158,7 @@ class OpenPIBackend:
             policy_cameras=_policy_cameras_from_config(train_config),
             server_id=server_id,
             code_revision=code_revision,
+            seed_by_episode=seed_by_episode,
         )
 
     @property
@@ -156,7 +166,15 @@ class OpenPIBackend:
         return self._contract
 
     def reset(self, episode_id: str) -> None:
-        del episode_id
+        if self.seed_by_episode:
+            seed = _episode_seed(episode_id)
+            random.seed(seed)
+            np.random.seed(seed % (2**32))
+            # torch.manual_seed also seeds the CUDA generators. Do this for
+            # every episode, not just process startup, so resume is independent
+            # of the number of previous requests or warmup calls.
+            _reseed_policy(self.policy, seed)
+            LOGGER.info("Reset episode %s with model seed %d", episode_id, seed)
         reset = getattr(self.policy, "reset", None)
         if callable(reset):
             reset()
@@ -178,6 +196,8 @@ class OpenPIBackend:
         actions = validate_action_chunk(
             np.asarray(output["actions"]),
             expected_horizon=self.contract.action.horizon,
+            expected_dim=self.contract.action.dim,
+            action_schema=self.contract.action.schema,
         )
         policy_timing = output.get("policy_timing", {})
         model_ms = (
@@ -196,3 +216,27 @@ class OpenPIBackend:
         close = getattr(self.policy, "close", None)
         if callable(close):
             close()
+
+
+def _reseed_policy(policy: Any, seed: int) -> None:
+    """Restart the policy's sampling RNG from ``seed`` when it supports it."""
+    reseed = getattr(policy, "reseed", None)
+    if callable(reseed):
+        reseed(seed)
+        return
+    # PyTorch-based OpenPI policies sample with the global torch generators.
+    try:
+        import torch
+
+        torch.manual_seed(seed)
+    except ImportError:
+        LOGGER.warning("Cannot reseed policy RNG: policy has no reseed() and torch is unavailable")
+
+
+def _episode_seed(episode_id: str) -> int:
+    match = re.search(r"(?:^|-)seed-(\d+)(?:-|$)", episode_id)
+    if match is None:
+        raise ValueError(
+            f"seed_by_episode requires an episode ID containing 'seed-<integer>': {episode_id!r}"
+        )
+    return int(match.group(1))

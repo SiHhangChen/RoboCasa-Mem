@@ -14,6 +14,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from bench.policy.backends.fake import FakePolicyBackend  # noqa: E402
+from bench.policy.protocol import runtime_profile_names  # noqa: E402
 from bench.policy.server import WebsocketPolicyServer  # noqa: E402
 
 
@@ -25,6 +26,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--image-size", type=int, default=224)
     parser.add_argument("--api-key-env", default="MEMBENCH_POLICY_API_KEY")
     parser.add_argument("--inference-timeout-s", type=float, default=30.0)
+    parser.add_argument(
+        "--runtime-profile",
+        choices=runtime_profile_names(),
+        default="membench.robocasa_pandaomron.v2",
+    )
     return parser.parse_args()
 
 
@@ -32,6 +38,7 @@ def main() -> None:
     args = parse_args()
     backend = FakePolicyBackend(
         horizon=args.horizon,
+        runtime_profile=args.runtime_profile,
         image_size=(args.image_size, args.image_size),
     )
     server = WebsocketPolicyServer(
