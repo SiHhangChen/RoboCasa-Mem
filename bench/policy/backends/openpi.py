@@ -22,7 +22,12 @@ from bench.policy.protocol import (
     PolicyContract,
 )
 from bench.policy.checkpoint import resolve_checkpoint_identity
-from bench.runtime.data_contract import ACTION_DIM, ACTION_SCHEMA, STATE_DIM, STATE_SCHEMA
+from bench.policy.protocol.profiles import (
+    COBOT_MAGIC_RUNTIME_PROFILE,
+    SIM_RUNTIME_PROFILE,
+    get_runtime_profile,
+)
+from bench.real_robot.wr07_prompts import FULL_CONFIG, SUBGOAL_CONFIG, prompt_policy
 
 LOGGER = logging.getLogger(__name__)
 
@@ -53,6 +58,29 @@ def _policy_cameras_from_config(train_config: Any) -> tuple[str, ...]:
     return _DEFAULT_POLICY_CAMERAS
 
 
+def _camera_map_from_config(train_config: Any, runtime_profile: str) -> dict[str, str]:
+    policy_cameras = _policy_cameras_from_config(train_config)
+    if runtime_profile == SIM_RUNTIME_PROFILE:
+        return {alias: alias for alias in policy_cameras}
+    if runtime_profile != COBOT_MAGIC_RUNTIME_PROFILE:
+        raise ValueError(f"Unsupported OpenPI runtime profile: {runtime_profile}")
+    inputs = train_config.data.repack_transforms.inputs
+    images = next(
+        (item.structure["images"] for item in inputs if "images" in item.structure), None
+    )
+    expected = {
+        "agentview_left": "observation.images.front",
+        "agentview_right": "observation.images.left",
+        "eye_in_hand": "observation.images.right",
+    }
+    if images != expected:
+        raise ValueError(f"WR07 OpenPI camera mapping differs from the trained configuration: {images}")
+    return {
+        model_alias: dataset_key.removeprefix("observation.images.")
+        for model_alias, dataset_key in images.items()
+    }
+
+
 class OpenPIBackend:
     def __init__(
         self,
@@ -62,8 +90,11 @@ class OpenPIBackend:
         checkpoint: CheckpointIdentity,
         action_horizon: int,
         image_size: tuple[int, int],
-        state_schema: str = STATE_SCHEMA,
+        state_schema: str | None = None,
         policy_cameras: tuple[str, ...] = _DEFAULT_POLICY_CAMERAS,
+        camera_map: dict[str, str] | None = None,
+        runtime_profile: str = SIM_RUNTIME_PROFILE,
+        prompt_contract: dict[str, object] | None = None,
         server_id: str | None = None,
         code_revision: dict[str, str] | None = None,
         seed_by_episode: bool = False,
@@ -71,14 +102,20 @@ class OpenPIBackend:
         self.policy = policy
         self.config_name = config_name
         self.seed_by_episode = bool(seed_by_episode)
-        policy_cameras = tuple(policy_cameras)
-        required_cameras = ("agentview_left", "agentview_right", "eye_in_hand")
-        if not policy_cameras or not set(policy_cameras) <= set(required_cameras):
+        profile = get_runtime_profile(runtime_profile)
+        camera_map = dict(
+            {alias: alias for alias in policy_cameras} if camera_map is None else camera_map
+        )
+        if not camera_map or not set(camera_map.values()) <= set(profile.required_cameras):
             raise ValueError(
-                f"policy_cameras must be a non-empty subset of {required_cameras}, "
-                f"got {policy_cameras}"
+                f"policy cameras must map to a non-empty subset of {profile.required_cameras}, "
+                f"got {camera_map}"
             )
-        self._policy_cameras = policy_cameras
+        self._camera_map = camera_map
+        self._prompt_contract = dict(prompt_contract or {})
+        self._active_prompt: str | None = None
+        if state_schema is not None and state_schema != profile.state_schema:
+            raise ValueError(f"{runtime_profile} requires state schema {profile.state_schema}, got {state_schema}")
         self._contract = PolicyContract(
             server_id=server_id or f"openpi-{config_name}",
             policy={
@@ -86,20 +123,25 @@ class OpenPIBackend:
                 "name": config_name,
                 "config": config_name,
                 "seed_policy": "episode_seed_v1" if seed_by_episode else "unseeded",
+                **self._prompt_contract,
             },
             checkpoint=checkpoint,
             observation=ObservationContract(
-                state_schema=state_schema,
-                state_dim=STATE_DIM,
-                required_cameras=required_cameras,
+                state_schema=profile.state_schema,
+                state_dim=profile.state_dim,
+                required_cameras=profile.required_cameras,
                 image_size=image_size,
             ),
             action=ActionContract(
-                schema=ACTION_SCHEMA,
-                dim=ACTION_DIM,
+                schema=profile.action_schema,
+                dim=profile.action_dim,
                 horizon=action_horizon,
             ),
-            control_frequency_hz=20.0,
+            control_frequency_hz=profile.control_frequency_hz,
+            runtime_profile=profile.name,
+            hardware_execution_semantics=(
+                "unverified" if profile.name == COBOT_MAGIC_RUNTIME_PROFILE else None
+            ),
             code_revision=dict(code_revision or {}),
         )
 
@@ -110,7 +152,8 @@ class OpenPIBackend:
         config_name: str,
         checkpoint_dir: Path,
         image_size: tuple[int, int],
-        state_schema: str,
+        state_schema: str | None = None,
+        runtime_profile: str | None = None,
         default_prompt: str | None = None,
         pytorch_device: str | None = None,
         norm_asset_id: str | None = None,
@@ -128,6 +171,25 @@ class OpenPIBackend:
                 "or install policy/openpi."
             ) from exc
         train_config = training_config.get_config(config_name)
+        is_wr07_real = config_name in (FULL_CONFIG, SUBGOAL_CONFIG)
+        expected_profile = COBOT_MAGIC_RUNTIME_PROFILE if is_wr07_real else SIM_RUNTIME_PROFILE
+        if runtime_profile is not None and runtime_profile != expected_profile:
+            raise ValueError(
+                f"{config_name} requires runtime profile {expected_profile}, got {runtime_profile}"
+            )
+        runtime_profile = expected_profile
+        profile = get_runtime_profile(runtime_profile)
+        if state_schema is not None and state_schema != profile.state_schema:
+            raise ValueError(
+                f"{config_name} requires state schema {profile.state_schema}, got {state_schema}"
+            )
+        if is_wr07_real and (
+            train_config.data.state_keep_dim != profile.state_dim
+            or train_config.data.action_output_dim != profile.action_dim
+        ):
+            raise ValueError(
+                f"{config_name} must use {profile.state_dim}D state and {profile.action_dim}D actions"
+            )
         if norm_asset_id is not None:
             assets = dataclasses.replace(
                 train_config.data.assets,
@@ -137,6 +199,8 @@ class OpenPIBackend:
                 train_config,
                 data=dataclasses.replace(train_config.data, assets=assets),
             )
+        camera_map = _camera_map_from_config(train_config, runtime_profile)
+        prompts = prompt_policy(config_name, default_prompt=train_config.data.default_prompt)
         horizon = int(train_config.model.action_horizon)
         checkpoint_path = checkpoint_dir.expanduser().resolve()
         policy = policy_config.create_trained_policy(
@@ -154,8 +218,10 @@ class OpenPIBackend:
             ),
             action_horizon=horizon,
             image_size=image_size,
-            state_schema=state_schema,
-            policy_cameras=_policy_cameras_from_config(train_config),
+            state_schema=profile.state_schema,
+            camera_map=camera_map,
+            runtime_profile=runtime_profile,
+            prompt_contract=prompts,
             server_id=server_id,
             code_revision=code_revision,
             seed_by_episode=seed_by_episode,
@@ -166,6 +232,7 @@ class OpenPIBackend:
         return self._contract
 
     def reset(self, episode_id: str) -> None:
+        self._active_prompt = None
         if self.seed_by_episode:
             seed = _episode_seed(episode_id)
             random.seed(seed)
@@ -181,9 +248,23 @@ class OpenPIBackend:
 
     def infer(self, request: InferenceRequest) -> InferenceResponse:
         observation = request.observation
+        prompt_mode = self._prompt_contract.get("prompt_mode")
+        if prompt_mode == "fixed" and observation.prompt != self._prompt_contract["default_prompt"]:
+            raise ValueError("Prompt differs from this checkpoint's fixed training prompt")
+        if (
+            prompt_mode == "episode_choice"
+            and observation.prompt not in self._prompt_contract["prompt_choices"].values()
+        ):
+            raise ValueError("Prompt must be one of this checkpoint's three WR07 subgoal choices")
+        if self._active_prompt is not None and observation.prompt != self._active_prompt:
+            raise ValueError(
+                "Prompt cannot change within an episode; reset before selecting another subgoal"
+            )
+        self._active_prompt = observation.prompt
         policy_input = {
             "images": {
-                alias: observation.images[alias] for alias in self._policy_cameras
+                model_alias: observation.images[wire_alias]
+                for model_alias, wire_alias in self._camera_map.items()
             },
             "state": observation.state,
             "prompt": observation.prompt,

@@ -25,8 +25,8 @@ for source in (
         sys.path.insert(0, str(source))
 
 from bench.policy.backends.openpi import OpenPIBackend  # noqa: E402
+from bench.policy.protocol.profiles import runtime_profile_names  # noqa: E402
 from bench.policy.server import WebsocketPolicyServer  # noqa: E402
-from bench.runtime.data_contract import STATE_SCHEMA  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
@@ -39,13 +39,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--image-size", type=int, choices=(224, 256), required=True)
     parser.add_argument(
         "--state-schema",
-        choices=(STATE_SCHEMA,),
-        required=True,
+        help="Optional schema check; inferred from the training config's runtime profile.",
     )
+    parser.add_argument("--runtime-profile", choices=runtime_profile_names())
     parser.add_argument("--default-prompt")
     parser.add_argument("--pytorch-device")
     parser.add_argument("--api-key-env", default="MEMBENCH_POLICY_API_KEY")
     parser.add_argument("--inference-timeout-s", type=float, default=30.0)
+    parser.add_argument(
+        "--seed-by-episode",
+        action="store_true",
+        help="Reset the sampling RNG from seed-<integer> in each episode ID.",
+    )
     return parser.parse_args()
 
 
@@ -60,10 +65,12 @@ def main() -> None:
         checkpoint_dir=args.checkpoint,
         image_size=(args.image_size, args.image_size),
         state_schema=args.state_schema,
+        runtime_profile=args.runtime_profile,
         default_prompt=args.default_prompt,
         pytorch_device=args.pytorch_device,
         checkpoint_uri=args.checkpoint_uri,
         code_revision={"membench": _git_revision(ROOT), "policy_repo": _git_revision(ROOT / "policy" / "openpi")},
+        seed_by_episode=args.seed_by_episode,
     )
     logging.info("Model loaded")
     hostname = socket.gethostname()

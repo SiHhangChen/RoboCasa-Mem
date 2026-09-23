@@ -94,6 +94,103 @@ This is diagnostic-only. No script in this profile sends action17 to a robot;
 the sidecar marks hardware execution semantics as `unverified` until the Cobot
 Magic SDK command units, limits, hold, and emergency-stop behavior are audited.
 
+## Real-robot WR07 OpenPI replay
+
+The two OpenPI WR07 configs use the same `state17/action17`, `front/left/right`,
+30 Hz protocol. The server maps the wire cameras to the trained OpenPI aliases:
+`front -> agentview_left`, `left -> agentview_right`, and
+`right -> eye_in_hand`. It loads normalization statistics from the selected
+checkpoint. Use a checkpoint trained with the matching config.
+
+Run the server in one terminal (requires an OpenPI environment with the model
+dependencies) and the recorded-data client in another:
+
+```bash
+MODEL=full CKPT_DIR=/path/to/full/checkpoint \
+  bash scripts/eval/real/eval_pi05_wr07.sh serve
+MODEL=full bash scripts/eval/real/eval_pi05_wr07.sh replay
+```
+
+The full model uses the complete task instruction from its training config.
+For the subgoal model, `replay` asks once per episode for the source-container
+color: brown, white, or pink. The chosen training prompt is sent on every
+inference request in that episode.
+
+```bash
+MODEL=subgoal CKPT_DIR=/path/to/subgoal/checkpoint \
+  bash scripts/eval/real/eval_pi05_wr07.sh serve
+MODEL=subgoal bash scripts/eval/real/eval_pi05_wr07.sh replay
+```
+
+For reproducible, noninteractive replay of labeled episodes, use
+`PROMPT_SOURCE=annotation` with the local WR07 annotations. `MAX_FRAMES`,
+`STRIDE`, `PORT`, `OUTPUT`, `OPENPI_PYTHON`, and `REPLAY_PYTHON` can be set as
+environment variables. Output includes the selected prompt for each episode,
+predicted action chunks' first action, recorded first action, and action MAE.
+This replay is diagnostic and does not command hardware.
+
+## Real-robot WR07 baseline Omega inference
+
+The `policy/baseline` branch `feature/pi05-multitask-omega-training` defines a
+different `pi05_real_robot_wr07_v3` model: it consumes the active color subtask
+and VGGT-Omega tokens from a six-step temporal window. Its server must run in
+an environment with that branch's OpenPI dependencies and VGGT-Omega installed.
+Set `BASELINE_PYTHON` to that environment's Python executable. The model
+checkpoint and Omega checkpoint must be the weights used by this training run.
+The server reads the same `meta/stats.json` used during training from
+`DATASET_ROOT`.
+
+```bash
+BASELINE_PYTHON=/path/to/baseline-env/bin/python \
+CKPT_DIR=/path/to/pi05_real_robot_wr07_v3/checkpoint \
+OMEGA_REPO=/path/to/vggt-omega \
+OMEGA_CHECKPOINT=/path/to/vggt_omega_1b_256_text.pt \
+bash scripts/eval/real/eval_baseline_wr07.sh serve
+```
+
+Replay recorded observations from another terminal. The client sends native
+`480x640` RGB frames alongside protocol-sized images. The server feeds the
+native frames to Omega and Pi0.5; OpenPI applies the same `224x224` PIL resize
+used during training. Replay selects frames at episode-local multiples of 10,
+uses the recorded color prompt, resets at each episode, and records action
+error and timing. The server feeds Omega the current frame followed by five
+earlier decision frames, repeating the episode's first frame during warm-up,
+as in the training cache.
+
+```bash
+bash scripts/eval/real/eval_baseline_wr07.sh replay
+```
+
+Before the model weights and Omega installation are available, this command
+checks one real recorded frame through LeRobot decoding, WebSocket transport,
+the baseline contract, and a fake 50x17 policy response:
+
+```bash
+.venv-gr00t/bin/python scripts/eval/real/smoke_baseline_wr07_replay.py
+```
+
+For a robot-side client, implement `create_robot_io()` in an importable module
+according to `bench/real_robot/io.py`. The driver returns synchronized
+`state17` and raw RGB `front/left/right` observations. The client defaults to
+shadow mode, which records actions without sending them to the robot:
+
+```bash
+REPLAY_PYTHON=.venv-gr00t/bin/python
+PYTHONPATH=/path/to/robot/driver:${PYTHONPATH:-} \
+  "$REPLAY_PYTHON" scripts/eval/real/run_baseline_wr07_client.py \
+  --endpoint ws://127.0.0.1:59219 --driver my_wr07_driver \
+  --color brown --episode-id wr07-live-001 \
+  --output outputs/eval/real/wr07_baseline_shadow_001.json
+```
+
+`--execute` sends only the first 10 actions from each 50-action prediction;
+the client requires a 10-frame replan interval to match the Omega history.
+It requires `verify_execution_contract()` in the robot driver to return
+`True` after validating command units, arm/base mapping, limits, hold and
+emergency-stop behavior. Each completed decision is also flushed to a `.jsonl`
+journal beside the final JSON result. The repository does not provide a Cobot
+Magic driver.
+
 ## DiffusionPolicy checkpoints
 
 The checkpoints under `outputs/train/diffusion_final_aligned_v1/` use two
