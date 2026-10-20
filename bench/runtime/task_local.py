@@ -46,6 +46,20 @@ ExpertRuntimeBuilder = Callable[
 ]
 
 
+def lazy_expert_runtime(symbol: str) -> ExpertRuntimeBuilder:
+    """Load optional demonstration code only when an expert runtime is requested."""
+    module_name, separator, attribute = symbol.partition(":")
+    if not separator or not module_name or not attribute:
+        raise ValueError("expert runtime reference must be 'module:attribute'")
+
+    def build(*args: Any, **kwargs: Any) -> Mapping[str, Any]:
+        from importlib import import_module
+
+        return getattr(import_module(module_name), attribute)(*args, **kwargs)
+
+    return build
+
+
 class TaskRuntimeAdapter:
     """Bind task-owned pure and physical callbacks to the shared runtime API."""
 

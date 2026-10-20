@@ -1,0 +1,10 @@
+{
+  "schema_version": "membench.simulator_asset_verification/v1",
+  "passed": true,
+  "checked_files": 3035,
+  "root": "/home/chensihang/RoboCasa-Mem/outputs/release_acceptance/isolated-20261020-v1/sources",
+  "archive": null,
+  "failures": [],
+  "note": "File identity check only; task coverage and simulator acceptance are separate.",
+  "manifest_sha256": "611091c98c78bf66e75cdae2cd470f864c26cc9275cbdda6d814d15ce48d786e"
+}

@@ -177,7 +177,7 @@ class TaskDefinition:
     package: str
     resource_root: Path
     resolve_episode: EpisodeResolver
-    build_expert_plan: ExpertPlanFactory
+    build_expert_plan: ExpertPlanFactory | None = None
     success_conditions: tuple[str, ...] = ()
     default_horizon: int = 1
     metadata: Mapping[str, Any] = field(default_factory=dict)
@@ -189,7 +189,9 @@ class TaskDefinition:
             raise ValueError("task version must be non-empty")
         if int(self.default_horizon) <= 0:
             raise ValueError("default_horizon must be positive")
-        if not callable(self.resolve_episode) or not callable(self.build_expert_plan):
+        if not callable(self.resolve_episode) or (
+            self.build_expert_plan is not None and not callable(self.build_expert_plan)
+        ):
             raise TypeError("TaskDefinition factories must be callable")
         object.__setattr__(self, "task_id", str(self.task_id))
         object.__setattr__(self, "version", str(self.version))

@@ -1,0 +1,96 @@
+{
+  "schema_version": "membench.simulation_equivalence/v1",
+  "checks": [
+    {
+      "task_id": "WX-01",
+      "seed": 1050,
+      "initial_observations_equal": true,
+      "state37_equal": true,
+      "action_steps": 20,
+      "trajectory_observations_equal": true,
+      "diagnostics_and_report_stages_equal": true,
+      "state_atol": 1e-09
+    },
+    {
+      "task_id": "WA-01",
+      "seed": 1050,
+      "initial_observations_equal": true,
+      "state37_equal": true,
+      "action_steps": 20,
+      "trajectory_observations_equal": true,
+      "diagnostics_and_report_stages_equal": true,
+      "state_atol": 1e-09
+    },
+    {
+      "task_id": "WA-05",
+      "seed": 1050,
+      "initial_observations_equal": true,
+      "state37_equal": true,
+      "action_steps": 20,
+      "trajectory_observations_equal": true,
+      "diagnostics_and_report_stages_equal": true,
+      "state_atol": 1e-09
+    },
+    {
+      "task_id": "WR-01",
+      "seed": 1050,
+      "initial_observations_equal": true,
+      "state37_equal": true,
+      "action_steps": 20,
+      "trajectory_observations_equal": true,
+      "diagnostics_and_report_stages_equal": true,
+      "state_atol": 1e-09
+    },
+    {
+      "task_id": "WR-08",
+      "seed": 1050,
+      "initial_observations_equal": true,
+      "state37_equal": true,
+      "action_steps": 20,
+      "trajectory_observations_equal": true,
+      "diagnostics_and_report_stages_equal": true,
+      "state_atol": 1e-09
+    },
+    {
+      "task_id": "TS02",
+      "seed": 1050,
+      "initial_observations_equal": true,
+      "state37_equal": true,
+      "action_steps": 20,
+      "trajectory_observations_equal": true,
+      "diagnostics_and_report_stages_equal": true,
+      "state_atol": 1e-09
+    },
+    {
+      "task_id": "TS03",
+      "seed": 1050,
+      "initial_observations_equal": true,
+      "state37_equal": true,
+      "action_steps": 20,
+      "trajectory_observations_equal": true,
+      "diagnostics_and_report_stages_equal": true,
+      "state_atol": 1e-09
+    },
+    {
+      "task_id": "TM01",
+      "seed": 1050,
+      "initial_observations_equal": true,
+      "state37_equal": true,
+      "action_steps": 20,
+      "trajectory_observations_equal": true,
+      "diagnostics_and_report_stages_equal": true,
+      "state_atol": 1e-09
+    },
+    {
+      "task_id": "TM02",
+      "seed": 1050,
+      "initial_observations_equal": true,
+      "state37_equal": true,
+      "action_steps": 20,
+      "trajectory_observations_equal": true,
+      "diagnostics_and_report_stages_equal": true,
+      "state_atol": 1e-09
+    }
+  ],
+  "scope": "Initial observations and 20 identical diagnostic actions per task at seed 1050; not a complete model rerun."
+}

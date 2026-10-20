@@ -169,6 +169,7 @@ def _run_manifest(
         "client_code_revision": _git_revision(ROOT),
         "client_code_dirty": _git_dirty(ROOT),
         "runtime_versions": _runtime_versions(),
+        "benchmark_release": _release_metadata(),
         "preflight": preflight,
     }
 
@@ -176,8 +177,7 @@ def _run_manifest(
 def _default_run_id(task_id: str, server_id: str) -> str:
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     safe_server = "".join(
-        character if character.isalnum() or character in "-_" else "-"
-        for character in server_id
+        character if character.isalnum() or character in "-_" else "-" for character in server_id
     )
     return f"{task_id.lower()}-{safe_server}-{timestamp}"
 
@@ -204,12 +204,28 @@ def _git_dirty(path: Path) -> bool | None:
 
 def _runtime_versions() -> dict[str, str]:
     versions = {"python": sys.version.split()[0]}
-    for distribution in ("numpy", "pydantic", "PyYAML", "websockets"):
+    for distribution in (
+        "MobileMemBench",
+        "mujoco",
+        "robocasa",
+        "robosuite",
+        "numpy",
+        "pydantic",
+        "PyYAML",
+        "websockets",
+    ):
         try:
             versions[distribution] = importlib.metadata.version(distribution)
         except importlib.metadata.PackageNotFoundError:
             versions[distribution] = "unavailable"
     return versions
+
+
+def _release_metadata() -> dict[str, Any]:
+    import json
+
+    path = ROOT / "configs" / "benchmark" / "release_identity.json"
+    return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
 
 
 def _json_dump(value: Any) -> str:

@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "config_kind": "tm02_can_place_region_release",
+  "description": "Candidate physical release geometry for placing the held WR01 can upright at the center of TM02's yellow counter marker.",
+  "task": {
+    "task_id": "TM02",
+    "layout_id": 15,
+    "style_id": 34,
+    "seed": 0
+  },
+  "anchor": {
+    "selector": "geom:bench_tm02_can_place_region",
+    "world_xyz": [0.30, -2.42, 0.925],
+    "size_xy": [0.22, 0.20]
+  },
+  "placement": {
+    "placement_reference": "bbox_bottom_center",
+    "placement_object_upright": true,
+    "place_height": 0.010,
+    "placement_approach_angles_deg": [0.0],
+    "placement_entry_standoff": 0.12,
+    "placement_entry_z_offset": 0.08,
+    "placement_exit_standoff": 0.24,
+    "placement_exit_z_offset": 0.24,
+    "post_release_clearance_distance": 0.12,
+    "post_release_clearance_z_offset": 0.16,
+    "post_release_clearance_direction_world": [1.0, 0.0, 0.0],
+    "release_steps": 45,
+    "release_settle_steps": 30,
+    "place_settle_steps": 5
+  },
+  "station": {
+    "station_id": "can_place_station",
+    "base_xy": [0.880, -2.518],
+    "base_yaw": -3.095,
+    "torso_policy": "preserve_reset_height"
+  }
+}

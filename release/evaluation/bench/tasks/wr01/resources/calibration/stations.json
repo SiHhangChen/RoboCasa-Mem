@@ -1,0 +1,86 @@
+{
+  "config_kind": "station",
+  "description": "WR-01 operation stations extracted from the manually calibrated directed loop.",
+  "schema_version": 1,
+  "task": "WR-01",
+  "env_name": "WR01RetrieveRememberedCan",
+  "layout_id": 24,
+  "style_id": 24,
+  "scene_seed": 0,
+  "samples_per_station": 1,
+  "split": "pretrain",
+  "stations": {
+    "item_station": {
+      "circle": {
+        "center_xy": [5.216, -1.055],
+        "radius_m": 0.05,
+        "base_yaw": 1.571,
+        "torso_height": 0.20,
+        "record_source": "item_station_10cm_diameter_region"
+      }
+    },
+    "lower_storage_station": {
+      "samples": [
+        {
+          "station_id": "lower_storage_station",
+          "sample_index": 0,
+          "base_xy": [2.75, -1.32],
+          "base_yaw": 1.570,
+          "torso_height": 0.20,
+          "record_source": "validated_lower_storage_operation"
+        }
+      ]
+    },
+    "upper_storage_station": {
+      "samples": [
+        {
+          "station_id": "upper_storage_station",
+          "sample_index": 0,
+          "base_xy": [3.049, -1.233],
+          "base_yaw": 1.570,
+          "torso_height": 0.20,
+          "record_source": "validated_upper_storage_operation"
+        }
+      ]
+    },
+    "upper_door_station": {
+      "circle": {
+        "center_xy": [2.862, -1.243],
+        "radius_m": 0.02,
+        "base_yaw": 1.569,
+        "torso_height": 0.20,
+        "record_source": "task_probe_tuned_upper_door_operation_2cm_region"
+      }
+    },
+    "lower_door_station": {
+      "circle": {
+        "center_xy": [2.65, -1.42],
+        "radius_m": 0.02,
+        "base_yaw": 1.5700056054202471,
+        "torso_height": 0.20,
+        "record_source": "terminal_manual_capture_lower_door_operation_2cm_region"
+      }
+    },
+    "cabinet_front_station": {
+      "circle": {
+        "center_xy": [3.05, -1.31],
+        "radius_m": 0.05,
+        "base_yaw": 1.569,
+        "torso_height": 0.20,
+        "record_source": "cabinet_front_10cm_diameter_region"
+      }
+    },
+    "door_station": {
+      "samples": [
+        {
+          "station_id": "door_station",
+          "sample_index": 0,
+          "base_xy": [2.862, -1.243],
+          "base_yaw": 1.569,
+          "torso_height": 0.20,
+          "record_source": "upper_door_station_calibration"
+        }
+      ]
+    }
+  }
+}

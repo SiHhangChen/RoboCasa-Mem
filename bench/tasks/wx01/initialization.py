@@ -8,12 +8,6 @@ from typing import Any
 
 import numpy as np
 
-from bench.execution.manipulation import (
-    evaluate_object_transport,
-    get_object_hold_status,
-    get_object_transport_snapshot,
-    lift_held_object_for_transport,
-)
 from bench.execution.navigation.base_motion import set_base_pose_kinematic
 from bench.runtime.contracts import InitializationReport
 from bench.execution.navigation.station_poses import (
@@ -179,6 +173,13 @@ def initialize_short_start_state(
     grasp_pose_file: str | Path,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Physically prepare the six-stage start before the recorder is installed."""
+
+    from bench.execution.manipulation import (
+        evaluate_object_transport,
+        get_object_hold_status,
+        get_object_transport_snapshot,
+        lift_held_object_for_transport,
+    )
 
     start = config.short_start
     execute = bool(setup_controller.runtime_config.execute)

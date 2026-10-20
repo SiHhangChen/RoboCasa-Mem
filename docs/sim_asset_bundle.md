@@ -1,5 +1,12 @@
 # RoboCasa / RoboSuite 最小资产包
 
+当前评测候选版复用 `membench` 已有的 **3035 文件**资产包，压缩大小为
+270484609 字节，SHA-256 为
+`140176b06cf220f6d11440fe3cede54cca7577edf13473d62fb210bd03ca68e3`。
+完整清单见 [simulator_assets.json](../configs/benchmark/simulator_assets.json)，
+恢复命令、校验工具和验收范围见[候选版资产说明](../release/evaluation/docs/ASSETS.md)。
+下文保留旧收集器的使用说明和当时的 2748 文件统计，不能用作当前资产包的身份信息。
+
 本仓库的任务不是使用 RoboCasa 的全部厨房资产。当前固定任务配置只用到以下
 layout/style 对：
 

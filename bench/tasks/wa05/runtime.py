@@ -30,7 +30,7 @@ from bench.tasks.wa05.evaluation import (
     success_for_runtime,
 )
 from bench.tasks.wa05.execution.navigation import build_navigation_config
-from bench.tasks.wa05.expert.operations import build_operation_handlers
+from bench.runtime.task_local import lazy_expert_runtime
 from bench.tasks.wa05.initialization import (
     apply_robot_base_initial_state,
     apply_sampled_initial_object_regions,
@@ -139,7 +139,9 @@ _ADAPTER = TaskRuntimeAdapter(
     close=default_close,
     report_stage_profile_id=REPORT_STAGE_PROFILE_ID,
     report_stages=report_stages_for_runtime,
-    expert_runtime=build_operation_handlers,
+    expert_runtime=lazy_expert_runtime(
+        "bench.tasks.wa05.expert.operations:build_operation_handlers"
+    ),
     subtask_scheduler=build_subtask_scheduler,
 )
 TASK_RUNTIME_API = _ADAPTER.api()

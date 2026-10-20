@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "task": "TS02",
+  "env_name": "TS02InspectThreeCabinets",
+  "layout_id": 24,
+  "style_id": 24,
+  "seed": 0,
+  "drawer_world_xyzs": [
+    [4.6, -2.37, 1.1363333333333332],
+    [4.85, -2.37, 1.1363333333333332],
+    [5.1, -2.37, 1.1363333333333332]
+  ],
+  "drawer_world_yaw_deg": 180.0,
+  "completion_button_world_xyz": [3.85, -2.06, 0.92],
+  "calibration": {
+    "method": "manual velocity teleoperation with calibrate_station_base_poses.py",
+    "source": "user-approved save positions",
+    "samples_per_station": 1,
+    "base_yaw_rad": -1.5707963267948966
+  },
+  "stations": {
+    "drawer_station": {
+      "circle": {
+        "center_xy": [4.85, -1.37],
+        "radius_m": 0.0,
+        "base_yaw": -1.5707963267948966,
+        "yaw_half_range_rad": 0.0,
+        "record_source": "ts02_drawer_fixed_point"
+      },
+      "sampling_region": {
+        "center_xy": [4.85, -1.37],
+        "radius_m": 0.0,
+        "shape": "disk"
+      },
+      "samples": [
+        {
+          "station_id": "drawer_station",
+          "sample_index": 0,
+          "record_source": "derived_center_station_for_compact_drawer_group",
+          "base_pos": [4.85, -1.37, 0.70000494],
+          "base_xy": [4.85, -1.37],
+          "base_quat_xyzw": [0.0, 0.0, -0.7071067811865475, 0.7071067811865476],
+          "base_yaw": -1.5707963267948966,
+          "target": "compact_drawer_group",
+          "target_slots": ["cabinet_slot_0", "cabinet_slot_1", "cabinet_slot_2"]
+        }
+      ]
+    },
+    "completion_button_station": {
+      "samples": [
+        {
+          "station_id": "completion_button_station",
+          "sample_index": 0,
+          "record_source": "derived_front_station_for_right_of_drawers_button",
+          "base_pos": [3.85, -1.37, 0.70000494],
+          "base_xy": [3.85, -1.37],
+          "base_quat_xyzw": [0.0, 0.0, -0.7071067811865475, 0.7071067811865476],
+          "base_yaw": -1.5707963267948966,
+          "target": "completion_button",
+          "button_world_xyz": [3.85, -2.06, 0.92]
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,6 @@
+recursive-include bench *.py *.yaml *.json *.xml
+recursive-include configs *.yaml *.json
+recursive-include scripts *.py
+include README.md LICENSE release_candidate.json
+recursive-include docs *.md *.json
+recursive-include docs/installation_evidence *.txt *.log *.py

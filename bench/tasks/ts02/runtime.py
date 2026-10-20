@@ -29,7 +29,7 @@ from bench.tasks.ts02.evaluation import (
     success_for_runtime,
 )
 from bench.tasks.ts02.execution.navigation import build_navigation_config
-from bench.tasks.ts02.expert.operations import build_operation_handlers
+from bench.runtime.task_local import lazy_expert_runtime
 from bench.tasks.ts02.initialization import (
     apply_initial_drawer_state,
     apply_robot_base_initial_state,
@@ -117,7 +117,9 @@ _ADAPTER = TaskRuntimeAdapter(
     close=default_close,
     report_stage_profile_id=REPORT_STAGE_PROFILE_ID,
     report_stages=report_stages_for_runtime,
-    expert_runtime=build_operation_handlers,
+    expert_runtime=lazy_expert_runtime(
+        "bench.tasks.ts02.expert.operations:build_operation_handlers"
+    ),
 )
 TASK_RUNTIME_API = _ADAPTER.api()
 build_descriptor = _ADAPTER.build_descriptor

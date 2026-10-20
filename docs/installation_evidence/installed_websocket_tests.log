@@ -1,0 +1,16 @@
+.                                                                        [100%]
+=============================== warnings summary ===============================
+../../../../release/evaluation/tests/evaluation/test_remote_e2e.py:87
+  /home/chensihang/RoboCasa-Mem/release/evaluation/tests/evaluation/test_remote_e2e.py:87: PytestUnknownMarkWarning: Unknown pytest.mark.policy_e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.policy_e2e
+
+::test_remote_client_runner_artifacts_summary_and_resume
+  /home/chensihang/RoboCasa-Mem/outputs/release_acceptance/isolated-20261020-v1/.venv/lib/python3.11/site-packages/bench/evaluation/client.py:184: DeprecationWarning: connect() must be used as a context manager: with connect(...) as websocket: ...; alternatively, use websocket = connect(..., legacy=True) to connect directly
+    frame = self._connection.recv(timeout=self.timeout_s)
+
+../.venv/lib/python3.11/site-packages/_pytest/cacheprovider.py:469
+  /home/chensihang/RoboCasa-Mem/outputs/release_acceptance/isolated-20261020-v1/.venv/lib/python3.11/site-packages/_pytest/cacheprovider.py:469: PytestCacheWarning: could not create cache path /dev/.pytest_cache/v/cache/nodeids: [Errno 13] Permission denied: '/dev/pytest-cache-files-zsz2b2ej'
+    config.cache.set("cache/nodeids", sorted(self.cached_nodeids))
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+1 passed, 3 warnings in 0.29s

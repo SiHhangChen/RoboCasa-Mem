@@ -1,0 +1,15 @@
+{
+  "schema_version": "membench.installed_software_checks/v1",
+  "software": {
+    "passed": true,
+    "tests_passed": 97,
+    "tests_deselected": 1,
+    "log": "installed_software_tests.log"
+  },
+  "localhost_websocket": {
+    "passed": true,
+    "tests_passed": 1,
+    "log": "installed_websocket_tests.log"
+  },
+  "note": "Resource test paths resolve from the installed implementation; no runtime implementation change was needed."
+}

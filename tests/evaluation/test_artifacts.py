@@ -29,11 +29,11 @@ def _finish(writer: ArtifactWriter, seed: int, status: str) -> None:
     )
 
 
-def _ts01_k1_report(*, success: bool) -> dict[str, object]:
+def _ts03_k1_report(*, success: bool) -> dict[str, object]:
     return {
         "schema_version": "membench.report_stages/v1",
-        "task_id": "TS01",
-        "profile_id": "TS01/report-v1",
+        "task_id": "TS03",
+        "profile_id": "TS03/report-v2",
         "order": ["sugar_1", "sugar_2", "sugar_3", "success"],
         "stages": {
             "sugar_1": {
@@ -71,11 +71,11 @@ def _finish_with_report(writer: ArtifactWriter, seed: int) -> None:
     session.finish(
         {
             "seed": seed,
-            "task_id": "TS01",
+            "task_id": "TS03",
             "status": "success",
             "success": True,
             "success_step": 2,
-            "report_stages": _ts01_k1_report(success=True),
+            "report_stages": _ts03_k1_report(success=True),
         }
     )
 
@@ -207,7 +207,7 @@ def test_report_stages_persist_and_remain_resumable(tmp_path: Path) -> None:
 
     assert writer.completed_seeds() == {7}
     result = writer.load_episode_results()[0]
-    assert result["report_stages"]["profile_id"] == "TS01/report-v1"
+    assert result["report_stages"]["profile_id"] == "TS03/report-v2"
     assert result["report_stages"]["stages"]["sugar_2"]["applicable"] is False
     summary = writer.write_summary()
     assert summary["report_stages"]["complete"] is True

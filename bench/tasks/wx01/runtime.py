@@ -18,9 +18,8 @@ from bench.tasks.wx01.evaluation import (
     success_for_runtime,
 )
 from bench.tasks.wx01.execution.geometry import resolve_episode_targets
-from bench.tasks.wx01.execution.manipulation import build_manipulation_assembly
 from bench.tasks.wx01.execution.navigation import build_navigation_config
-from bench.tasks.wx01.expert.operations import build_operation_handlers
+from bench.runtime.task_local import lazy_expert_runtime
 from bench.tasks.wx01.initialization import apply_initial_object_plan, apply_robot_base_initial_state, initialize_short_start_state
 from bench.tasks.wx01.prompts import resolve_prompt_spec
 
@@ -56,6 +55,8 @@ def _environment(config: Any, scene: Any, plan: Any, resources: Mapping[str, Any
 
 
 def _initialize(descriptor: Any, env: Any, observation: Mapping[str, Any]):
+    from bench.tasks.wx01.execution.manipulation import build_manipulation_assembly
+
     configure_episode = getattr(env, "configure_episode", None)
     if callable(configure_episode):
         configure_episode(descriptor.episode_plan)
@@ -106,7 +107,9 @@ _ADAPTER = TaskRuntimeAdapter(
             or (getattr(episode, "facts", {}) or {}).get("sponge_type", "")
         ),
     },
-    expert_runtime=build_operation_handlers,
+    expert_runtime=lazy_expert_runtime(
+        "bench.tasks.wx01.expert.operations:build_operation_handlers"
+    ),
 )
 TASK_RUNTIME_API = _ADAPTER.api()
 build_descriptor = _ADAPTER.build_descriptor

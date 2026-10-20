@@ -1,0 +1,180 @@
+{
+  "metadata": {
+    "task_id": "WA-05",
+    "layout_id": 15,
+    "style_id": 34,
+    "seed": 0,
+    "calibration_seed": 1,
+    "description": "WA-05 manually recorded forward loop: button, shared cup pick, fill, shared service placement, then return to button.",
+    "record_source": "user_line_teleoperation_2026-08-02"
+  },
+  "default_start_index": 0,
+  "route_mode": "forward_loop",
+  "station_targets": {
+    "navigation_start": 0,
+    "water_button_station": [0, 13],
+    "water_button_station:hot_answer": {"indexes": [0, 13], "routes": {"10": [10, 13]}},
+    "water_button_station:cold_answer": {"indexes": [0, 13], "routes": {"10": [10, 13]}},
+    "cup_pick_station": 4,
+    "cup_A:pick": {
+      "index": 4,
+      "routes": {
+        "10": [10, 11, 12, 2, 3, 4],
+        "13": [13, 0, 1, 2, 3, 4]
+      }
+    },
+    "sink_basin": 8,
+    "sink_basin:fill": 8,
+    "sink_basin:holding:cup_A": 8,
+    "service_area": {
+      "index": 10,
+      "routes": {
+        "8": [8, 10],
+        "13": [13, 14, 15, 10]
+      }
+    },
+    "service_area:slot_1": {
+      "index": 10,
+      "routes": {
+        "8": [8, 10],
+        "13": [13, 14, 15, 10]
+      }
+    },
+    "service_area:holding:cup_A": {
+      "index": 10,
+      "routes": {
+        "8": [8, 10]
+      }
+    }
+  },
+  "samples": [
+    {
+      "index": 0,
+      "name": "water_button_ready",
+      "xy": [1.760, -2.550],
+      "yaw": 0.003
+    },
+    {
+      "index": 1,
+      "name": "button_exit_reverse",
+      "xy": [1.680, -2.550],
+      "yaw": 0.003
+    },
+    {
+      "index": 2,
+      "name": "button_to_cup_right_turn",
+      "xy": [1.191, -3.224],
+      "yaw": -1.562
+    },
+    {
+      "index": 3,
+      "name": "button_to_cup_forward",
+      "xy": [1.188, -3.959],
+      "yaw": -1.570
+    },
+    {
+      "index": 4,
+      "station_id": "cup_pick_station",
+      "name": "shared_cup_pick_verified_preset",
+      "xy": [1.3789267853889002, -3.7609959163360895],
+      "yaw": 0.000009949271771056808,
+      "record_source": "outputs/wa05_cup_pick_station_calibration.json",
+      "replaces_recorded_xy": [1.396, -3.779],
+      "replaces_recorded_yaw": -0.047
+    },
+    {
+      "index": 5,
+      "name": "turn_left_after_pick",
+      "xy": [1.205, -3.560],
+      "yaw": 1.485,
+      "relative_turn": {
+        "nominal_angle_rad": 1.5707963267948966,
+        "angle_half_range_rad": 0.08726646259971647,
+        "source_index": 4,
+        "record_source": "wa05_left_turn_90deg_plus_minus_5deg"
+      }
+    },
+    {
+      "index": 6,
+      "name": "cup_to_fill_forward",
+      "xy": [1.203, -2.856],
+      "yaw": 1.494,
+      "inherit_yaw_from": 5,
+      "circle": {
+        "center_xy": [1.203, -2.856],
+        "radius_m": 0.05,
+        "base_yaw": 1.494,
+        "yaw_half_range_rad": 0.0,
+        "record_source": "wa05_path_point_6_5cm_radius"
+      }
+    },
+    {
+      "index": 7,
+      "name": "turn_right_toward_sink",
+      "xy": [1.396, -3.051],
+      "yaw": -0.029,
+      "relative_turn": {
+        "nominal_angle_rad": -1.5707963267948966,
+        "angle_half_range_rad": 0.08726646259971647,
+        "source_index": 6,
+        "record_source": "wa05_right_turn_90deg_plus_minus_5deg"
+      }
+    },
+    {
+      "index": 8,
+      "station_id": "sink_fill_station",
+      "name": "sink_fill_ready",
+      "xy": [1.593, -3.055],
+      "yaw": -0.038,
+      "inherit_yaw_from": 7
+    },
+    {
+      "index": 9,
+      "name": "legacy_fill_to_service_left_shift_unused",
+      "xy": [1.572, -2.242],
+      "yaw": -0.039,
+      "active": false,
+      "record_source": "superseded_by_direct_route_8_to_10"
+    },
+    {
+      "index": 10,
+      "station_id": "service_area_station",
+      "name": "service_place_ready",
+      "xy": [1.476, -2.242],
+      "yaw": -0.038,
+      "inherit_yaw_from": 8
+    },
+    {
+      "index": 11,
+      "name": "service_to_button_right_turn",
+      "xy": [1.249, -2.442],
+      "yaw": -1.562
+    },
+    {
+      "index": 12,
+      "name": "service_to_button_forward",
+      "xy": [1.246, -3.237],
+      "yaw": -1.571
+    },
+    {
+      "index": 13,
+      "name": "button_return_left_turn",
+      "xy": [1.760, -2.550],
+      "yaw": -0.048
+    },
+    {
+      "index": 14,
+      "name": "button_to_service_left_turn",
+      "xy": [1.760, -2.550],
+      "yaw": 1.533,
+      "record_source": "forward_service_return_from_button"
+    },
+    {
+      "index": 15,
+      "name": "button_to_service_forward",
+      "xy": [1.476, -2.350],
+      "yaw": 1.533,
+      "record_source": "forward_service_return_from_button"
+    }
+  ]
+}

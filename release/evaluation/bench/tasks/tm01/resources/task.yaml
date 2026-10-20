@@ -1,0 +1,220 @@
+schema_version: 1
+
+task:
+  id: TM01
+  display_name: Boil Water and Inspect Two Drawers
+  description: Turn on the stove, inspect two drawers, turn it off, and submit.
+  canonical_prompt: >-
+    You have two tasks to complete. Task A: use the stove's control knob to turn
+    on the heating function and heat the water, then turn off the heating after
+    the water has heated for a while. Task B: go to the other side of the
+    workspace and inspect both drawers, opening each drawer, looking inside,
+    and closing it. After both tasks are complete, press either green button at
+    the two ends to indicate completion.
+  canonical_prompt_sha256: 3d6c2d5997d6b1f0f00f39e2294915df6eb8ad3e497b7197d302531b9631b6f3
+  success_conditions:
+    - legal_event_route
+    - native_knob_on_once
+    - native_knob_off_once
+    - burner_off
+    - both_drawers_checked_once
+    - all_drawers_closed
+    - no_invalid_open
+    - no_invalid_inspect
+    - no_invalid_close
+    - no_duplicate_check
+    - no_close_before_inspect
+    - pot_stable
+    - either_completion_button_pressed
+    - completion_button_pressed_once
+    - no_invalid_completion_button_press
+    - no_absorbing_failure
+    - fixed_prompt
+
+scene:
+  env_name: TM01BoilWaterAndInspectTwoDrawers
+  fixed_scene: true
+  layout_id: 39
+  style_id: 24
+  scene_seed: 0
+  drawer_names: [drawer_left, drawer_right]
+  drawer_world_xyzs:
+    - [4.60, -2.37, 1.1363333333333332]
+    - [4.85, -2.37, 1.1363333333333332]
+  drawer_world_yaw_deg: 180.0
+  task_added_button_names:
+    - completion_button_drawer_side
+    - completion_button_stove_side
+  completion_button_world_xyzs:
+    completion_button_drawer_side: [3.55, -2.40, 0.92]
+    completion_button_stove_side: [4.30, -3.30, 0.92]
+  completion_button_visual_role: green
+  completion_button_success_rule: any
+  stove_fixture: stove
+  expected_stove_asset: Stovetop057
+  stove_knob_id: front_right
+  burner_id: rear_left
+  stove_knob_joint: knob_front_right_joint
+  stove_knob_collision_geom: knob_front_right_main
+  stove_burner_site: burner_on_rear_left
+  pot_name: pot
+  pot_xml: objects/lightwheel/saucepan/Saucepan002/model.xml
+  pot_graspable: false
+
+episode:
+  plan_balance: seed_mod_4
+  max_horizon: 3200
+  # Appearance only: cabinet and drawer shell change, while handles and physics stay fixed.
+  drawer_material_candidates:
+    - wood/light_wood_planks
+    - wood/walnut_wood_grain
+    - wood/gray_wood_grain
+    - wood/bamboo
+    - flat/white
+    - flat/blue_gray
+    - flat/green
+    - steel-brushed
+
+initial_state:
+  robot_base_sample_index: 0
+  drawers_closed_fraction: 0.0
+  all_burners_off: true
+  pot_on_burner: true
+  settle_steps: 20
+
+semantics:
+  drawer_open_threshold: 0.70
+  drawer_closed_threshold: 0.08
+  inspect_dwell_steps: 10
+  completion_button_pressed_threshold_m: 0.004
+  completion_button_released_threshold_m: 0.001
+  completion_button_release_dwell_steps: 3
+  pot_burner_xy_threshold_m: 0.08
+  pot_translation_guard_m: 0.02
+  pot_tilt_guard_deg: 5.0
+  reject_simultaneous_semantic_events: true
+  absorbing_order_failures: true
+
+appliance:
+  control_mode: native_stove_knob_contact
+  knob_joint_range_rad: [0.0, 3.141592653589793]
+  off_commit_max_rad: 0.10
+  burner_on_min_rad: 0.35
+  on_commit_min_rad: 0.50
+  expert_on_target_qpos_rad: 1.5707963267948966
+  commit_dwell_steps: 3
+  min_gripper_contact_steps: 3
+  contact_evidence_window_steps: 20
+  min_interaction_motion_rad: 0.40
+  max_unexplained_delta_rad_per_step: 0.25
+  require_gripper_or_finger_contact: true
+  forbid_direct_qpos_write_after_reset: true
+  forbid_knob_actuator_command_after_reset: true
+  require_all_other_burners_off: true
+
+sensors:
+  cameras: [robot0_agentview_left, robot0_agentview_right, robot0_eye_in_hand]
+  wrist_rgb_camera: robot0_eye_in_hand
+  width: 224
+  height: 224
+  depth: true
+  use_camera_observations: true
+  has_renderer: false
+  has_offscreen_renderer: true
+
+resources:
+  stove_knob_interaction_poses: calibration/stove_knob/interaction_poses.json
+  stove_knob_pinch_off_pose: calibration/stove_knob/pinch_off.json
+  stove_knob_pinch_on_pose: calibration/stove_knob/pinch_on.json
+  manual_base_path: navigation/manual_base_path_layout39_style24_seed0.json
+  # TM01 owns this task-local handle-relative hook calibration.
+  drawer_grasp_pose: calibration/cabinet_slot_1_hook_pose.json
+
+navigation:
+  manual_base_path_enabled: true
+  manual_base_path_start_index: 0
+  # Drawer contact uses TM01's task-owned calibrated terminal accuracy. The shared
+  # defaults (9 cm / 0.10 rad) are sufficient for coarse transit, but can leave
+  # the fingers on the cabinet face instead of centered on the handle after a
+  # drawer-to-drawer lateral move.
+  manual_base_path_xy_tolerance: 0.030
+  manual_base_path_yaw_tolerance: 0.06
+  # Transit samples are pass-through waypoints; only the requested station is
+  # docked precisely. This removes long convergence pauses on the measured route.
+  manual_base_path_intermediate_xy_tolerance: 0.12
+  manual_base_path_intermediate_yaw_tolerance: 0.20
+  use_station_base_poses: false
+  use_station_astar_paths: false
+manipulation:
+  planner:
+    # Keep MPlib in the canonical membench environment. RoboCasa/MuJoCo is
+    # provided by the recording process; the planner subprocess consumes only
+    # the serialized kinematic request.
+    conda_env: membench
+    subprocess_timeout_s: 60.0
+    planning_time: 5.0
+    time_step: 0.1
+    qpos_step: 0.02
+    rrt_range: 0.1
+  runtime:
+    max_joint_step: 0.025
+    settle_steps: 10
+    position_threshold: 0.10
+    orientation_threshold_deg: 20.0
+    qpos_threshold: 0.18
+    open_steps: 20
+    close_steps: 30
+    release_steps: 10
+    release_settle_steps: 20
+  static_scene:
+    enabled: false
+    validate_collisions: false
+
+operations:
+  stove_knob_on:
+    actuation_mode: pinch_and_rotate_native_knob
+    target_qpos_rad: 1.5707963267948966
+    require_contact_evidence: true
+    post_release_lift_m: 0.05
+    post_release_lift_tolerance_m: 0.01
+    post_release_lift_settle_steps: 10
+  stove_knob_off:
+    actuation_mode: pinch_and_rotate_native_knob
+    target_qpos_rad: 0.0
+    require_contact_evidence: true
+    post_release_lift_m: 0.05
+    post_release_lift_tolerance_m: 0.01
+    post_release_lift_settle_steps: 10
+  drawer_open:
+    actuation_mode: contact
+    open_fraction: 1.0
+    hook_orientation_blend: 0.90
+    handle_side_offset: 0.0
+    handle_vertical_offset: 0.0
+    prehook_distance: 0.125
+    hook_offset: 0.005
+    pull_distance: 0.18
+    open_fraction_threshold: 0.70
+    gripper_steps: 25
+    grasp_pose_resource: drawer_grasp_pose
+    close_gripper_on_hook: true
+    close_gripper_action: 1.0
+    close_gripper_steps: 25
+  inspect:
+    dwell_steps: 10
+  drawer_close:
+    actuation_mode: contact
+    closed_fraction: 0.0
+    close_overshoot: 0.005
+    closed_fraction_threshold: 0.08
+    return_arm_after_close: false
+  completion_button:
+    hold_steps: 12
+    press_depth_threshold_m: 0.004
+    require_physical_button_motion: true
+
+recording:
+  record_depth: true
+  depth_dtype: uint16
+  depth_scale: 0.001
+  action_schema: membench.pandaomron_hybrid13.v2

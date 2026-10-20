@@ -5,7 +5,7 @@ import pytest
 from bench.evaluation.summary import aggregate_episode_results
 
 
-def _ts01_report(
+def _ts03_report(
     *,
     target: int,
     passed_sugars: int,
@@ -27,8 +27,8 @@ def _ts01_report(
     }
     return {
         "schema_version": "membench.report_stages/v1",
-        "task_id": "TS01",
-        "profile_id": "TS01/report-v1",
+        "task_id": "TS03",
+        "profile_id": "TS03/report-v2",
         "order": ["sugar_1", "sugar_2", "sugar_3", "success"],
         "stages": stages,
     }
@@ -125,10 +125,10 @@ def test_report_stage_denominators_exclude_non_applicable_stages() -> None:
         [
             {
                 "seed": 1,
-                "task_id": "TS01",
+                "task_id": "TS03",
                 "status": "success",
                 "success": True,
-                "report_stages": _ts01_report(
+                "report_stages": _ts03_report(
                     target=1,
                     passed_sugars=1,
                     success=True,
@@ -136,11 +136,11 @@ def test_report_stage_denominators_exclude_non_applicable_stages() -> None:
             },
             {
                 "seed": 2,
-                "task_id": "TS01",
+                "task_id": "TS03",
                 "status": "failure",
                 "success": False,
                 "failure_reason": "max_steps",
-                "report_stages": _ts01_report(
+                "report_stages": _ts03_report(
                     target=2,
                     passed_sugars=1,
                     success=False,
@@ -148,10 +148,10 @@ def test_report_stage_denominators_exclude_non_applicable_stages() -> None:
             },
             {
                 "seed": 3,
-                "task_id": "TS01",
+                "task_id": "TS03",
                 "status": "success",
                 "success": True,
-                "report_stages": _ts01_report(
+                "report_stages": _ts03_report(
                     target=3,
                     passed_sugars=3,
                     success=True,
@@ -187,10 +187,10 @@ def test_partial_report_stage_coverage_is_not_publishable() -> None:
         [
             {
                 "seed": 1,
-                "task_id": "TS01",
+                "task_id": "TS03",
                 "status": "success",
                 "success": True,
-                "report_stages": _ts01_report(
+                "report_stages": _ts03_report(
                     target=1,
                     passed_sugars=1,
                     success=True,
@@ -198,7 +198,7 @@ def test_partial_report_stage_coverage_is_not_publishable() -> None:
             },
             {
                 "seed": 2,
-                "task_id": "TS01",
+                "task_id": "TS03",
                 "status": "failure",
                 "success": False,
                 "failure_reason": "max_steps",
@@ -214,28 +214,15 @@ def test_partial_report_stage_coverage_is_not_publishable() -> None:
 
 
 def test_incompatible_report_stage_profiles_cannot_be_aggregated() -> None:
-    first = _ts01_report(target=1, passed_sugars=1, success=True)
+    first = _ts03_report(target=1, passed_sugars=1, success=True)
     second = {
         "schema_version": "membench.report_stages/v1",
-        "task_id": "TS03",
-        "profile_id": "TS03/report-v1",
-        "order": ["sugar_1", "sugar_2", "success"],
+        "task_id": "WA-05",
+        "profile_id": "WA-05/report-v1",
+        "order": ["cup_filled", "cup_staged", "success"],
         "stages": {
-            "sugar_1": {
-                "applicable": True,
-                "passed": True,
-                "first_pass_step": 1,
-            },
-            "sugar_2": {
-                "applicable": False,
-                "passed": None,
-                "first_pass_step": None,
-            },
-            "success": {
-                "applicable": True,
-                "passed": True,
-                "first_pass_step": 2,
-            },
+            stage: {"applicable": True, "passed": True, "first_pass_step": index}
+            for index, stage in enumerate(("cup_filled", "cup_staged", "success"), start=1)
         },
     }
 
@@ -244,14 +231,14 @@ def test_incompatible_report_stage_profiles_cannot_be_aggregated() -> None:
             [
                 {
                     "seed": 1,
-                    "task_id": "TS01",
+                    "task_id": "TS03",
                     "status": "success",
                     "success": True,
                     "report_stages": first,
                 },
                 {
                     "seed": 2,
-                    "task_id": "TS03",
+                    "task_id": "WA-05",
                     "status": "success",
                     "success": True,
                     "report_stages": second,

@@ -1,0 +1,167 @@
+{
+  "schema_version": 1,
+  "metadata": {
+    "task_id": "TM02",
+    "layout_id": 15,
+    "style_id": 34,
+    "seed": 0,
+    "description": "User-calibrated loop with WR01-derived, no-lift-validated door and retrieval terminals at the cabinet left of the stove.",
+    "source": "interactive line-mode calibration transcript, 2026-08-01",
+    "cabinet_world_xyz": [0.32, -3.93, 1.12],
+    "can_place_region_world_xyz": [0.30, -2.42, 0.925]
+  },
+  "default_start_index": 0,
+  "route_mode": "spatial_graph",
+  "station_targets": {
+    "navigation_start": 0,
+    "water_button_station": {
+      "index": 0,
+      "routes": {
+        "3": [3, 4, 5, 6, 11, 0],
+        "4": [4, 5, 6, 11, 0],
+        "9": [9, 10, 0],
+        "10": [10, 0]
+      }
+    },
+    "cabinet_door_station": {
+      "index": 4,
+      "routes": {
+        "0": [0, 1, 2, 3, 4],
+        "3": [3, 4],
+        "9": [9, 10, 0, 1, 2, 3, 4],
+        "10": [10, 0, 1, 2, 3, 4]
+      }
+    },
+    "can_retrieval_station": {
+      "index": 4,
+      "routes": {
+        "0": [0, 1, 2, 3, 4],
+        "3": [3, 4],
+        "9": [9, 10, 0, 1, 2, 3, 4],
+        "10": [10, 0, 1, 2, 3, 4]
+      }
+    },
+    "can_place_station": {
+      "index": 9,
+      "routes": {
+        "0": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+        "3": [3, 4, 5, 6, 7, 8, 9],
+        "4": [4, 5, 6, 7, 8, 9]
+      }
+    },
+    "can_place_station:holding:can": {
+      "index": 9,
+      "routes": {
+        "0": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+        "3": [3, 4, 5, 6, 7, 8, 9],
+        "4": [4, 5, 6, 7, 8, 9]
+      }
+    },
+    "completion_button_station": {
+      "index": 0,
+      "routes": {
+        "0": [0],
+        "4": [4, 5, 6, 11, 0],
+        "9": [9, 10, 0],
+        "10": [10, 0]
+      }
+    }
+  },
+  "samples": [
+    {
+      "index": 0,
+      "name": "water_button_station",
+      "xy": [1.544, -2.503],
+      "yaw": 0.040,
+      "circle": {"center_xy": [1.544, -2.503], "radius_m": 0.05, "base_yaw": 0.040, "yaw_half_range_rad": 0.0}
+    },
+    {
+      "index": 1,
+      "name": "turn_south_toward_cabinet",
+      "xy": [1.348, -2.716],
+      "yaw": -1.506,
+      "relative_turn": {"source_index": 0, "nominal_angle_rad": -1.546, "angle_half_range_rad": 0.08726646259971647},
+      "circle": {"center_xy": [1.348, -2.716], "radius_m": 0.04, "base_yaw": -1.506, "yaw_half_range_rad": 0.0}
+    },
+    {
+      "index": 2,
+      "name": "cabinet_corridor",
+      "xy": [1.347, -4.578],
+      "yaw": -1.518,
+      "inherit_yaw_from": 1,
+      "circle": {"center_xy": [1.347, -4.578], "radius_m": 0.05, "base_yaw": -1.518, "yaw_half_range_rad": 0.0}
+    },
+    {
+      "index": 3,
+      "name": "wr01_source_door_reference_waypoint",
+      "xy": [1.3899982, -4.6399999],
+      "yaw": 3.140801932215144,
+      "relative_turn": {"source_index": 2, "nominal_angle_rad": -1.624, "angle_half_range_rad": 0.08726646259971647},
+      "circle": {"center_xy": [1.3899982, -4.6399999], "radius_m": 0.03, "base_yaw": 3.140801932215144, "yaw_half_range_rad": 0.0}
+    },
+    {
+      "index": 4,
+      "name": "cabinet_door_and_retrieval_station_no_lift",
+      "xy": [1.2899982, -4.5399999],
+      "yaw": 3.140796326794897,
+      "inherit_yaw_from": 3,
+      "circle": {"center_xy": [1.2899982, -4.5399999], "radius_m": 0.03, "base_yaw": 3.140796326794897, "yaw_half_range_rad": 0.0}
+    },
+    {
+      "index": 5,
+      "name": "cabinet_departure_clearance",
+      "xy": [1.128, -4.401],
+      "yaw": -3.083,
+      "inherit_yaw_from": 4,
+      "circle": {"center_xy": [1.128, -4.401], "radius_m": 0.05, "base_yaw": -3.083, "yaw_half_range_rad": 0.0}
+    },
+    {
+      "index": 6,
+      "name": "depart_cabinet_turn_north",
+      "xy": [1.326, -4.178],
+      "yaw": 1.623,
+      "relative_turn": {"source_index": 5, "nominal_angle_rad": -1.577, "angle_half_range_rad": 0.08726646259971647},
+      "circle": {"center_xy": [1.326, -4.178], "radius_m": 0.04, "base_yaw": 1.623, "yaw_half_range_rad": 0.0}
+    },
+    {
+      "index": 7,
+      "name": "north_return_corridor",
+      "xy": [1.328, -2.317],
+      "yaw": 1.610,
+      "inherit_yaw_from": 6,
+      "circle": {"center_xy": [1.328, -2.317], "radius_m": 0.05, "base_yaw": 1.610, "yaw_half_range_rad": 0.0}
+    },
+    {
+      "index": 8,
+      "name": "turn_west_toward_place",
+      "xy": [1.128, -2.513],
+      "yaw": -3.108,
+      "relative_turn": {"source_index": 7, "nominal_angle_rad": 1.565, "angle_half_range_rad": 0.08726646259971647},
+      "circle": {"center_xy": [1.128, -2.513], "radius_m": 0.04, "base_yaw": -3.108, "yaw_half_range_rad": 0.0}
+    },
+    {
+      "index": 9,
+      "name": "can_place_station",
+      "xy": [0.880, -2.518],
+      "yaw": -3.095,
+      "inherit_yaw_from": 8,
+      "circle": {"center_xy": [0.880, -2.518], "radius_m": 0.03, "base_yaw": -3.095, "yaw_half_range_rad": 0.0}
+    },
+    {
+      "index": 10,
+      "name": "water_station_return_approach",
+      "xy": [1.280, -2.500],
+      "yaw": 0.046,
+      "relative_turn": {"source_index": 9, "nominal_angle_rad": 3.1416, "angle_half_range_rad": 0.08726646259971647},
+      "circle": {"center_xy": [1.280, -2.500], "radius_m": 0.04, "base_yaw": 0.046, "yaw_half_range_rad": 0.0}
+    },
+    {
+      "index": 11,
+      "name": "sink_return_without_can_table_detour",
+      "xy": [1.328, -2.500],
+      "yaw": 1.610,
+      "inherit_yaw_from": 10,
+      "circle": {"center_xy": [1.328, -2.500], "radius_m": 0.05, "base_yaw": 1.610, "yaw_half_range_rad": 0.0}
+    }
+  ]
+}

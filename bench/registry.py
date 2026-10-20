@@ -50,14 +50,16 @@ class TaskPlugin:
     default_task_config: Path
     environment_module: str
     runtime_api_symbol: str
-    expert_plan_symbol: str
+    expert_plan_symbol: str | None = None
 
     def __post_init__(self) -> None:
         canonical_id = str(self.canonical_id).strip()
         env_name = str(self.env_name).strip()
         environment_module = str(self.environment_module).strip()
         runtime_api_symbol = str(self.runtime_api_symbol).strip()
-        expert_plan_symbol = str(self.expert_plan_symbol).strip()
+        expert_plan_symbol = (
+            None if self.expert_plan_symbol is None else str(self.expert_plan_symbol).strip()
+        )
         aliases = tuple(str(alias).strip() for alias in self.aliases)
 
         _normalize_task_plugin_name(canonical_id)
@@ -67,12 +69,15 @@ class TaskPlugin:
             raise ValueError("task plugin environment_module must be non-empty")
         for field_name, symbol in {
             "runtime_api_symbol": runtime_api_symbol,
-            "expert_plan_symbol": expert_plan_symbol,
         }.items():
             if not symbol or ":" not in symbol:
                 raise ValueError(
                     f"{field_name} must use the 'module:qualified.name' format"
                 )
+        if expert_plan_symbol is not None and (
+            not expert_plan_symbol or ":" not in expert_plan_symbol
+        ):
+            raise ValueError("expert_plan_symbol must use the 'module:qualified.name' format")
         if any(not alias for alias in aliases):
             raise ValueError("task plugin aliases must be non-empty strings")
         for alias in aliases:
@@ -106,6 +111,8 @@ class TaskPlugin:
 
     def load_expert_plan_factory(self) -> Any:
         """Load the task-local ExpertPlan factory."""
+        if self.expert_plan_symbol is None:
+            raise RuntimeError(f"task {self.canonical_id} has no expert policy in this distribution")
         return _load_symbol(self.expert_plan_symbol)
 
 

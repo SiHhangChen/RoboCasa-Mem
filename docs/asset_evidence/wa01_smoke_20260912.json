@@ -1,0 +1,86 @@
+{
+  "action_dim": 13,
+  "control_frequency_hz": 20,
+  "elapsed_s": 11.335524988826364,
+  "images": {
+    "agentview_left": {
+      "path": "/home/chensihang/membench/outputs/test_env_setup/wa01-smoke-20260912T041255135472Z/agentview_left.png",
+      "shape": [
+        224,
+        224,
+        3
+      ]
+    },
+    "agentview_right": {
+      "path": "/home/chensihang/membench/outputs/test_env_setup/wa01-smoke-20260912T041255135472Z/agentview_right.png",
+      "shape": [
+        224,
+        224,
+        3
+      ]
+    },
+    "eye_in_hand": {
+      "path": "/home/chensihang/membench/outputs/test_env_setup/wa01-smoke-20260912T041255135472Z/eye_in_hand.png",
+      "shape": [
+        224,
+        224,
+        3
+      ]
+    }
+  },
+  "initialization_s": 11.011782597983256,
+  "kind": "simulation_environment_smoke_test",
+  "policy_model_loaded": false,
+  "preflight": {
+    "action_schema": "membench.pandaomron_hybrid13.v2",
+    "artifact_cameras": [
+      "agentview_left",
+      "agentview_right",
+      "eye_in_hand"
+    ],
+    "control_frequency_hz": 20.0,
+    "modalities": [
+      "prompt",
+      "rgb",
+      "state"
+    ],
+    "policy_cameras": [
+      "agentview_left",
+      "agentview_right",
+      "eye_in_hand"
+    ],
+    "state_schema": "membench.robot_state37.v2",
+    "task": {
+      "adapter_mode": "resolved_episode_runtime",
+      "effective_rollout_max_steps": 5000,
+      "observation_profile": "rgbd_v3",
+      "observation_profile_path": "/home/chensihang/membench/configs/benchmark/observation_profiles/rgbd_v3.yaml",
+      "prompt_scheduler": null,
+      "report_stage_profile_id": "WA-01/report-v2",
+      "resolved_episode_identity": "sha256:1745a76e7b47308d93fccad5ffee506345a4b18f32913d4f5b3968b39ed6437f",
+      "task_config_path": "/home/chensihang/membench/bench/tasks/wa01/resources/task.yaml"
+    },
+    "task_id": "WA-01"
+  },
+  "prompt": "Start at the coffee machine with two identical prepared coffees. Add one sugar cube to either coffee, carry both coffees to the dining counter, and identify the coffee you sugared.",
+  "python": "3.11.15 (main, Mar 10 2026, 18:16:52) [Clang 21.1.4 ]",
+  "render_backend": "egl",
+  "render_device": "0",
+  "seed": 1050,
+  "source_revisions": {
+    "robocasa": "8f124f0e263de0c583ba5d2acc87137bfd905986",
+    "robosuite": "232ce7d4a6ed89c949a9aba024a05c8c32fdd08b"
+  },
+  "state_dim": 37,
+  "status": "passed",
+  "steps": 3,
+  "task_id": "WA-01",
+  "versions": {
+    "mujoco": "3.3.1",
+    "numba": "0.61.2",
+    "numpy": "2.2.5",
+    "robocasa": "1.0.1",
+    "robosuite": "1.5.2",
+    "scipy": "1.15.3"
+  }
+}

@@ -5,6 +5,11 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 
+# Python build products
+build/
+dist/
+*.egg-info/
+
 # Local environments and machine state
 .venv/
 venv/
@@ -55,6 +60,12 @@ pretrain_model/
 
 # Training logs.
 *.log
+
+# Reviewed installation evidence is part of the release snapshot.
+!/docs/installation_evidence/installed_software_tests.log
+!/docs/installation_evidence/installed_websocket_tests.log
+!/release/evaluation/docs/installation_evidence/installed_software_tests.log
+!/release/evaluation/docs/installation_evidence/installed_websocket_tests.log
 
 # Checkpoint weights (large generated artifacts, kept out of git).
 ckpts/

@@ -1,0 +1,9 @@
+........................................................................ [ 74%]
+.........................                                                [100%]
+=============================== warnings summary ===============================
+../../../../release/evaluation/tests/evaluation/test_remote_e2e.py:87
+  /home/chensihang/RoboCasa-Mem/release/evaluation/tests/evaluation/test_remote_e2e.py:87: PytestUnknownMarkWarning: Unknown pytest.mark.policy_e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.policy_e2e
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+97 passed, 1 deselected, 1 warning in 3.52s

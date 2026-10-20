@@ -19,7 +19,7 @@ from bench.tasks.tm02.evaluation import (
     success_for_runtime,
 )
 from bench.tasks.tm02.execution.navigation import build_navigation_config, sample_episode_path_poses
-from bench.tasks.tm02.expert.operations import build_operation_handlers
+from bench.runtime.task_local import lazy_expert_runtime
 from bench.tasks.tm02.initialization import apply_manual_path_initial_base_pose
 from bench.tasks.tm02.prompts import resolve_prompt_spec
 
@@ -107,7 +107,9 @@ _ADAPTER = TaskRuntimeAdapter(
     report_stage_profile_id=REPORT_STAGE_PROFILE_ID,
     report_stages=report_stages_for_runtime,
     validate_descriptor=_validate, release_facts=_release_facts,
-    expert_runtime=build_operation_handlers,
+    expert_runtime=lazy_expert_runtime(
+        "bench.tasks.tm02.expert.operations:build_operation_handlers"
+    ),
     task_validated_resource_names=tuple(CALIBRATION_RESOURCE_NAMES),
 )
 TASK_RUNTIME_API = _ADAPTER.api()

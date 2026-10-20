@@ -1,0 +1,13 @@
+"""WR-08 station mapping and mobile-base assembly."""
+from __future__ import annotations
+from dataclasses import replace
+from pathlib import Path
+from typing import Any
+from bench.execution.planning import NavigationConfig
+
+def build_navigation_config(settings: dict[str, Any], *, manual_base_path_file: str | Path | None, station_base_pose_file: str | Path) -> NavigationConfig:
+    values = dict(settings)
+    config = replace(NavigationConfig(), kinematic_base_navigation=bool(values.pop('kinematic_base_navigation', False)), base_action_frame=str(values.pop('base_action_frame', 'world')), base_translation_action_sign=float(values.pop('base_translation_action_sign', 1.0)), base_tolerance=float(values.pop('base_tolerance', 0.08)), base_yaw_tolerance=float(values.pop('base_yaw_tolerance', 0.08)), base_max_steps=int(values.pop('base_max_steps', 2000)), base_holding_drop_tolerance=float(values.pop('base_holding_drop_tolerance', 0.1)), base_profile_v_max=float(values.pop('base_profile_v_max', 0.35)), base_profile_a_max=float(values.pop('base_profile_a_max', 0.7)), base_profile_a_dec=float(values.pop('base_profile_a_dec', 0.65)), base_profile_v_min=float(values.pop('base_profile_v_min', 0.1)), base_profile_dock_v_max=float(values.pop('base_profile_dock_v_max', 0.22)), base_profile_dock_v_min=float(values.pop('base_profile_dock_v_min', 0.1)), base_profile_w_max=float(values.pop('base_profile_w_max', 0.5)), base_profile_alpha_max=float(values.pop('base_profile_alpha_max', 0.8)), base_profile_alpha_dec=float(values.pop('base_profile_alpha_dec', 0.7)), base_profile_w_min=float(values.pop('base_profile_w_min', 0.08)), manual_base_path_enabled=bool(values.pop('manual_base_path_enabled', False)), manual_base_path_file=None if manual_base_path_file is None else Path(manual_base_path_file), manual_base_path_start_index=int(values.pop('manual_base_path_start_index', 0)), manual_base_path_xy_tolerance=float(values.pop('manual_base_path_xy_tolerance', 0.08)), manual_base_path_yaw_tolerance=float(values.pop('manual_base_path_yaw_tolerance', 0.08)), manual_base_path_segment_yaw_threshold=float(values.pop('manual_base_path_segment_yaw_threshold', 0.25)), manual_base_path_rotate_xy_tolerance=float(values.pop('manual_base_path_rotate_xy_tolerance', 0.18)), base_single_axis_tracking=bool(values.pop('base_single_axis_tracking', False)), use_station_astar_paths=bool(values.pop('use_station_astar_paths', False)), station_nav_use_docking=bool(values.pop('station_nav_use_docking', True)), station_base_pose_file=Path(station_base_pose_file), use_station_base_poses=bool(values.pop('use_station_base_poses', True)))
+    if values:
+        raise ValueError('unknown WR-08 navigation settings: ' + ', '.join(sorted(values)))
+    return config
