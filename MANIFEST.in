@@ -5,3 +5,4 @@ prune tests
 include .gitignore README.md LICENSE release_candidate.json
 prune docs
 prune bench/real_robot
+prune scripts/release

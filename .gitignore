@@ -66,6 +66,7 @@ pretrain_model/
 # Local maintainer documentation and evidence are not part of the release.
 /docs/
 /bench/real_robot/
+/scripts/release/
 
 # Checkpoint weights (large generated artifacts, kept out of git).
 ckpts/
