@@ -2,7 +2,7 @@
   "schema_version": "membench.release_identity/v1",
   "version": "0.1.0rc1",
   "source_revision": "b891bdf35fbe7b8390ea6cc663a870fb9ea7820c",
-  "implementation_sha256": "2dff368e1b9e11dd105afd3a84afb91745813980a8c4438513ec8fa3f08d16c0",
+  "implementation_sha256": "24335cf93cf8dd3d967051c02a50d9fa6cb11ffc1f1c89f74b4a894eadc3e8cb",
   "suite_inventory_sha256": "0aa8e9af916b00a23ecb8e85048e507a50c1122dcd5276bde81e0d3c239654f2",
   "input_lock_sha256": "4a149b92882d8f5d1be855fadfcbd813219333c9abf3b83a470e7abca8d98618",
   "wx01_setup_manifest_sha256": "fb95c738c1b00823816a7575e0ef91f905de5b4ab6b621d57298c56ac89c735b",

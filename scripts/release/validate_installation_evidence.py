@@ -25,6 +25,8 @@ def runtime_files(root: Path) -> dict[str, str]:
             if "__pycache__" in path.parts:
                 continue
             relative = path.relative_to(root).as_posix()
+            if relative.startswith("bench/real_robot/"):
+                continue
             if relative in {
                 "configs/benchmark/release_identity.json",
                 "configs/benchmark/simulator_environment.json",
@@ -60,7 +62,7 @@ def config_hash(candidate: Path, episode: dict, *, allow_partial_calibration: bo
     ).hexdigest()
 
 
-def validate(candidate: Path) -> dict:
+def validate(candidate: Path, *, require_current_runtime: bool = True) -> dict:
     directory = candidate / "docs/installation_evidence"
     index = json.loads((directory / "manifest.json").read_text())
     required = {
@@ -74,7 +76,7 @@ def validate(candidate: Path) -> dict:
         path = (directory / name).resolve()
         if not path.is_relative_to(directory.resolve()) or sha(path) != digest:
             raise ValueError(f"installation evidence hash mismatch: {name}")
-    if runtime_files(candidate) != index["runtime_files_sha256"]:
+    if require_current_runtime and runtime_files(candidate) != index["runtime_files_sha256"]:
         raise ValueError("current runtime differs from the accepted installed wheel")
     assets = json.loads((candidate / "configs/benchmark/simulator_assets.json").read_text())
     if assets["archive"]["sha256"] != index["asset_archive_sha256"]:

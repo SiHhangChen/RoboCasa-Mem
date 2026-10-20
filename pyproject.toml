@@ -25,6 +25,7 @@ membench-serve-openpi = "scripts.serve.serve_openpi:main"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["bench*", "configs*", "scripts*"]
+exclude = ["bench.real_robot", "bench.real_robot.*"]
 namespaces = true
 
 [tool.setuptools.package-data]

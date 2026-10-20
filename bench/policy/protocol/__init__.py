@@ -14,7 +14,6 @@ from .contracts import (
 )
 from .errors import ErrorCode, ProtocolError
 from .profiles import (
-    COBOT_MAGIC_RUNTIME_PROFILE,
     SIM_RUNTIME_PROFILE,
     RuntimeProfile,
     get_runtime_profile,
@@ -22,7 +21,6 @@ from .profiles import (
 )
 
 __all__ = [
-    "COBOT_MAGIC_RUNTIME_PROFILE",
     "PROTOCOL_VERSION",
     "SIM_RUNTIME_PROFILE",
     "ActionContract",

@@ -63,9 +63,9 @@ pretrain_model/
 # Training logs.
 *.log
 
-# Reviewed installation evidence is part of the release snapshot.
-!/docs/installation_evidence/installed_software_tests.log
-!/docs/installation_evidence/installed_websocket_tests.log
+# Local maintainer documentation and evidence are not part of the release.
+/docs/
+/bench/real_robot/
 
 # Checkpoint weights (large generated artifacts, kept out of git).
 ckpts/

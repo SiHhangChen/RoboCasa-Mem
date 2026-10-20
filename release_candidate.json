@@ -70,10 +70,10 @@
   ],
   "release_ready": false,
   "files": {
-    ".gitignore": "01d0503ddbf977269333d65952bcd600e25c503550d892c1e549b19d6ccc4e95",
+    ".gitignore": "0edb740c81325da4eeea54badab3a91be4c6805522e0abcf3219e7e76415cd1d",
     "LICENSE": "cd8ccdd0a6367df420b50aa75a269b429fb5cbe78fbd7acb9b03c040953e32bd",
-    "MANIFEST.in": "cd51dee224dffff3f1d02ebac5b36389186841856a320c6a2e5c91c4c148de3e",
-    "README.md": "29cc7a7450d1903df9c5ce80559a1316deba63e65ffc25ebce3ef53bc24a089a",
+    "MANIFEST.in": "6ed09d375b04f092c275c8463239229ea7a7546fe0cab8997c6a000be5d0f82e",
+    "README.md": "76a0811e86b160a612afb0f7e6b03c6375d25c3d426cfb1500cb7eabb0b54b57",
     "bench/__init__.py": "d15a2cc1a58aa612cf048ee16121986dddcf1d192e67538e03a728f47e3ddc73",
     "bench/core/__init__.py": "dfbebb7f2d270bec96d41d8749848dee705a3b8ba4805e60f2f0b54c4611d0b0",
     "bench/core/errors.py": "0fa42c7460e2b1dec0436f1885e6778c5cb5a3bff84ce3d8a4e5bebd57457303",
@@ -132,17 +132,14 @@
     "bench/policy/backends/base.py": "f494acbcb1ea78ef9c458fadd895979d671a0575b3c00db98b5161d9728ceb5c",
     "bench/policy/backends/fake.py": "dc51fc1e00cd0ee9eb456000496951c96b14794edf0ba498aaf579be1fcb4903",
     "bench/policy/backends/lerobot.py": "e80cfee63831c2b44d888272c4dd28536215168ba90a081214a6d0947bf24b4b",
-    "bench/policy/backends/openpi.py": "7b6c68f5a641f469c87ef217e47c4ecc743863cf28a914c823ceec1680c5d1f4",
+    "bench/policy/backends/openpi.py": "61ce457ec244abcf6a7f8946d2b17038a434c7409298c48927f5c1249b514f6f",
     "bench/policy/checkpoint.py": "f74a81731620cb8d922258de065c1b870a01aef9fb92e114afa7c7a5f782fc8c",
-    "bench/policy/protocol/__init__.py": "3a656c9ed4820cc76b858edaf5f4c418e1d9acd42b45f44294bb483b1c32d584",
+    "bench/policy/protocol/__init__.py": "bc5b8c796cad4a3e032dce815f9142bc582e23cea42db85a80554b4b50ead57c",
     "bench/policy/protocol/codec.py": "09178f01bfcc4f5d6030049214b8fa97d4f12b2c2f86ef10a60c9f345a3f2ab0",
     "bench/policy/protocol/contracts.py": "ae5fee82f115ddbd998160d88af7c51f8776cbdd2a3a067c71a96eb7a02d2453",
     "bench/policy/protocol/errors.py": "6191e7ad59969f4a1dd2ac162c030f254ac9499f2a47a81ec26bd5640f280d86",
-    "bench/policy/protocol/profiles.py": "4d85b3eb88a0fccb1124a5b562f24558ad37a5a0344c76ce17f3acc37f25e36a",
+    "bench/policy/protocol/profiles.py": "b6dd7104e4ab24ad3083f44b00b059b11d788be38f2b076fb15dc934d23a98e2",
     "bench/policy/server.py": "43874e9db81e9462032cf3450f5bb2a58340758b0f5a8eed21a9de1be3690382",
-    "bench/real_robot/__init__.py": "944b30b0333d3c89467196d8cf7ac91d4d93f4513eccbeb61ad1f8d55fe224d8",
-    "bench/real_robot/contracts.py": "18182c92a86da4a38cb954844d3650f3a409f0a250fffd46d0a290cdcaec7193",
-    "bench/real_robot/wr07_prompts.py": "464e04bb154ad640b0d1dc75f1537f96d20b8d4a5ff7f86c45ae4673e5201d59",
     "bench/registry.py": "121f67c7b5afad53d3594c96c800d9579f143f9069000a23e1d281223c6548a8",
     "bench/runtime/__init__.py": "cfa69ba0babb6139bc398d3688002bb24df72275133ceea4616ad013ceaa5424",
     "bench/runtime/contracts.py": "215e0a99ee5f764f588e3fb86cfc3e13be056ef4a3caa72f79906f8fb34d425f",
@@ -494,7 +491,7 @@
     "configs/benchmark/evaluation_input_lock.json": "4a149b92882d8f5d1be855fadfcbd813219333c9abf3b83a470e7abca8d98618",
     "configs/benchmark/evaluation_suite_sources.json": "0aa8e9af916b00a23ecb8e85048e507a50c1122dcd5276bde81e0d3c239654f2",
     "configs/benchmark/observation_profiles/rgbd_v3.yaml": "cc8904e3b3bae61c0138914fc5a200a548f34f582d5650bb5f534b07b720470a",
-    "configs/benchmark/release_identity.json": "46ee600371c80582a1c0325a90fe207a890693af8a118b4592ed0bd5a6f01ef2",
+    "configs/benchmark/release_identity.json": "ee54ecc466abf26a9142ffb901f72a24e711457edecbaebc4cf66b5c7fbde634",
     "configs/benchmark/setup_replays/wx01/1050.json": "70e3533b97a1e81af9baa53232aa50e80d42f9ad6f0511f4cf04afb1b652f4c4",
     "configs/benchmark/setup_replays/wx01/1051.json": "05d1d915332ccde256bc5a1e955dae9b2d05ed0ffc9aa3bb2e6d95e30778927c",
     "configs/benchmark/setup_replays/wx01/1052.json": "e1bd99313e3e83c628b090bb6a40c5b6c75ccafc5ab435320f4d5a9525655163",
@@ -575,44 +572,14 @@
     "configs/eval/suites/wr08_v1.yaml": "eedac6ce691d482e91435e1c870db49a2a958cb8a7b83a578997f624e5a15f70",
     "configs/eval/suites/wx01_pi05_r40_t1200_v1.yaml": "710c92126c2aba49f5bfe23d5f0581cbdfda2d9a4a3be259e242e257f8bd96a2",
     "configs/eval/suites/wx01_v1.yaml": "b0fe29f3673db0c149b1cc196fc061efbacbe07da5c4228f6095105f9288c126",
-    "docs/ASSETS.md": "ea19eb77b7bc029218cc0d03913604dfd9503342c2f90ab6af6afed2e7c20c93",
-    "docs/DEVELOPMENT.md": "6592dff9de2ef9ff5924fc7576f1222ab0e88d47e8b1c932ea64df448d6f90c2",
-    "docs/IMPLEMENTATION.md": "826a604c1ff9eece03744785ff9c51b1d8a4f914be55c28fe84ddda31a25fadb",
-    "docs/INSTALL.md": "43bad249cb88e438a8a91b0219593ad6d61e18e5db29916d910adbc5036de90f",
-    "docs/ISOLATED_INSTALL.md": "17d71e8f4fb7c8dcb569b8542ac5c91f913edf3d1b0761353bd8e3de745cc687",
-    "docs/THIRD_PARTY.md": "219ade141152606c38205e8cb4841f7a72a8206eb72f8bbba0a360c4fcc49416",
-    "docs/asset_evidence/current_bundle_verification.json": "9a3ad2e984c6a6c72938cdf9b65919725936c87dd90f7d4a0dd0f40c2ed878d2",
-    "docs/asset_evidence/wa01_smoke_20260912.json": "ac78f70afa88ce97011028264b7f4b397d5a34e5faf7ee8d29d2e8488c4437ab",
-    "docs/evaluation_asset_audit.json": "6fab308ef817abd26ca042f26a57b814c87ba40f844d7a3f3b1631f969f63929",
-    "docs/historical_result_repairs/ts03_pi05_r40/README.md": "60453c54f4f6ec4022141fca7d913972b28196920715ea84344612044595c807",
-    "docs/historical_result_repairs/ts03_pi05_r40/original_result.json": "dd71b26268781a2b12ec51943322d7878d88a0af253a0bf8e88dae328e66f557",
-    "docs/historical_result_repairs/ts03_pi05_r40/original_summary.json": "f4a2679dce892156b36cfc765c45fece90447ca95916e48b297ac4a5210ebeee",
-    "docs/historical_result_repairs/ts03_pi05_r40/provenance.json": "69586bfbd4d39644bd1067dc17d17a47cb9f873b23e1c41edbc14d3f18ca7460",
-    "docs/historical_result_repairs/ts03_pi05_r40/repaired_result.json": "9335c276121edd3ae77add6c109b64e1ad8568440e1aa21fdf482383d56bb6a0",
-    "docs/historical_result_repairs/ts03_pi05_r40/summary.json": "c47dbb3abdb72cf99bfba4681affc99a47af6fdf8c85518fc7b8f90969db3f3d",
-    "docs/installation_evidence/full_input_coverage.json": "7ade2ce0305865ed10fc5af5aa67caf779384f62cd720d033c0e0a8517e8f3dd",
-    "docs/installation_evidence/installation_setup.json": "01e64ad52eff6ac5339e42b64217067ded3082a523a9f6bc5d91f70e0753b0e2",
-    "docs/installation_evidence/installed_software_tests.log": "585d06cd424e7a6372706ce5e7bdb5371347975572e0371c78e77f18f3e5fb39",
-    "docs/installation_evidence/installed_suite_selectors.json": "ef221d5e88128f435b3e0a35680baad7d43b7a2504723bb92294742220ea5168",
-    "docs/installation_evidence/installed_websocket_tests.log": "e5beb54dc754581e3f4e62e6cf940b24ea8b38230a15cd985e0f1793afea6858",
-    "docs/installation_evidence/manifest.json": "9d19f57a839ded5f4cc961b206620701fc18e228c62ee472b75b1f7726130974",
-    "docs/installation_evidence/nine_task_smoke.json": "456200102e59099f2bd4d1ed31ab98d187d53863258a5560f635b4f0f140ea0b",
-    "docs/installation_evidence/requirements-tested.txt": "04268592aa87956bdd986fe8c7a1de9bd46c44936c5ed0cf0b0e7b4a1ce11f05",
-    "docs/installation_evidence/restored_assets.json": "a9150726f07b4596facffe57c565d3df5f8854bfed1ac7397c051d3c711dad99",
-    "docs/installation_evidence/run_full_inputs.py": "a0e1e6ad44db2893726f0ce1b3707b4875a09fe03c4cc88f3f48952c29c82d84",
-    "docs/installation_evidence/software_checks.json": "5964c2e28864f102a7d4db5758faa230af8756228664bb7380bcf42b106758c4",
-    "docs/installation_evidence/worker.py": "9c078c6ab6b18a7e2a56f183047290441db07c14a13aeaff0820830f2c3fc127",
-    "docs/membench_evaluation_audit.json": "a25524fa71e668771b67a42d75254b16780b3c7935017eac3d915f8ea90d1349",
-    "docs/membench_evaluation_audit.md": "788d74d50c414f81423d635ae25859fd3b6399157955348f3e7060dbb8226c4b",
-    "docs/simulation_equivalence.json": "08047b5392a25b10535bb268d80314d5f211549b9b024800043cdb71c18605ce",
-    "pyproject.toml": "6bacf0ad0a05b2007345183e8042451de38dcbb5826ac22793c6eb5bd6068cdc",
+    "pyproject.toml": "280e85190d133043ae2eb6077a648c5e8714fb197327201c5320fcc70841f39e",
     "scripts/eval/replay_run_actions.py": "1ece46a9d8e00d63f2bc27ee602ec6238ac8d68a29fe4ac69039ab66cf431db9",
     "scripts/eval/run_remote.py": "fd8a9c472ee950f6e77ee2f0f58c56b3a181a077a1337ae80118c66f983917b7",
     "scripts/eval/summarize_run.py": "91c6c3684edfa0f48bdfce6e365c55444c9eebf3e04a49c182712d63d7f54993",
     "scripts/release/check_installed_candidate.py": "9c078c6ab6b18a7e2a56f183047290441db07c14a13aeaff0820830f2c3fc127",
-    "scripts/release/finalize_candidate.py": "98aed645847eba25bbf645a945f8ea3af7936fc89b4af04d25173e19303e232e",
+    "scripts/release/finalize_candidate.py": "abb781d214bd7e6ec152afd155b67b48abbb65c27e48183b84f18c0f59d2f117",
     "scripts/release/repair_ts03_stage_report.py": "395e4b9d397f20361905a649c1edf21d829ff2eb7656f3998800cc525251e8c2",
-    "scripts/release/validate_installation_evidence.py": "0a5277abedceb5339c112aa0e8f23ed2a6134b02ce22c2b3ca8dab2c8b641e49",
+    "scripts/release/validate_installation_evidence.py": "3b75009698e9d34da03ba891ac34374f69647aadcf003ba1b64e423271bc93ae",
     "scripts/release/verify_assets.py": "c443690486e644668307653ea3d6c9ee370da02ca17f567427b282852777f773",
     "scripts/serve/serve_fake.py": "7b23e68c113883c17292ca43a64efe825fc8331bcc4a06cc2c1caaf211634ab3",
     "scripts/serve/serve_lerobot.py": "e4e705f4cd4fecdd1f62e910c85b501fbceafe6b4ab6e2ea0a3f8a2bbb1e6b6d",
@@ -629,7 +596,8 @@
     "historical_full_model_rollouts_rerun": false
   },
   "remaining_release_requirements": [
-    "Freeze the final release source revision and provide release users with the pinned asset archive."
+    "Freeze the final release source revision and provide release users with the pinned asset archive.",
+    "Repeat installed-wheel acceptance for the changed runtime; the recorded 450-case run describes the previous wheel."
   ],
   "historical_result_repairs": {
     "ts03_pi05_r40_seed1056": {
@@ -650,15 +618,34 @@
     "audit": "docs/evaluation_asset_audit.json",
     "audit_sha256": "6fab308ef817abd26ca042f26a57b814c87ba40f844d7a3f3b1631f969f63929",
     "nine_task_coverage_verified": true,
-    "clean_candidate_installation_verified": true
+    "clean_candidate_installation_verified": false
   },
   "installation_acceptance": {
-    "status": "passed",
+    "status": "historical_passed_runtime_changed",
     "scope": "Same-host isolated Python environment, independent pinned simulator sources and restored archive; 450 official task/seed inputs, three action steps each.",
     "manifest": "docs/installation_evidence/manifest.json",
     "manifest_sha256": "9d19f57a839ded5f4cc961b206620701fc18e228c62ee472b75b1f7726130974",
     "accepted_wheel_sha256": "f19e89795ccb904de20e221595daf88f160b95fbeca7300a31ec50b52c600c8c",
-    "runtime_files_match_accepted_wheel": true,
-    "model_inference": false
+    "runtime_files_match_accepted_wheel": false,
+    "model_inference": false,
+    "runtime_changes": {
+      "removed": [
+        "bench/real_robot/__init__.py",
+        "bench/real_robot/contracts.py",
+        "bench/real_robot/wr07_prompts.py"
+      ],
+      "added": [],
+      "modified": [
+        "bench/policy/backends/openpi.py",
+        "bench/policy/protocol/__init__.py",
+        "bench/policy/protocol/profiles.py"
+      ]
+    }
+  },
+  "documentation_archive": {
+    "distribution": "excluded_from_release; retained_locally_and_in_git_history",
+    "source_revision": "e020312e8146c646c9013d35e9a7fc3523f0cdc1",
+    "url": "https://github.com/SiHhangChen/RoboCasa-Mem/tree/e020312e8146c646c9013d35e9a7fc3523f0cdc1/docs",
+    "note": "All docs/ paths in this metadata refer to local maintainer files or this archived revision, not files shipped in the release. Evidence verification and candidate finalization require these local files."
   }
 }

@@ -4,10 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from bench.real_robot import contracts as cobot_contract
 from bench.runtime import data_contract as sim_contract
-
-COBOT_MAGIC_RUNTIME_PROFILE = cobot_contract.RUNTIME_PROFILE
 
 SIM_RUNTIME_PROFILE = "membench.robocasa_pandaomron.v2"
 
@@ -35,16 +32,6 @@ _PROFILES = {
         image_size=(224, 224),
         control_frequency_hz=20.0,
     ),
-    COBOT_MAGIC_RUNTIME_PROFILE: RuntimeProfile(
-        name=COBOT_MAGIC_RUNTIME_PROFILE,
-        state_schema=cobot_contract.STATE_SCHEMA,
-        state_dim=cobot_contract.STATE_DIM,
-        action_schema=cobot_contract.ACTION_SCHEMA,
-        action_dim=cobot_contract.ACTION_DIM,
-        required_cameras=cobot_contract.CAMERA_ALIASES,
-        image_size=cobot_contract.IMAGE_SIZE,
-        control_frequency_hz=cobot_contract.CONTROL_FREQUENCY_HZ,
-    ),
 }
 
 
@@ -61,7 +48,6 @@ def runtime_profile_names() -> tuple[str, ...]:
 
 
 __all__ = [
-    "COBOT_MAGIC_RUNTIME_PROFILE",
     "SIM_RUNTIME_PROFILE",
     "RuntimeProfile",
     "get_runtime_profile",

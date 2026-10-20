@@ -20,6 +20,7 @@ if str(ROOT) not in sys.path:
 from scripts.release.repair_ts03_stage_report import verify_bundle
 from scripts.release.verify_assets import load_manifest
 from scripts.release.validate_installation_evidence import validate as validate_installation
+from scripts.release.validate_installation_evidence import runtime_files
 
 
 def sha(path):
@@ -29,7 +30,7 @@ def sha(path):
 def release_files(candidate):
     # Root checkouts can contain gigabytes of ignored local environments.
     # Inventory only the release tree, never Git metadata or local outputs.
-    release_roots = ("bench", "configs", "docs", "scripts")
+    release_roots = ("bench", "configs", "scripts")
     inventory_paths = [candidate / name for name in (
         ".gitignore", "LICENSE", "MANIFEST.in", "README.md", "pyproject.toml"
     )]
@@ -47,6 +48,7 @@ def release_files(candidate):
         str(p.relative_to(candidate)): sha(p)
         for p in sorted(inventory_paths)
         if p.is_file()
+        and not p.relative_to(candidate).as_posix().startswith("bench/real_robot/")
         and not any(part in ignored for part in p.relative_to(candidate).parts)
     }
 
@@ -136,22 +138,37 @@ def finalize(candidate):
     }
     installation_manifest = candidate / "docs/installation_evidence/manifest.json"
     if installation_manifest.is_file():
-        accepted = validate_installation(candidate)
+        # Preserve historical evidence without claiming an altered runtime is
+        # byte-identical to the wheel that originally passed acceptance.
+        accepted = validate_installation(candidate, require_current_runtime=False)
+        current = runtime_files(candidate)
+        previous = accepted["runtime_files_sha256"]
+        runtime_matches = current == previous
         result["installation_acceptance"] = {
-            "status": "passed",
+            "status": "passed" if runtime_matches else "historical_passed_runtime_changed",
             "scope": "Same-host isolated Python environment, independent pinned simulator sources and restored archive; 450 official task/seed inputs, three action steps each.",
             "manifest": str(installation_manifest.relative_to(candidate)),
             "manifest_sha256": sha(installation_manifest),
             "accepted_wheel_sha256": accepted["wheel_sha256"],
-            "runtime_files_match_accepted_wheel": True,
+            "runtime_files_match_accepted_wheel": runtime_matches,
             "model_inference": False,
         }
+        if not runtime_matches:
+            result["installation_acceptance"]["runtime_changes"] = {
+                "removed": sorted(previous.keys() - current.keys()),
+                "added": sorted(current.keys() - previous.keys()),
+                "modified": sorted(name for name in current.keys() & previous.keys() if current[name] != previous[name]),
+            }
         result["simulator_assets"]["status"] = "verified_for_all_450_official_inputs_in_isolated_installation"
         result["simulator_assets"]["nine_task_coverage_verified"] = True
-        result["simulator_assets"]["clean_candidate_installation_verified"] = True
+        result["simulator_assets"]["clean_candidate_installation_verified"] = runtime_matches
         result["remaining_release_requirements"] = [
             "Freeze the final release source revision and provide release users with the pinned asset archive."
         ]
+        if not runtime_matches:
+            result["remaining_release_requirements"].append(
+                "Repeat installed-wheel acceptance for the changed runtime; the recorded 450-case run describes the previous wheel."
+            )
     else:
         result.pop("installation_acceptance", None)
     repair = candidate / "docs/historical_result_repairs/ts03_pi05_r40"
@@ -175,6 +192,7 @@ def finalize(candidate):
         str(p.relative_to(candidate)): sha(p)
         for p in sorted((candidate / "bench").rglob("*"))
         if p.is_file() and p.suffix in (".py", ".yaml", ".json", ".xml")
+        and not p.relative_to(candidate).as_posix().startswith("bench/real_robot/")
     }
     identity = {
         "schema_version": "membench.release_identity/v1",
