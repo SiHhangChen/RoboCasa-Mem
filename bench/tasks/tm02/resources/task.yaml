@@ -121,7 +121,6 @@ resources:
   can_grasp_pose: calibration/can_side_grasp.json
   can_retrieval_prepose: calibration/wr01_relative_lower_retrieval_prepose.json
   can_place_pose: calibration/can_place_region_release.json
-  planner_script: ../../../execution/planning/mplib_planner.py
 
 navigation:
   manual_base_path_enabled: true

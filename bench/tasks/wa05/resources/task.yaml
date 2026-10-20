@@ -76,7 +76,6 @@ resources:
   answer_button_positions: poses/answer_button_positions_layout15_style34_seed0.json
   cup_grasp_candidates: poses/water_cup_grasp_candidates.json
   sink_fill_pose: poses/sink_cup_place_pose_layout15_style34_seed0.json
-  planner_script: ../../../execution/planning/mplib_planner.py
 
 navigation:
   kinematic_base_navigation: false

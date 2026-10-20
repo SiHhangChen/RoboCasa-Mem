@@ -36,31 +36,15 @@ class CatalogEntry:
     default_horizon: int
 
 
-_ENTRIES: tuple[CatalogEntry, ...] = (
-    CatalogEntry("TM01", "tm01", "TM01BoilWaterAndInspectTwoDrawers", "1.0.0", 3200),
-    CatalogEntry("TM02", "tm02", "TM02FillPotAndRetrieveCan", "1.0.0", 3600),
-    CatalogEntry("TM03", "tm03", "TM03BoilWaterInspectDrawersAndRunToasterOven", "1.0.0", 4800),
-    CatalogEntry("TM04", "tm04", "TM04FillPotRetrieveCanAndAddTwoSugars", "1.0.0", 5200),
-    CatalogEntry("TS01", "ts01", "TS01AddKSugarToHotChocolate", "1.0.0", 2800),
-    CatalogEntry("TS02", "ts02", "TS02InspectThreeCabinets", "1.1.0", 2800),
-    CatalogEntry("TS03", "ts03", "TS03HierarchicalAddKSugarToHotChocolate", "1.0.0", 2800),
-    CatalogEntry("TS04", "ts04", "TS04InspectTwoDrawers", "1.1.0", 1800),
-    CatalogEntry("WA-01", "wa01", "WA01SortSugaredAndUnsugaredCoffee", "2.0.0", 5000),
-    CatalogEntry("WA-02", "wa02", "WA02ServeHotColdWaterCups", "1.0.0", 6000),
-    CatalogEntry("WA-03", "wa03", "WA03SortSugaredAndUnsugaredCoffee", "1.0.0", 6500),
-    CatalogEntry("WA-04", "wa04", "WA04ServeUniqueTemperatureCupAmongThree", "1.0.0", 8500),
-    CatalogEntry("WA-05", "wa05", "WA05FillOneCupAndMatchTemperatureButton", "1.0.0", 4000),
-    CatalogEntry("WR-01", "wr01", "WR01RetrieveRememberedCan", "1.0.0", 15000),
-    CatalogEntry("WR-02", "wr02", "WR02ReturnCondimentPair", "1.0.0", 5000),
-    CatalogEntry("WR-03", "wr03", "WR03StoreAndRetrieveRememberedCan", "1.0.0", 15000),
-    CatalogEntry("WR-04", "wr04", "WR04ReturnSingleObjectToOriginalLevel", "1.0.0", 3200),
-    CatalogEntry("WR-05", "wr05", "WR05ReturnCondimentPair", "1.0.0", 5000),
-    CatalogEntry("WR-06", "wr06", "WR06ReturnSingleBottleToOriginalLevel", "1.0.0", 3200),
-    CatalogEntry("WR-07", "wr07", "WR07MatchMilkCartonToColoredSugarPlate", "3.0.0", 3600),
-    CatalogEntry("WR-08", "wr08", "WR08MatchMilkCartonsToColoredSugarPlates", "2.0.0", 2000),
-    CatalogEntry("WX-01", "wx01", "WX01ReturnObjectToOriginalPlace", "1.0.0", 3200),
-    CatalogEntry("WX-02", "wx02", "WX02CleanUnderCupAndReturnIt", "1.0.0", 5200),
-)
+_ENTRIES = (CatalogEntry('WX-01', 'wx01', 'WX01ReturnObjectToOriginalPlace', '1.0.0', 3200),
+CatalogEntry('WA-01', 'wa01', 'WA01SortSugaredAndUnsugaredCoffee', '2.0.0', 5000),
+CatalogEntry('WA-05', 'wa05', 'WA05FillOneCupAndMatchTemperatureButton', '1.0.0', 4000),
+CatalogEntry('WR-01', 'wr01', 'WR01RetrieveRememberedCan', '1.0.0', 15000),
+CatalogEntry('WR-08', 'wr08', 'WR08MatchMilkCartonsToColoredSugarPlates', '2.0.0', 2000),
+CatalogEntry('TS02', 'ts02', 'TS02InspectThreeCabinets', '1.1.0', 2800),
+CatalogEntry('TS03', 'ts03', 'TS03HierarchicalAddKSugarToHotChocolate', '1.0.0', 2800),
+CatalogEntry('TM01', 'tm01', 'TM01BoilWaterAndInspectTwoDrawers', '1.0.0', 3200),
+CatalogEntry('TM02', 'tm02', 'TM02FillPotAndRetrieveCan', '1.0.0', 3600),)
 
 _ALIASES: dict[str, str] = {}
 for _entry in _ENTRIES:
@@ -132,7 +116,7 @@ def _definition(entry: CatalogEntry) -> TaskDefinition:
         package=f"bench.tasks.{entry.package}",
         resource_root=_ROOT / f"{entry.package}" / "resources",
         resolve_episode=lambda request, item=entry: _resolve_episode(item, request),
-        build_expert_plan=lambda episode, item=entry: _expert_plan(item, episode),
+        build_expert_plan=None,
         success_conditions=metadata["success_conditions"],
         default_horizon=entry.default_horizon,
         metadata={"catalog_version": TASK_CATALOG_VERSION, "task_config": metadata["config_path"]},

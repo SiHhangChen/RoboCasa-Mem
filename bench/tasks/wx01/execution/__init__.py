@@ -1,1 +1,1 @@
-"""Runtime adapters used by WX-01."""
+"""Task-owned initialization configuration."""

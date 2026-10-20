@@ -29,7 +29,6 @@ from bench.tasks.wr08.evaluation import (
 )
 from bench.tasks.wr08.execution.geometry import resolve_episode_targets
 from bench.tasks.wr08.execution.navigation import build_navigation_config
-from bench.runtime.task_local import lazy_expert_runtime
 from bench.tasks.wr08.initialization import initialize_episode_state
 from bench.tasks.wr08.prompts import resolve_prompt_spec
 
@@ -100,9 +99,7 @@ _ADAPTER = TaskRuntimeAdapter(
             episode.facts["carton_material_candidates"]
         ),
     },
-    expert_runtime=lazy_expert_runtime(
-        "bench.tasks.wr08.expert.operations:build_operation_handlers"
-    ),
+    expert_runtime=None,
 )
 TASK_RUNTIME_API = _ADAPTER.api()
 build_descriptor = _ADAPTER.build_descriptor

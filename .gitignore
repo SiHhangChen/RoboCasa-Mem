@@ -15,6 +15,8 @@ dist/
 venv/
 .env
 .codex
+.agents/
+.aws/
 .serena/
 .vscode/
 
@@ -64,8 +66,6 @@ pretrain_model/
 # Reviewed installation evidence is part of the release snapshot.
 !/docs/installation_evidence/installed_software_tests.log
 !/docs/installation_evidence/installed_websocket_tests.log
-!/release/evaluation/docs/installation_evidence/installed_software_tests.log
-!/release/evaluation/docs/installation_evidence/installed_websocket_tests.log
 
 # Checkpoint weights (large generated artifacts, kept out of git).
 ckpts/

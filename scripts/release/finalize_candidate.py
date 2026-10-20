@@ -11,16 +11,44 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
-
-from repair_ts03_stage_report import verify_bundle
-from verify_assets import load_manifest
-from validate_installation_evidence import validate as validate_installation
+import sys
 
 ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from scripts.release.repair_ts03_stage_report import verify_bundle
+from scripts.release.verify_assets import load_manifest
+from scripts.release.validate_installation_evidence import validate as validate_installation
 
 
 def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def release_files(candidate):
+    # Root checkouts can contain gigabytes of ignored local environments.
+    # Inventory only the release tree, never Git metadata or local outputs.
+    release_roots = ("bench", "configs", "docs", "scripts", "tests")
+    inventory_paths = [candidate / name for name in (
+        ".gitignore", "LICENSE", "MANIFEST.in", "README.md", "pyproject.toml"
+    )]
+    for folder in release_roots:
+        inventory_paths.extend((candidate / folder).rglob("*"))
+    ignored = {
+        "__pycache__",
+        ".pytest_cache",
+        "build",
+        "dist",
+        "MobileMemBench.egg-info",
+        "mobilemembench.egg-info",
+    }
+    return {
+        str(p.relative_to(candidate)): sha(p)
+        for p in sorted(inventory_paths)
+        if p.is_file()
+        and not any(part in ignored for part in p.relative_to(candidate).parts)
+    }
 
 
 def finalize(candidate):
@@ -168,27 +196,13 @@ def finalize(candidate):
     (candidate / "configs/benchmark/release_identity.json").write_text(
         json.dumps(identity, indent=2) + "\n"
     )
-    ignored = {
-        "__pycache__",
-        ".pytest_cache",
-        "build",
-        "dist",
-        "MobileMemBench.egg-info",
-        "mobilemembench.egg-info",
-    }
-    result["files"] = {
-        str(p.relative_to(candidate)): sha(p)
-        for p in sorted(candidate.rglob("*"))
-        if p.is_file()
-        and p != path
-        and not any(part in ignored for part in p.relative_to(candidate).parts)
-    }
+    result["files"] = release_files(candidate)
     path.write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps(result["validation"]))
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("candidate", type=Path)
+    parser.add_argument("candidate", type=Path, nargs="?", default=ROOT)
     args = parser.parse_args()
     finalize(args.candidate.resolve())

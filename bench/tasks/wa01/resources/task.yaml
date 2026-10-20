@@ -56,7 +56,6 @@ resources:
   sugar_cube_poses: poses/sugar_cube.json
   station_poses: station/stations.json
   manual_base_path: navigation/manual_base_path_layout29_style29_seed0.json
-  planner_script: ../../../execution/planning/mplib_planner.py
 
 navigation:
   kinematic_base_navigation: false

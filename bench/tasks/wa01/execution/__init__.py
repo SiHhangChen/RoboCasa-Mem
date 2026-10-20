@@ -1,1 +1,1 @@
-"""WA-01 导航、操作、目标和阶段执行适配层。"""
+"""Task-owned initialization configuration."""

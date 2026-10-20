@@ -43,128 +43,20 @@ def _builtin_task_plugin(
         ),
         environment_module=f"{package}.environment",
         runtime_api_symbol=f"{package}.runtime:TASK_RUNTIME_API",
-        expert_plan_symbol=f"{package}.expert.spec:build_expert_plan",
+        expert_plan_symbol=None,
     )
 
 
 # This is the single source of truth for the task packages shipped by bench.
-BUILTIN_TASK_PLUGINS: tuple[TaskPlugin, ...] = (
-    _builtin_task_plugin(
-        "TM01",
-        aliases=("TM-01", "TM_01"),
-        env_name="TM01BoilWaterAndInspectTwoDrawers",
-    ),
-    _builtin_task_plugin(
-        "TM02",
-        aliases=("TM-02", "TM_02"),
-        env_name="TM02FillPotAndRetrieveCan",
-    ),
-    _builtin_task_plugin(
-        "TM03",
-        aliases=("TM-03", "TM_03"),
-        env_name="TM03BoilWaterInspectDrawersAndRunToasterOven",
-    ),
-    _builtin_task_plugin(
-        "TM04",
-        aliases=("TM-04", "TM_04"),
-        env_name="TM04FillPotRetrieveCanAndAddTwoSugars",
-    ),
-    _builtin_task_plugin(
-        "TS01",
-        aliases=("TS-01", "TS_01"),
-        env_name="TS01AddKSugarToHotChocolate",
-    ),
-    _builtin_task_plugin(
-        "TS02",
-        aliases=("TS-02", "TS_02"),
-        env_name="TS02InspectThreeCabinets",
-    ),
-    _builtin_task_plugin(
-        "TS03",
-        aliases=("TS-03", "TS_03"),
-        env_name="TS03HierarchicalAddKSugarToHotChocolate",
-    ),
-    _builtin_task_plugin(
-        "TS04",
-        aliases=("TS-04", "TS_04"),
-        env_name="TS04InspectTwoDrawers",
-    ),
-    _builtin_task_plugin(
-        "WA-01",
-        aliases=("WA01", "WA_01"),
-        env_name="WA01SortSugaredAndUnsugaredCoffee",
-    ),
-    _builtin_task_plugin(
-        "WA-02",
-        aliases=("WA02", "WA_02"),
-        env_name="WA02ServeHotColdWaterCups",
-    ),
-    _builtin_task_plugin(
-        "WA-03",
-        aliases=("WA03", "WA_03"),
-        env_name="WA03SortSugaredAndUnsugaredCoffee",
-    ),
-    _builtin_task_plugin(
-        "WA-04",
-        aliases=("WA04", "WA_04"),
-        env_name="WA04ServeUniqueTemperatureCupAmongThree",
-    ),
-    _builtin_task_plugin(
-        "WA-05",
-        aliases=("WA05", "WA_05"),
-        env_name="WA05FillOneCupAndMatchTemperatureButton",
-    ),
-    _builtin_task_plugin(
-        "WR-01",
-        aliases=("WR01", "WR_01"),
-        env_name="WR01RetrieveRememberedCan",
-    ),
-    _builtin_task_plugin(
-        "WR-02",
-        aliases=("WR02", "WR_02"),
-        env_name="WR02ReturnCondimentPair",
-    ),
-    _builtin_task_plugin(
-        "WR-03",
-        aliases=("WR03", "WR_03"),
-        env_name="WR03StoreAndRetrieveRememberedCan",
-    ),
-    _builtin_task_plugin(
-        "WR-04",
-        aliases=("WR04", "WR_04"),
-        env_name="WR04ReturnSingleObjectToOriginalLevel",
-    ),
-    _builtin_task_plugin(
-        "WR-05",
-        aliases=("WR05", "WR_05"),
-        env_name="WR05ReturnCondimentPair",
-    ),
-    _builtin_task_plugin(
-        "WR-06",
-        aliases=("WR06", "WR_06"),
-        env_name="WR06ReturnSingleBottleToOriginalLevel",
-    ),
-    _builtin_task_plugin(
-        "WR-07",
-        aliases=("WR07", "WR_07"),
-        env_name="WR07MatchMilkCartonToColoredSugarPlate",
-    ),
-    _builtin_task_plugin(
-        "WR-08",
-        aliases=("WR08", "WR_08"),
-        env_name="WR08MatchMilkCartonsToColoredSugarPlates",
-    ),
-    _builtin_task_plugin(
-        "WX-01",
-        aliases=("WX01", "WX_01"),
-        env_name="WX01ReturnObjectToOriginalPlace",
-    ),
-    _builtin_task_plugin(
-        "WX-02",
-        aliases=("WX02", "WX_02"),
-        env_name="WX02CleanUnderCupAndReturnIt",
-    ),
-)
+BUILTIN_TASK_PLUGINS = (_builtin_task_plugin('WX-01', aliases=('WX01', 'WX_01'), env_name='WX01ReturnObjectToOriginalPlace'),
+_builtin_task_plugin('WA-01', aliases=('WA01', 'WA_01'), env_name='WA01SortSugaredAndUnsugaredCoffee'),
+_builtin_task_plugin('WA-05', aliases=('WA05', 'WA_05'), env_name='WA05FillOneCupAndMatchTemperatureButton'),
+_builtin_task_plugin('WR-01', aliases=('WR01', 'WR_01'), env_name='WR01RetrieveRememberedCan'),
+_builtin_task_plugin('WR-08', aliases=('WR08', 'WR_08'), env_name='WR08MatchMilkCartonsToColoredSugarPlates'),
+_builtin_task_plugin('TS02', aliases=('TS-02', 'TS_02'), env_name='TS02InspectThreeCabinets'),
+_builtin_task_plugin('TS03', aliases=('TS-03', 'TS_03'), env_name='TS03HierarchicalAddKSugarToHotChocolate'),
+_builtin_task_plugin('TM01', aliases=('TM-01', 'TM_01'), env_name='TM01BoilWaterAndInspectTwoDrawers'),
+_builtin_task_plugin('TM02', aliases=('TM-02', 'TM_02'), env_name='TM02FillPotAndRetrieveCan'),)
 
 
 def register_builtin_task_plugins() -> tuple[TaskPlugin, ...]:

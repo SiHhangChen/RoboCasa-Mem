@@ -1,1 +1,1 @@
-"""Runtime-only navigation and manipulation adapters for TS02."""
+"""Task-owned initialization configuration."""

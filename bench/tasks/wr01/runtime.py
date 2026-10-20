@@ -21,7 +21,6 @@ from bench.tasks.wr01.evaluation import (
     success_for_runtime,
 )
 from bench.tasks.wr01.execution.navigation import build_navigation_config
-from bench.runtime.task_local import lazy_expert_runtime
 from bench.tasks.wr01.initialization import apply_robot_base_initial_state, apply_robot_torso_initial_state, initialize_episode_state
 from bench.tasks.wr01.prompts import resolve_prompt_spec
 
@@ -111,9 +110,7 @@ _ADAPTER = TaskRuntimeAdapter(
         "task_revision": TASK_REVISION,
         "task_id": episode.task_id,
     },
-    expert_runtime=lazy_expert_runtime(
-        "bench.tasks.wr01.expert.operations:build_operation_handlers"
-    ),
+    expert_runtime=None,
 )
 TASK_RUNTIME_API = _ADAPTER.api()
 build_descriptor = _ADAPTER.build_descriptor

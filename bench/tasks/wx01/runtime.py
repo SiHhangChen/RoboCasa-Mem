@@ -19,8 +19,7 @@ from bench.tasks.wx01.evaluation import (
 )
 from bench.tasks.wx01.execution.geometry import resolve_episode_targets
 from bench.tasks.wx01.execution.navigation import build_navigation_config
-from bench.runtime.task_local import lazy_expert_runtime
-from bench.tasks.wx01.initialization import apply_initial_object_plan, apply_robot_base_initial_state, initialize_short_start_state
+from bench.tasks.wx01.initialization import apply_initial_object_plan, apply_robot_base_initial_state
 from bench.tasks.wx01.prompts import resolve_prompt_spec
 
 
@@ -55,8 +54,6 @@ def _environment(config: Any, scene: Any, plan: Any, resources: Mapping[str, Any
 
 
 def _initialize(descriptor: Any, env: Any, observation: Mapping[str, Any]):
-    from bench.tasks.wx01.execution.manipulation import build_manipulation_assembly
-
     configure_episode = getattr(env, "configure_episode", None)
     if callable(configure_episode):
         configure_episode(descriptor.episode_plan)
@@ -69,14 +66,8 @@ def _initialize(descriptor: Any, env: Any, observation: Mapping[str, Any]):
         navigation=descriptor.navigation, seed=descriptor.episode_plan.seed,
     )
     targets = resolve_episode_targets(env, descriptor.episode_plan)
-    setup = build_manipulation_assembly(
-        env, updated, settings=descriptor.config.manipulation,
-        planner_script=descriptor.resources["planner_script"], execute=descriptor.execute,
-    )
-    updated, short_start = initialize_short_start_state(
-        env, setup.controller, targets=targets, config=descriptor.config.initial_state,
-        grasp_pose_file=descriptor.resources["cleaning_tool_grasp_pose"],
-    )
+    from bench.runtime.setup_replay import replay_setup
+    updated, short_start = replay_setup(env, descriptor)
     evaluator = WX01Evaluator()
     evaluator.reset(env.evaluation_snapshot())
     env._wx01_evaluator = evaluator
@@ -107,9 +98,7 @@ _ADAPTER = TaskRuntimeAdapter(
             or (getattr(episode, "facts", {}) or {}).get("sponge_type", "")
         ),
     },
-    expert_runtime=lazy_expert_runtime(
-        "bench.tasks.wx01.expert.operations:build_operation_handlers"
-    ),
+    expert_runtime=None,
 )
 TASK_RUNTIME_API = _ADAPTER.api()
 build_descriptor = _ADAPTER.build_descriptor

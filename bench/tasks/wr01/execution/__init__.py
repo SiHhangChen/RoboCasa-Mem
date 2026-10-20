@@ -1,1 +1,1 @@
-"""WR-01 navigation, manipulation, geometry, and stage adapters."""
+"""Task-owned initialization configuration."""

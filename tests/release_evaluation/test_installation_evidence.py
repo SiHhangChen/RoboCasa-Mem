@@ -8,7 +8,7 @@ from scripts.release.validate_installation_evidence import runtime_files, sha, v
 
 
 ROOT = Path(__file__).resolve().parents[2]
-CANDIDATE = ROOT if (ROOT / "docs/installation_evidence").is_dir() and (ROOT / "configs/benchmark/evaluation_input_lock.json").is_file() else ROOT / "release/evaluation"
+CANDIDATE = ROOT
 
 
 def test_recorded_installation_evidence_matches_candidate():

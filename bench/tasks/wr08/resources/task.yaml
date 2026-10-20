@@ -49,7 +49,6 @@ sensors:
   use_camera_observations: true
 
 resources:
-  planner_script: ../../../execution/planning/mplib_planner.py
   stations: calibration/stations.json
 
 navigation:

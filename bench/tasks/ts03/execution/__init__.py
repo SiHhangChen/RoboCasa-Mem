@@ -1,1 +1,1 @@
-"""TS01 controller assembly and runtime handlers."""
+"""Task-owned initialization configuration."""

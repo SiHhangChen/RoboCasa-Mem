@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 from pathlib import Path
@@ -142,3 +143,17 @@ def validate(candidate: Path) -> dict:
     if selectors["passed"] is not True or selectors["suite_count"] != 27:
         raise ValueError("installed suite selector verification is incomplete")
     return index
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("candidate", type=Path, nargs="?", default=Path(__file__).resolve().parents[2])
+    args = parser.parse_args()
+    candidate = args.candidate.resolve()
+    accepted = validate(candidate)
+    release = json.loads((candidate / "release_candidate.json").read_text())
+    for name, digest in release["files"].items():
+        path = (candidate / name).resolve()
+        if not path.is_relative_to(candidate) or sha(path) != digest:
+            raise ValueError(f"release file hash mismatch: {name}")
+    print(json.dumps({"status": "passed", "scope": accepted["scope"], "release_files_verified": len(release["files"])}))

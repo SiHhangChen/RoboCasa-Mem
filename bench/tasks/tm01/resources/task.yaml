@@ -129,7 +129,6 @@ resources:
   manual_base_path: navigation/manual_base_path_layout39_style24_seed0.json
   # TM01 owns this task-local handle-relative hook calibration.
   drawer_grasp_pose: calibration/cabinet_slot_1_hook_pose.json
-  planner_script: ../../../execution/planning/mplib_planner.py
 
 navigation:
   manual_base_path_enabled: true

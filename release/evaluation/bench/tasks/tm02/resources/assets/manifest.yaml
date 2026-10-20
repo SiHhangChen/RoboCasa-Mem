@@ -1,5 +1,0 @@
-schema_version: 1
-entries:
-  - id: tm02_slide_cabinet
-    path: tm02_slide_cabinet.xml
-    kind: fixture_mjcf

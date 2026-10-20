@@ -67,7 +67,6 @@ resources:
   manual_base_path: navigation/manual_base_path_layout39_style37_seed0.json
   station_poses: navigation/stations.json
   completion_button_position: poses/completion_button_position_layout39_style37_seed0.json
-  planner_script: ../../../execution/planning/mplib_planner.py
 
 navigation:
   kinematic_base_navigation: false

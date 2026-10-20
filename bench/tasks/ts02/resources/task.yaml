@@ -85,7 +85,6 @@ sensors:
 resources:
   station_poses: station/stations.json
   manual_base_path: navigation/manual_base_path_layout24_style24_seed0.json
-  planner_script: ../../../execution/planning/mplib_planner.py
   drawer_grasp_pose: poses/cabinet_slot_1_hook_pose.json
 
 navigation:

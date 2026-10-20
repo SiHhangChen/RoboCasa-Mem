@@ -19,7 +19,6 @@ from bench.tasks.ts03.evaluation import (
     success_for_runtime,
 )
 from bench.tasks.ts03.execution.navigation import build_navigation_config
-from bench.runtime.task_local import lazy_expert_runtime
 from bench.tasks.ts03.initialization import apply_fixed_initial_object_regions, apply_robot_base_initial_state
 from bench.tasks.ts03.prompts import resolve_prompt_spec
 
@@ -100,9 +99,7 @@ _ADAPTER = TaskRuntimeAdapter(
         "sugar_plate_material": episode.facts.get("sugar_plate_material"),
         "sugar_cube_material": episode.facts.get("sugar_cube_material"),
     },
-    expert_runtime=lazy_expert_runtime(
-        "bench.tasks.ts03.expert.operations:build_operation_handlers"
-    ),
+    expert_runtime=None,
 )
 TASK_RUNTIME_API = _ADAPTER.api()
 build_descriptor = _ADAPTER.build_descriptor
