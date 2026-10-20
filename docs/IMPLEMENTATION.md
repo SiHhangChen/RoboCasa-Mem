@@ -37,9 +37,6 @@ WR-01、WR-08、TS02、TS03、TM01、TM02，顺序与发布任务清单一致。
 # 从仓库根目录检查验收证据和发布文件哈希。
 python scripts/release/validate_installation_evidence.py .
 
-# 运行软件测试；通信集成测试需要允许 localhost socket。
-python -m pytest -q
-
 # 构建可安装的 wheel。
 python -m pip wheel --no-deps --no-build-isolation . -w dist
 ```
@@ -49,6 +46,10 @@ python -m pip wheel --no-deps --no-build-isolation . -w dist
 50 份初始化记录；如需改变初始化或任务资源，应重新生成并验收相关证据。
 维护发布元数据可使用 `python scripts/release/finalize_candidate.py .`；该工具会校验
 现有验收证据，不会把修改后的运行代码自动视为已验收，也不会批准公开发布。
+
+维护测试源码已移出当前发布范围，最后一版保存在 Git 提交 `953b8ef`。
+本文中的测试通过数量及 `docs/installation_evidence/` 中的日志属于既有验收记录；
+运行任务和模型评测不需要测试源码或 pytest。
 
 候选版安装后可从任意目录使用：
 

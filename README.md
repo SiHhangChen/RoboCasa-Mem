@@ -48,4 +48,6 @@ Third-party asset terms are described in `docs/THIRD_PARTY.md`.
 The repository root contains the evaluation release directly. Task resources
 retain their seeded randomization settings and existing recording metadata;
 no data collection entry point or expert policy implementation is included.
-See `docs/DEVELOPMENT.md` for tests, build commands, and release maintenance.
+Maintainer tests are excluded from the release repository and distributions;
+their last published source is preserved in Git commit `953b8ef`.
+See `docs/DEVELOPMENT.md` for validation, build commands, and release maintenance.

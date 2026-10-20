@@ -29,7 +29,7 @@ def sha(path):
 def release_files(candidate):
     # Root checkouts can contain gigabytes of ignored local environments.
     # Inventory only the release tree, never Git metadata or local outputs.
-    release_roots = ("bench", "configs", "docs", "scripts", "tests")
+    release_roots = ("bench", "configs", "docs", "scripts")
     inventory_paths = [candidate / name for name in (
         ".gitignore", "LICENSE", "MANIFEST.in", "README.md", "pyproject.toml"
     )]

@@ -13,16 +13,17 @@ Use Python 3.10+ for the software and the pinned Python 3.11 simulator
 environment in `INSTALL.md` for simulation. From the repository root:
 
 ```sh
-python -m pip install -e '.[dev,video]'
-python -m pytest -q
+python -m pip install -e '.[video]'
 python scripts/release/validate_installation_evidence.py .
 python -m pip wheel --no-deps --no-build-isolation . -w dist
 ```
 
-The `policy_e2e` test starts a localhost WebSocket server. Where sockets are
-restricted, run `python -m pytest -q -m 'not policy_e2e'` and run the marked
-test separately with localhost access. Model backend tests use stand-ins;
-loading real checkpoints requires the corresponding policy environment.
+Maintainer test sources and the pytest development extra are excluded from
+this release checkout and its distributions. Their last published source is
+preserved in Git commit `953b8ef`; they are not needed to evaluate tasks or
+models. Recorded acceptance results remain under `installation_evidence/`
+as provenance. Loading real checkpoints requires the corresponding policy
+environment.
 
 `validate_installation_evidence.py` checks the recorded 450-case acceptance,
 runtime identity, pinned simulator versions, asset evidence, and release
