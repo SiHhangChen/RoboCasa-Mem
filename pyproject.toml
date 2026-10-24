@@ -17,7 +17,6 @@ video = ["opencv-python-headless>=4.8"]
 [project.scripts]
 membench-eval = "bench.evaluation.release_cli:main"
 membench-summarize = "scripts.eval.summarize_run:main"
-membench-replay = "scripts.eval.replay_run_actions:main"
 membench-serve-fake = "scripts.serve.serve_fake:main"
 membench-serve-lerobot = "scripts.serve.serve_lerobot:main"
 membench-serve-openpi = "scripts.serve.serve_openpi:main"

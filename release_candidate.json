@@ -572,8 +572,7 @@
     "configs/eval/suites/wr08_v1.yaml": "eedac6ce691d482e91435e1c870db49a2a958cb8a7b83a578997f624e5a15f70",
     "configs/eval/suites/wx01_pi05_r40_t1200_v1.yaml": "710c92126c2aba49f5bfe23d5f0581cbdfda2d9a4a3be259e242e257f8bd96a2",
     "configs/eval/suites/wx01_v1.yaml": "b0fe29f3673db0c149b1cc196fc061efbacbe07da5c4228f6095105f9288c126",
-    "pyproject.toml": "ce2452ef026cb70f80277dd98a42cb873968bd5a06127f85193317e52206ff66",
-    "scripts/eval/replay_run_actions.py": "1ece46a9d8e00d63f2bc27ee602ec6238ac8d68a29fe4ac69039ab66cf431db9",
+    "pyproject.toml": "34a657103fdf94eaafce60a36e3d001d868f91844ef2723fbb48f84122680fd2",
     "scripts/eval/run_remote.py": "fd8a9c472ee950f6e77ee2f0f58c56b3a181a077a1337ae80118c66f983917b7",
     "scripts/eval/summarize_run.py": "91c6c3684edfa0f48bdfce6e365c55444c9eebf3e04a49c182712d63d7f54993",
     "scripts/serve/serve_fake.py": "7b23e68c113883c17292ca43a64efe825fc8331bcc4a06cc2c1caaf211634ab3",
@@ -628,7 +627,8 @@
       "removed": [
         "bench/real_robot/__init__.py",
         "bench/real_robot/contracts.py",
-        "bench/real_robot/wr07_prompts.py"
+        "bench/real_robot/wr07_prompts.py",
+        "scripts/eval/replay_run_actions.py"
       ],
       "added": [],
       "modified": [
