@@ -24,6 +24,7 @@ venv/
 .DS_Store
 
 # Large generated artifacts
+/membench-sim-assets.tar.gz
 *.h5
 *.hdf5
 *.mp4

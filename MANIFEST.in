@@ -2,7 +2,7 @@ recursive-include bench *.py *.yaml *.json *.xml
 recursive-include configs *.yaml *.json
 recursive-include scripts *.py
 prune tests
-include .gitignore README.md LICENSE release_candidate.json
+include .gitignore README.md README.zh-CN.md LICENSE release_candidate.json
 prune docs
 prune bench/real_robot
 prune scripts/release

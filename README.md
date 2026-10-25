@@ -1,5 +1,7 @@
 # RoboCasa-Mem
 
+[English](README.md) | [简体中文](README.zh-CN.md)
+
 RoboCasa-Mem provides nine memory-dependent mobile manipulation tasks in
 RoboCasa, with evaluation interfaces for Pi0.5, ACT, Diffusion Policy, and
 compatible custom policy servers.
