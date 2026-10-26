@@ -24,7 +24,7 @@ from bench.evaluation.suite import load_eval_suite  # noqa: E402
 from bench.tasks import get_builtin_task_plugin, register_builtin_task_plugins  # noqa: E402
 
 
-DEFAULT_SUITE = ROOT / "configs" / "eval" / "suites" / "wx01_v1.yaml"
+DEFAULT_SUITE = ROOT / "configs" / "eval" / "act" / "wx01.yaml"
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

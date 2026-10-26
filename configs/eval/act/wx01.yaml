@@ -1,12 +1,14 @@
-# Canonical 50-seed benchmark suite for TS02.
-suite_version: ts02_v1
+# Official act evaluation for WX-01, seeds 1050-1099.
+suite_version: wx01_act_v2
 task:
-  id: TS02
+  id: WX-01
   env_split: pretrain
   options:
-    task_config_file: bench/tasks/ts02/resources/task.yaml
+    task_config_file: bench/tasks/wx01/resources/task.yaml
     observation_profile_file: configs/benchmark/observation_profiles/rgbd_v3.yaml
-seeds: {start: 1050, stop: 1100}
+seeds:
+  start: 1050
+  stop: 1100
 rollout:
   replan_steps: 50
   action_repeat: 1
@@ -14,7 +16,10 @@ rollout:
   ignore_done: true
 artifacts:
   record_video: true
-  video_cameras: [agentview_left, agentview_right, eye_in_hand]
+  video_cameras:
+  - agentview_left
+  - agentview_right
+  - eye_in_hand
   video_fps: 20
 transport:
   timeout_s: 30.0

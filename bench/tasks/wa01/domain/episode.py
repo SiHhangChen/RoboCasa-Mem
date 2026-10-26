@@ -164,7 +164,7 @@ def resolve_episode_plan(*, seed: int, **values: Any) -> EpisodePlan:
                 values.get("sugar_cube_material_candidates")
             ),
         ),
-        max_horizon=int(values.get("max_horizon", 5000)),
+        max_horizon=int(values.get("max_horizon", 2000)),
     )
 
 

@@ -18,7 +18,7 @@
   "suites": {
     "act/TM01": {
       "env_split": "pretrain",
-      "hash": "sha256:668744b54a4eead45572cd132ea471237f84cf1c8cb7b298b475680d974e657a",
+      "hash": "sha256:0f2504600cbc1f2893e10737dd0ac6129eadbe9a9826f7534b142f07a3953d8d",
       "options": {
         "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
         "task_config_file": "bench/tasks/tm01/resources/task.yaml"
@@ -81,11 +81,12 @@
         1097,
         1098,
         1099
-      ]
+      ],
+      "suite_file": "configs/eval/act/tm01.yaml"
     },
     "act/TM02": {
       "env_split": "pretrain",
-      "hash": "sha256:f3c417cc28d78170b7aa5defe61a0d11cfe296113570f6f4dcb4c267042a60f3",
+      "hash": "sha256:5b6211753e23b0c2ad2bb4a3e40915441de18406872f537564b2b47cf628a0ad",
       "options": {
         "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
         "task_config_file": "bench/tasks/tm02/resources/task.yaml"
@@ -148,11 +149,12 @@
         1097,
         1098,
         1099
-      ]
+      ],
+      "suite_file": "configs/eval/act/tm02.yaml"
     },
     "act/TS02": {
       "env_split": "pretrain",
-      "hash": "sha256:f6bd737c58efc2ac255b9891c0ff6655cce7b635658d1db206fc6ebd4facfcaf",
+      "hash": "sha256:18382495d0d41665b6205c5d6be9b579be54eec5c854c241ed50dbbdec60f794",
       "options": {
         "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
         "task_config_file": "bench/tasks/ts02/resources/task.yaml"
@@ -215,11 +217,12 @@
         1097,
         1098,
         1099
-      ]
+      ],
+      "suite_file": "configs/eval/act/ts02.yaml"
     },
     "act/TS03": {
       "env_split": "pretrain",
-      "hash": "sha256:3e57b419076d2591b19d412b7d2aa848509c9b6c14e415ba5902f138238f0e1e",
+      "hash": "sha256:b48b7a7740e5fd75423a9024e4ee123f97c50ce7ea36efe907837f4abe1e4721",
       "options": {
         "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
         "task_config_file": "bench/tasks/ts03/resources/task.yaml"
@@ -282,11 +285,12 @@
         1097,
         1098,
         1099
-      ]
+      ],
+      "suite_file": "configs/eval/act/ts03.yaml"
     },
     "act/WA-01": {
       "env_split": "pretrain",
-      "hash": "sha256:182f3f36ac9897fdb3bf1add0f2f5b9ed7065b4b8dfa7f1a72c3b5bd75b4705d",
+      "hash": "sha256:7e63ea03216504b53574dc0ae7c17d8df77853566dbdaae00e7d2182c0d7e500",
       "options": {
         "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
         "task_config_file": "bench/tasks/wa01/resources/task.yaml"
@@ -294,7 +298,7 @@
       "rollout": {
         "action_repeat": 1,
         "ignore_done": true,
-        "max_steps": 5000,
+        "max_steps": 2000,
         "replan_steps": 50,
         "stop_on_success": true
       },
@@ -349,11 +353,12 @@
         1097,
         1098,
         1099
-      ]
+      ],
+      "suite_file": "configs/eval/act/wa01.yaml"
     },
     "act/WA-05": {
       "env_split": "pretrain",
-      "hash": "sha256:dc3aeb8bc7084c58bbd23a909a0b2cc32aec5020399e202ff5d6b0bec8006445",
+      "hash": "sha256:99b4d1c79b75676a0deb53b6d2c5c837ac47d9dc37a7fc115352455a8daa3b98",
       "options": {
         "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
         "task_config_file": "bench/tasks/wa05/resources/task.yaml"
@@ -416,11 +421,12 @@
         1097,
         1098,
         1099
-      ]
+      ],
+      "suite_file": "configs/eval/act/wa05.yaml"
     },
     "act/WR-01": {
       "env_split": "pretrain",
-      "hash": "sha256:724fd2f40968820514d59cdf4e556b26f4ae46b3b5ebc986a2326e71441676d2",
+      "hash": "sha256:8786d0fc9ce5e73881666b507f28b6c69de69e613a0f94231e857332a447cfdd",
       "options": {
         "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
         "task_config_file": "bench/tasks/wr01/resources/task.yaml"
@@ -483,11 +489,12 @@
         1097,
         1098,
         1099
-      ]
+      ],
+      "suite_file": "configs/eval/act/wr01.yaml"
     },
     "act/WR-08": {
       "env_split": "pretrain",
-      "hash": "sha256:60edeeeb6b5f90a62966b8f171db5b4e5c4e2538d51af8ffb96a73f14fe3808e",
+      "hash": "sha256:76af8bec07f0c24dd373177dd8e4071f4e285a553449befa38427896c6a69773",
       "options": {
         "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
         "task_config_file": "bench/tasks/wr08/resources/task.yaml"
@@ -550,11 +557,12 @@
         1097,
         1098,
         1099
-      ]
+      ],
+      "suite_file": "configs/eval/act/wr08.yaml"
     },
     "act/WX-01": {
       "env_split": "pretrain",
-      "hash": "sha256:5bf2cfa4dfe4b3543a8f273362262032a38764f535c47888ee064de70ed4664c",
+      "hash": "sha256:b2631cc865224ba7353be0ac22a4e27b11b934c21c9a04d6601a2e1e4c551665",
       "options": {
         "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
         "task_config_file": "bench/tasks/wx01/resources/task.yaml"
@@ -617,11 +625,12 @@
         1097,
         1098,
         1099
-      ]
+      ],
+      "suite_file": "configs/eval/act/wx01.yaml"
     },
     "diffusion/TM01": {
       "env_split": "pretrain",
-      "hash": "sha256:80958fc374589612e1f6412bc6276690d07016f7ec276559f6e9ed222a237f30",
+      "hash": "sha256:8844f7587cc694363ce150a7ef3ca640ac73cdd96270732a5f61e7bf4f18e527",
       "options": {
         "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
         "task_config_file": "bench/tasks/tm01/resources/task.yaml"
@@ -684,11 +693,12 @@
         1097,
         1098,
         1099
-      ]
+      ],
+      "suite_file": "configs/eval/diffusion/tm01.yaml"
     },
     "diffusion/TM02": {
       "env_split": "pretrain",
-      "hash": "sha256:d85e395204ffbbdcc70434d07953aea5064caefa035c1eef1417d0b7f00092b7",
+      "hash": "sha256:3f7530407f73f5bd7061a0b0dcad1e1a5dacd526cfb28e9be79dff8c86e29d28",
       "options": {
         "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
         "task_config_file": "bench/tasks/tm02/resources/task.yaml"
@@ -751,11 +761,12 @@
         1097,
         1098,
         1099
-      ]
+      ],
+      "suite_file": "configs/eval/diffusion/tm02.yaml"
     },
     "diffusion/TS02": {
       "env_split": "pretrain",
-      "hash": "sha256:c8e9056564975c955c729a2ff4dee240bc201a76b93c2f33223b56468f226433",
+      "hash": "sha256:1194587d3229f0cb2ba09cb196c679c644ebfae993e21788ae48e4e4b3d6f9a5",
       "options": {
         "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
         "task_config_file": "bench/tasks/ts02/resources/task.yaml"
@@ -818,11 +829,12 @@
         1097,
         1098,
         1099
-      ]
+      ],
+      "suite_file": "configs/eval/diffusion/ts02.yaml"
     },
     "diffusion/TS03": {
       "env_split": "pretrain",
-      "hash": "sha256:9d7b1bc43139131314cee5400f5aeba3d3f288d1996010a84174978e216aaa93",
+      "hash": "sha256:fde49e3f5539bdd23d8619892fe0f7f84965f47e3871e6a73add3504786c8140",
       "options": {
         "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
         "task_config_file": "bench/tasks/ts03/resources/task.yaml"
@@ -885,11 +897,12 @@
         1097,
         1098,
         1099
-      ]
+      ],
+      "suite_file": "configs/eval/diffusion/ts03.yaml"
     },
     "diffusion/WA-01": {
       "env_split": "pretrain",
-      "hash": "sha256:bb4f359b059f5a9ff5ecdc8ca6c30585345b83e52c21a3ba01a5e0a7e08beede",
+      "hash": "sha256:1ed4ead21c2bda9483c5095736de5152b4d175ded3dde596cf94ce403dadf09d",
       "options": {
         "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
         "task_config_file": "bench/tasks/wa01/resources/task.yaml"
@@ -897,7 +910,7 @@
       "rollout": {
         "action_repeat": 1,
         "ignore_done": true,
-        "max_steps": 5000,
+        "max_steps": 2000,
         "replan_steps": 1,
         "stop_on_success": true
       },
@@ -952,11 +965,12 @@
         1097,
         1098,
         1099
-      ]
+      ],
+      "suite_file": "configs/eval/diffusion/wa01.yaml"
     },
     "diffusion/WA-05": {
       "env_split": "pretrain",
-      "hash": "sha256:a2b7eea0884517627cc388a0e481d61f3c2e9fbd6db32b970da50fe05ec01570",
+      "hash": "sha256:ba5917b7d8d3944e64ac16e310b29f284fe42e01821589bac1f76fcb2f181136",
       "options": {
         "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
         "task_config_file": "bench/tasks/wa05/resources/task.yaml"
@@ -1019,11 +1033,12 @@
         1097,
         1098,
         1099
-      ]
+      ],
+      "suite_file": "configs/eval/diffusion/wa05.yaml"
     },
     "diffusion/WR-01": {
       "env_split": "pretrain",
-      "hash": "sha256:f054161065610710be789281e7955b10bdb53fd46c91ace7b1b416c5bf6364d1",
+      "hash": "sha256:a6a389a815185206ce044975b299f59b7f3b0fa98cae9a1c5792912cd6318051",
       "options": {
         "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
         "task_config_file": "bench/tasks/wr01/resources/task.yaml"
@@ -1086,11 +1101,12 @@
         1097,
         1098,
         1099
-      ]
+      ],
+      "suite_file": "configs/eval/diffusion/wr01.yaml"
     },
     "diffusion/WR-08": {
       "env_split": "pretrain",
-      "hash": "sha256:93bfe8540b132034fc2dd37f87c079d6792c66a7cf808764b3500a37ac0792ce",
+      "hash": "sha256:f68e18fb3a659b8870207eda4bc12e490978695adbc10dfc549ac499121c6283",
       "options": {
         "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
         "task_config_file": "bench/tasks/wr08/resources/task.yaml"
@@ -1153,11 +1169,12 @@
         1097,
         1098,
         1099
-      ]
+      ],
+      "suite_file": "configs/eval/diffusion/wr08.yaml"
     },
     "diffusion/WX-01": {
       "env_split": "pretrain",
-      "hash": "sha256:8d00ed88bf7095b24fdc91a3a56acf0971938b55771bb2ac4581548fc726b2d7",
+      "hash": "sha256:8ae464ca562dbec0a42a22f5b374e543b35fa500a174856706d6637a2bd32174",
       "options": {
         "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
         "task_config_file": "bench/tasks/wx01/resources/task.yaml"
@@ -1220,11 +1237,12 @@
         1097,
         1098,
         1099
-      ]
+      ],
+      "suite_file": "configs/eval/diffusion/wx01.yaml"
     },
     "pi05/TM01": {
       "env_split": "pretrain",
-      "hash": "sha256:95f98a2a30c62e1c5aa41e1c0cd55fdd5a04d325c59001e74e9d6ed8ed4dc51b",
+      "hash": "sha256:1ea7c456ab0d4615e1c1430cd47d8c312cbc27981d194184144c4766c2d2ccce",
       "options": {
         "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
         "task_config_file": "bench/tasks/tm01/resources/task.yaml"
@@ -1287,11 +1305,12 @@
         1097,
         1098,
         1099
-      ]
+      ],
+      "suite_file": "configs/eval/pi05/tm01.yaml"
     },
     "pi05/TM02": {
       "env_split": "pretrain",
-      "hash": "sha256:46960fcca20e125af4229645bbfdbae10ecacc6f6909c8bf0caf8b746fe6765f",
+      "hash": "sha256:55021424667d91a28c720aee542957b9933329839a63fb61c06dc1b16c1e50fe",
       "options": {
         "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
         "task_config_file": "bench/tasks/tm02/resources/task.yaml"
@@ -1354,11 +1373,12 @@
         1097,
         1098,
         1099
-      ]
+      ],
+      "suite_file": "configs/eval/pi05/tm02.yaml"
     },
     "pi05/TS02": {
       "env_split": "pretrain",
-      "hash": "sha256:f0db5b2472bc1a384b6cd843a1f596c59c634ed5f81f2fbd15f2a9a1185a05b1",
+      "hash": "sha256:fda7ac494c8872f98534d84956cb0e548f96bac87b15cbef810c1bb6a457d98f",
       "options": {
         "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
         "task_config_file": "bench/tasks/ts02/resources/task.yaml"
@@ -1421,11 +1441,12 @@
         1097,
         1098,
         1099
-      ]
+      ],
+      "suite_file": "configs/eval/pi05/ts02.yaml"
     },
     "pi05/TS03": {
       "env_split": "pretrain",
-      "hash": "sha256:c2b8ca1fcf473ea9c7c5788ce22aac3c7d899592821b3acb8656a10143b580b6",
+      "hash": "sha256:8eb89249753fc4e0e6b01d0d798ee8689d05da54524f8f83bc3166f4f09794fb",
       "options": {
         "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
         "task_config_file": "bench/tasks/ts03/resources/task.yaml"
@@ -1488,11 +1509,12 @@
         1097,
         1098,
         1099
-      ]
+      ],
+      "suite_file": "configs/eval/pi05/ts03.yaml"
     },
     "pi05/WA-01": {
       "env_split": "pretrain",
-      "hash": "sha256:be273428edde185aad436d4ccba9895d82b1d9c0f0eccc07b8c60ce9757615e8",
+      "hash": "sha256:88a62042fb067c670f7c5fecba1f0e9f4065324b0b906772a5dc203ce49b3f40",
       "options": {
         "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
         "task_config_file": "bench/tasks/wa01/resources/task.yaml"
@@ -1555,11 +1577,12 @@
         1097,
         1098,
         1099
-      ]
+      ],
+      "suite_file": "configs/eval/pi05/wa01.yaml"
     },
     "pi05/WA-05": {
       "env_split": "pretrain",
-      "hash": "sha256:1c26b64047d552dbb7d2282feb5ef9ee0889d89fa84ac6644f47566d24ca2d39",
+      "hash": "sha256:448e0db58ac084e90dde50f776f766936799dc20141360d3273b78fb0c40b1a5",
       "options": {
         "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
         "task_config_file": "bench/tasks/wa05/resources/task.yaml"
@@ -1622,11 +1645,12 @@
         1097,
         1098,
         1099
-      ]
+      ],
+      "suite_file": "configs/eval/pi05/wa05.yaml"
     },
     "pi05/WR-01": {
       "env_split": "pretrain",
-      "hash": "sha256:349cfaf564ed0cae1042620e4382a3cdff2a249198b6570765285047b90ac7be",
+      "hash": "sha256:a1d33033ac6e1b511b818309a4b0a943ca949b14cbb713031f3c4581290dbe5b",
       "options": {
         "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
         "task_config_file": "bench/tasks/wr01/resources/task.yaml"
@@ -1689,11 +1713,12 @@
         1097,
         1098,
         1099
-      ]
+      ],
+      "suite_file": "configs/eval/pi05/wr01.yaml"
     },
     "pi05/WR-08": {
       "env_split": "pretrain",
-      "hash": "sha256:88caa9ee6b8096c64f7fb84eeb3608505c1c8cc85baf67835e2f225b8e1be9cc",
+      "hash": "sha256:a2a198f118b10a6bc5af509c246bfa9037cf681bee3d5d54eb1742615c9f279e",
       "options": {
         "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
         "task_config_file": "bench/tasks/wr08/resources/task.yaml"
@@ -1756,11 +1781,12 @@
         1097,
         1098,
         1099
-      ]
+      ],
+      "suite_file": "configs/eval/pi05/wr08.yaml"
     },
     "pi05/WX-01": {
       "env_split": "pretrain",
-      "hash": "sha256:67a4d186a4a2e3f456a24a23fbb84fda777d91f37747a6bbd03ea270fcc27ed7",
+      "hash": "sha256:74d225a4936723f9eb4bc919992df9598b5da32832ccfc76b197131a8f27e279",
       "options": {
         "observation_profile_file": "configs/benchmark/observation_profiles/rgbd_v3.yaml",
         "task_config_file": "bench/tasks/wx01/resources/task.yaml"
@@ -1823,7 +1849,8 @@
         1097,
         1098,
         1099
-      ]
+      ],
+      "suite_file": "configs/eval/pi05/wx01.yaml"
     }
   },
   "episode_identities": {
@@ -3230,350 +3257,350 @@
     "WA-01/1050/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:d09c74fefd425599ec9d0fb2e198d35a0ca08681da8f0832b1d0ec30ce9df444",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:060586a5b8504a1aaf596133cf6d298ee392199c0312d4d525b4f843691b7013",
+      "release_config_hash": "sha256:ef7c2a0a9af16c32bd5c84c6ef0c8d340e46a5f6a1c25c40ef7d104c18ab7db5",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1051/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:d211f5f2876e47a99b74b9f3b3a6a8a72e045d79b57774babd6c670fdeceb414",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:3c814ae50ded6e35f1e3ed46bb3a76122fdd6cc35d52de95b991bf3c955b8826",
+      "release_config_hash": "sha256:e4e7095adcf7ae2e3ea022e28661a0854a6ab69a0fb4caeef55c118aaa5cd169",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1052/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:b06a804878d17c4a222d0b504f92412bd0c09c3a1a50f0fc48d77659096cadf4",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:f802c271582d5ab1c9b6ee54156c87b442226bad57809be830804ba26c12b1eb",
+      "release_config_hash": "sha256:d91fb0b4f14a11604bb8fcacedf69a129a94e3eafb3d7c2d2b6d45aa3fc916bd",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1053/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:964a9bea2bb4f1a2aca5a9d65500ad54d13195fad7fbe796556ec438a016765e",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:c683024f7d8fee704e5dc0b7f4aaa493d0aa1127ec855753c9e775cf7a71d5f9",
+      "release_config_hash": "sha256:90cf259be19d98bde102f0227895e6f7fbe5bf093d4a1ce26b908c20ffa1b2ee",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1054/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:b86358a16773a70acf52c21865ef65b2853223f16d0e6f564a4069fae26e2227",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:556b7580cde31ed996feddcc8cd30218932765a29a2b4c367b36a190ded49b4d",
+      "release_config_hash": "sha256:1805c27a3e72b20629cd4ce5e0d0ed349b56a33b4eae9e3997c9102665301ba7",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1055/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:a4baf1571a803b58ce6339b8a7c7d6db4a9f80ace1ab6521f6c889601f6e4637",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:223690732c40edce688ebae4c66cb30f8687cf1ec8eb0997b5c7430e330d6edb",
+      "release_config_hash": "sha256:59a76c0280a7a9939dc671bf9b7da3d58d353e6ce2fc50b782dcf033bc35ab0d",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1056/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:22ff3f46a0aacceb5f81e239c67d3f280c3a16fbdd070a1bad0cf9d1ed22f1e3",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:49c0bf06a817472cf0739f70c3690204942edfb67bc1256407c02488a620418f",
+      "release_config_hash": "sha256:2b9f8dc9348bdcee7b6a9531e60fb1cd3d3d15174ad1c46e69b4ea10d22300c1",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1057/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:a31ab56d00cd375af160f6a907f960bb38766a3a2a3e57044810eeb4ac54c6b6",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:ff82e3f69d369e745a7b3501b6c827c8ff9e9bc85b5bfe1f0d9ea048f5fbe52a",
+      "release_config_hash": "sha256:5c1a2addc8c739a2f3ebeb013dcc1f14fb56711bd093190841db2559389e9704",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1058/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:e469d7a03770b3a10ddbdff957032bd802b27b306a7c4d7aa79e7c35ac9d0c2b",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:23d8af63b9275009cab77434ac84599a1cf36b445fdadfc98a9cd6c91b4089d0",
+      "release_config_hash": "sha256:ef3d51f8ffbbbf5522eac9d106e1f80501f6e58848af057e65264ea2f76b56e1",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1059/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:a423eb113fb2e1a5a0d65b757b967787f3afe1c5f8f3cd277e0afa32e46fe9c9",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:f2cb6f46ba92ea6d288118380b4a7a2c4f6fdb468878238ae4c246a9c72ac38c",
+      "release_config_hash": "sha256:eb68028d809f4a1202c275e7994df26d9114840668c7c308943a195e8a186f62",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1060/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:fa6b2035b82b49959e63119b58ab26db903b74775fd5e6d00b7f5b882619ce46",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:eb648748d9acb5fd2589f7868a71fc8d35bba03da44ba00e0fa4064b4890076f",
+      "release_config_hash": "sha256:f6538d9092f66f66d0db9135e78e74ce58ca705f7d36372c49bcbeeb5e5d78e7",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1061/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:04361561fad26c0fad2b592405fde1f83fdca5cdaa01fe9f0f891c1962c2ea79",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:9c1dff9d57e4ad33d7d6f9d601ef9e8ea053c8ef1e71a3a422cd3194ce68a187",
+      "release_config_hash": "sha256:a1896cbc32d97280cb26596a524129f95b4f0680904b35fe956d3f5d50e41f66",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1062/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:2415704a51b71d81bc9cf326880099cf54475e3bb0533760f01c7871dfe13155",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:ced73296c1d9951c8d261f53f63c2f908b746ab032d4afddb9ca13f8e0f0f72d",
+      "release_config_hash": "sha256:3bd29da5646fd17196684ae1c3e98b93ef988a6542f4aa2e710c4b592c80d557",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1063/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:115d5202bfeebba6bb811b3df09d039a404242481d89c01f0061a95fb2342074",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:9d49823fd83e40e1b9340f7d3e8e0303f64a01630bf584b700ea79223cfa6037",
+      "release_config_hash": "sha256:bec6dd1d542ba83af07ec26581c8703905fd3a9fc909f03a07cf6e069619b8af",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1064/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:e3568ff5ef71501725ec63f1160616e41954aee2748527fb4b3896812e6a02b1",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:ad3cd6eab6679a74bf47e7166794828cd21c8218dda8e88835f7d3a7e35396a6",
+      "release_config_hash": "sha256:bdc2ae89b606c84da40e83595c3062d273f2461208298be3bfa5613114597bd1",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1065/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:ac5757a8e96bf845bd539bec98011f4e8cfacdb75bb6932fa1927b2314cdad76",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:b5e1c5209cd6465117df791a5b03658575d5a5562d7d322aadf66ccc47ec2298",
+      "release_config_hash": "sha256:cfa6382dd528070370aefb2852b6cfd8fa20a394cff29321d232a866c7338f2e",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1066/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:6c5d68bbfd9f6aaf804455d085c31d6d7e042efe6f5c51b992bf958a2538a726",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:8dd618d114464aaf05ebc0a8bc8b778fff997dc9a724e9da4514c68c43c66c0e",
+      "release_config_hash": "sha256:9e5e057df034047aafad0837b0208a49d91cd019a45ebf4324cd3bd0a9f8404d",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1067/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:ce88c4c00dd681e61a168f01f8dba5c8c578cec06eccd1ce42e0a0fad889b7d5",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:9e7df81f9272942ae8b3c54959a49902c7e9b8225dfc0720fb38d212aafe21b2",
+      "release_config_hash": "sha256:9998b0389e8b5712709344697ac8a455a81ec595e5549b798b8c17e77af65faa",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1068/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:1ba8840e4984f1a955a53b7f2ac77fe99ea93dbda4aaf32ecc2fe06eb0dd4db9",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:dff27769c6e75c90b0581a0ea9407536f5df79fdb1785b241938a54ef001d660",
+      "release_config_hash": "sha256:7b5337cd925e8c9bc7ea4750cfa46b86dd02b10a08ee2f73c6e53f28c1d5d454",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1069/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:38c927fb0f1b91b01a8594e4138fb0600fa1b8f9fc7ddc8436a1312b824af6ce",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:66d156b18f0052849d967d937c79683706f805d152a59f713418e44ca7fc3d6b",
+      "release_config_hash": "sha256:caac2d528f906edf7d514388f34ab14bba71a10e4256b93faa5789ae98604d7a",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1070/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:5757bbb0b21ecf606f5f7b0d2d8f8e2e7f91677830253af7f0098dc5de6a8bb4",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:d4e8a4c0530497329f447a0b3f3d796b22561b3b9f38da116dc34e4380d87406",
+      "release_config_hash": "sha256:ffdc11853b75b493198369b3ea4d3b91b99b22af3c7f3c0cf9e4e5e62e519e1d",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1071/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:b8a43f0dbfeaa5559dd1b35f9c36d172f0f8f317eed305e789724d5bd21ce973",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:1629d64359991d1ed6a302764904281e068c6068b044a9d2ad4953ddbce461af",
+      "release_config_hash": "sha256:3465c9c9641bacaad7a4a46164a2db6024593730d11c59ecbd2412d47a289916",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1072/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:c94caf9428e2e695d44f2080b550a26cdf57b71724b7f70ef0d7a4f40ccddd07",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:d022b5c9db5ebdab568adc4a2f0421ba716163e3f46bd703719e037589cf786e",
+      "release_config_hash": "sha256:4707d935e31fbade26284c9c2d1d4f1fc8d7e309664161534f7287273b8d77e1",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1073/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:bf7324e0c4339a75ffae9acbdae6b717097c7ada22e68834ac42d7659423a192",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:1b23b961605ccb8128bf8b8a9f152284bd5f0bdf4932c4905a5b5ea57efd384c",
+      "release_config_hash": "sha256:0ce7a115775c7d28136bdb3aa9ea54194b178e8d46391e0c4bb846b9ce980379",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1074/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:3730364f0966041d1ee62e219049b881b4f25ad1f840247d9affa9d59aea9d8b",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:28f18a9e4f23133d08b2e6dc64d1bbacdeb05ee76db601e6f2678e389a98a760",
+      "release_config_hash": "sha256:8bd4ed753c5ffd29fb75585b6f88532030a4926962afe4b510ce4406d3b40092",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1075/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:15e7b947b3ba023bfbfd39972d7ac7ff35f3b133d4f2a1bab9e6ad43d5ab3f80",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:a7dc496e6cbbc220d80612265659dd6264fedb4665908e4db0a72136992a190d",
+      "release_config_hash": "sha256:dddabc663d53c73abd72d2fc710e9fdd248c6c43ef9a8dc40ad7201687e2fa05",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1076/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:5b0151dd218dba94f1b0e89a642450cbe34018ba743d19e7076f049934995aa3",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:0984ac76590a4e3b500995a769d1c5ce1c9ecf9fec66662404fbb98f9c16daef",
+      "release_config_hash": "sha256:502f0185b97a744522bbc3e81828d21ebf48088176b191cf018a9fc1f330a5e6",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1077/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:508421a7dfa3222c56860cd31e608a2ee0aa403c961a47cd1f6441b2d3bdf627",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:8ee6626d6cb359a0fb289a2372e661f04cb6bc1915873838fe031b6a73f7b6c2",
+      "release_config_hash": "sha256:be825d332507ef48c536545c76b1c70f8b4f9fd265405569b62030c059746e78",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1078/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:82f4576ed3a4d31c9920e315397f4ed420aee936b9b331e4876768e1942f7d61",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:028d819f430e3ca0119c8fd484c95c26083e18be5596174d261f17f03ba14512",
+      "release_config_hash": "sha256:2b12d8d0b58b355d322f177a0548036b6aff752b0d55a619fe5fe3c66236c525",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1079/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:45447ac8bee9e3db71e9dce6836110e87c4a023613d3dddffe70b301dee93f8b",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:1139569a4e1d62af5b9b9833fd01570b372e874edd1fb9e465d40460b34ee1a0",
+      "release_config_hash": "sha256:ac67f0cf2d3c5d8faf2234692bf60f9102564cf91b78223f29231afa26931f5d",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1080/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:af74e0780bba703bfa04054533350bb58ad3c2e624dd06c7e585c00c9fa1ad9e",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:8a8a7a5a1963b13da61fab3a942d616f54e7681ab686402339db7c3c9cda87ff",
+      "release_config_hash": "sha256:4367e03ddb1438c26d93e7765e3ed06336ee72490bcc6da7a21342b3a4244f90",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1081/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:9bc9c63e98cfefb782cd90b16caca53c0201515b374839eba8c75d6f6de5ec0a",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:6599d8bbaac619351b1f3c6d499ecae2470bf854e3b3198e1832c153a2cf054e",
+      "release_config_hash": "sha256:a6e6863c09acb7724cec1f5463785e1e9ea9db4a2a8f66a18dd7cc605b44a51b",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1082/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:f8b73f4d1629554c0cebdaab24160f2cb2bdf76bc269c23fdac3ff7f8cec4d44",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:566eb67ecb786f9a505afbb62bc792d2dd611ddcca499cb055066fa27fc26af5",
+      "release_config_hash": "sha256:0559ed6f59e60098c56368e6b2cdf82816a4076cef2be34104d9a310e3c46eba",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1083/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:574d2c6ec04f51dca2025aa9155a70ceef43674a0b037c1eab25b53a1f2be1cf",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:b998780e0ce03e5b28511711d026648dc7bc1ea6e9f4d44af1bff88680009136",
+      "release_config_hash": "sha256:bd61a8077774921a95d61a5e7d09b116515d35685afe2f9107fb417dccc5f966",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1084/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:a8d959aa61ae9db9bf124e0d08693c41a0758a1ae799b9947bfba3ddd3e136c4",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:ebc2b2f89198c948e0c62a8d1389d8a15ef5d9065c992bda04f8761cd8289bb4",
+      "release_config_hash": "sha256:ef94f5afa925abaa00963c1a71f34c12215e76c20751b4a880097bac9cd4b50a",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1085/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:5e81a9374944a25bad1f435607b017bf82535db2b4c1ebb76a2022b32253ad0b",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:a41b0edb8d053240bdb5983449d0a34c30f2ec0bb27a5ab9ecde984e4f2ae1c0",
+      "release_config_hash": "sha256:b8626c0c670ef1f55a1480ba7c431c6756d231978dac65479819404c480084d6",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1086/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:c3532dd81795a6cde9d185f05082113bb232abdda7dfc31ac0be549d8c8a6692",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:06facc1e96c52b2cef57c13c9c182246841031b9bb4f5a6902a82e185fe6d099",
+      "release_config_hash": "sha256:284dcd926a17366d26ae01641d73abc5e3c72f1b690222bf9cf36ff142c0a787",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1087/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:91b04462ae8fd862e76d7e5e2625c91a20b385d70107429ecd318f3c701dd0f2",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:ac3be18caf216e27596875549a6865e93357f7328defd9c5477378cf1739942d",
+      "release_config_hash": "sha256:f07dbf1bef580ecf43fa1d5d165bb09debdedfeda65d85d4b77cae79607b235b",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1088/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:6563e96b96a47be6c3a21f85baaa19aa4ea6953c3a46364dd64f3cf29e070ac6",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:7dd2eae99e8221cdf29493246342cef51910353aa411b73a1a8e3e4dfff3064a",
+      "release_config_hash": "sha256:4415d51ec7be5b9820eb40277fdb8541cdeb716311909504b38f34c7d91195ee",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1089/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:4486bd78e17f36649941c72ca8f62d3ddfb5c98aac562197a726b5e80ed6c15d",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:4b1302b5d1ba7a7da1d7083702b36f0c0aa408c72f8b5f55dc1e4ecb2fd2d976",
+      "release_config_hash": "sha256:44e31cd670dc15bb4e44606e5491ffea4184f2678bd0b1f6614d8aa20e2004ef",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1090/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:4ec3140d9a3374a1a6229db39d647b39d599bbf25513bf48e63b5f3bfca7e9dd",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:a074beb6b7460669b3a8b6c41cd3153ee6e5123ff4aea5c69328edc1f3caf6b9",
+      "release_config_hash": "sha256:eff3c50167e07e9bed721cd3f7b5f5cbea020fcdebaffde5b4c06870b42a4016",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1091/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:0eb4e60e72d69fd6781e2e0d6a4879e0d641588059fad78b410f9c19d466a111",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:c873c18c6aa085fdcaf7d892563762d7558488c4d43c6e7169a622291c5fdfcf",
+      "release_config_hash": "sha256:450d5e6c6ce93908157d8457aec71f8a8f0a216b1f8e12fabe3bee90eec9058f",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1092/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:aff69944501680c938ab12112774dd852cd9e0ed38a86c920be0134f9d215f3e",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:6483c3a973052f8aa52e40a80778198188118019059d1ce55b0ba7d131a3b643",
+      "release_config_hash": "sha256:4c3ba292774b7ad39a340ed33cd048cd78526d477daf9b2ce95b928f6992c947",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1093/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:0afb64edfacfa4ea391c7484b989c72f3b40421fefc1b04e54ed1ecf2f19ccd8",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:152cbe795dab741cf7f8a9081fc0ad611eca7d7b350cb4eb04c3a654a8b67a83",
+      "release_config_hash": "sha256:fab9bd0e1abe1e035bd286852dd892b92b0a7cc045ba745ecbbab30e473b0172",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1094/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:b498634b516d952ec65aeb286c3017a12b1b1660fb4fa54e8bc3e9c132e35191",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:3447951f380103e7774e19b8daa0e9889eea3538748491591bf749cdc2d5341d",
+      "release_config_hash": "sha256:4d25c4a3576d8873eb350f0b04351f6069bbe3727b6de4c537fef7c7c9221c10",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1095/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:3e1ea80dae3157f0a7f5d2b618505406bd56531fab6cf532de71f87bcf75b5ed",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:be991c6e6af5232c2e40ec4a030fb46af47f23b0d7714e5fec37249f6b07e5c5",
+      "release_config_hash": "sha256:2fca466d97eba026ef8d5bf4db4412b02b135a6a748d9a051d03a1f3b49dc6bf",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1096/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:d322a88d0ba0adfab10437741db90723083e405e4b7b371b9b2277801aae5611",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:00881e2d3c70b6a8606c558c2503062e00b732fa726462d4ecbbb13fc1e21e68",
+      "release_config_hash": "sha256:d66355f0fc5307b1d4e2a12bebe206dda5a5d3bc26c38892130cab0ed95e291f",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1097/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:911ea3d645aa85a25636de53d990aed59f0b53631f4cfc5091fe21b0c9b36540",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:813f3cd1d708d5cbafb806dd4194b99330a03c570a845e8a94cf6efaa2747c5e",
+      "release_config_hash": "sha256:a190ae7a1b5d1e63bb919055a20c77c6dd4905cb96b396855021b540cb05bdb7",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1098/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:ca84b619b5a0d25c875421ce89febfb1e6abdaa8f9000308e10c162af7166bfa",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:df200b484b8de58814df6e28d52e3077e1abed5bb9342c1e6022ef6003d8bee5",
+      "release_config_hash": "sha256:a655d84f309d72ad01c454b1037ba7d585fcf50a20e54ca861eb90bf3a2e88f0",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
     "WA-01/1099/sha256:e78b60c529c02c0ba136152be7e92c89d57129f83517cd3960fbf55a1da62ce0": {
       "source_config_hash": "sha256:a8f4ba65f86c068199befb60ce139b65b76f21a83ee574bac608b0c0049a58ab",
       "source_resource_hash": "sha256:ba5ddfb296a6b3f5f4614fd5168cdf1221d013ecc54d7a2193ef49e0e9ef6c33",
-      "release_config_hash": "sha256:a1048002f0991736ab2009bb4deebe757d6005be54775ecec2ffda07d191b066",
+      "release_config_hash": "sha256:3d045875ee096b19bd8899086692183879c1b28383b6e21ace97fa58d9422a7b",
       "release_resource_hash": "sha256:026dc43a2875f78ce5ea20a3516ad175ad18b5d3ac96fb1cb60831a9a370d24b",
       "task_version": "2.0.0"
     },
@@ -4978,5 +5005,5 @@
       "task_version": "1.0.0"
     }
   },
-  "identity_change": "Removed unused planner_script resource; physical task inputs identical."
+  "identity_change": "Unused planner_script was removed previously. WA-01 task horizon is now 2000 steps, and ACT/DP WA-01 budgets are reduced from 5000 to 2000. Suite paths and versions are normalized; the other eight task budgets and all resource contents are unchanged. Historical source hashes describe the original inputs."
 }

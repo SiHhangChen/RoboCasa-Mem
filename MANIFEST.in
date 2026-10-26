@@ -1,5 +1,8 @@
 recursive-include bench *.py *.yaml *.json *.xml
-recursive-include configs *.yaml *.json
+recursive-include configs/benchmark *.yaml *.json
+recursive-include configs/eval/act *.yaml
+recursive-include configs/eval/diffusion *.yaml
+recursive-include configs/eval/pi05 *.yaml
 recursive-include scripts *.py
 prune tests
 include .gitignore README.md README.zh-CN.md LICENSE release_candidate.json

@@ -22,7 +22,7 @@ episode:
   first_delivery_coffee: null
   coffee_material_candidates: [dark_blue, green, brass, red_wood, steel]
   sugar_cube_material_candidates: [original, sugar_white, sugar_cream, sugar_pink, sugar_blue]
-  max_horizon: 5000
+  max_horizon: 2000
 
 initial_state:
   robot_base:

@@ -33,20 +33,41 @@ acceptance after the removal of real-robot integration; see
 
 Select a suite using `<family>:<suffix>`, for example `pi05:wx01`, `act:wa01`,
 or `diffusion:ts03`. All three families have configurations for all nine tasks.
+The release contains only these 27 evaluation suites, organized under
+`configs/eval/act/`, `configs/eval/diffusion/`, and `configs/eval/pi05/`,
+with task names such as `wa01.yaml`.
 The full mapping is in
 [`evaluation_suite_sources.json`](configs/benchmark/evaluation_suite_sources.json).
 
-## Installation
+## Environments and terminals
 
-The tested simulator environment uses Python 3.11, Linux, and an NVIDIA GPU
-with EGL rendering. Use a separate Python environment for the simulator and
-for each model stack; they communicate over WebSocket.
+**`.venv` is the main Python environment required to run RoboCasa-Mem.** Install
+the project, run task simulation and model evaluation, and summarize results in
+this environment. Use two terminals with separate project and policy
+environments:
 
-### 1. Create the simulation environment
+- **Terminal A, project runtime environment (`.venv`, Python 3.11):** install RoboCasa,
+  robosuite, simulator assets, and this repository. Run `membench-eval` and
+  `membench-summarize` here. This process creates the task, renders observations,
+  executes actions, and saves results.
+- **Terminal B, policy environment:** install the chosen model implementation
+  and this repository. Load the checkpoint and run inference here, using
+  `membench-serve-lerobot` for ACT or DP, or `membench-serve-openpi` for Pi0.5.
+  Choose Python and dependency versions for that model implementation.
+
+Terminal A sends observations to Terminal B over WebSocket and receives model
+actions. Keep the model server running while evaluating. The environments can
+share a GPU if memory permits; separate environments do not require two GPUs.
+The simulator requires Linux and an NVIDIA GPU with EGL rendering.
+
+## Install the project runtime environment (Terminal A)
+
+### 1. Create the project runtime environment
 
 ```sh
 git clone https://github.com/SiHhangChen/RoboCasa-Mem.git
 cd RoboCasa-Mem
+export ROBOCASA_MEM_ROOT="$PWD"
 python3.11 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
@@ -115,49 +136,120 @@ export PYOPENGL_PLATFORM=egl
 export MUJOCO_EGL_DEVICE_ID=0
 ```
 
-## Start a model server
+## Start a policy server (Terminal B)
 
-Open a separate terminal and activate your model environment. Install the
-compatible LeRobot or OpenPI implementation and obtain the checkpoint for the
-chosen task. Model packages, task-specific OpenPI configurations, and pretrained
-weights are supplied separately; installing this repository alone does not
-provide them.
+### Prepare the policy environment
 
-Install this checkout into the model environment to expose the server commands:
+The policy environment supplies the implementation and dependencies for the
+chosen model. Keep policy environments and model sources under this checkout's
+`policy/` directory. ACT and DP share `policy/.venv` and `policy/lerobot`;
+Pi0.5 uses its OpenPI environment under `policy/openpi/`. Install this repository
+in each policy environment to expose its server commands. `policy/` is ignored
+by Git and excluded from the release package.
+
+For ACT and DP (Diffusion Policy), the following LeRobot installation is a
+reference configuration. It requires Python 3.12. Set `ROBOCASA_MEM_ROOT` to the
+same checkout used in Terminal A.
+The pinned LeRobot commit is recorded in the historical ACT evaluation manifests;
+the `diffusers-dep` extra supplies DP dependencies.
 
 ```sh
-python -m pip install -e /path/to/RoboCasa-Mem
+export ROBOCASA_MEM_ROOT=/absolute/path/to/RoboCasa-Mem
+cd "$ROBOCASA_MEM_ROOT"
+mkdir -p policy
+python3.12 -m venv policy/.venv
+source policy/.venv/bin/activate
+export TORCH_HOME="$ROBOCASA_MEM_ROOT/policy/.cache/torch"
+export HF_HOME="$ROBOCASA_MEM_ROOT/policy/.cache/huggingface"
+python -m pip install --upgrade pip
+git clone https://github.com/huggingface/lerobot.git policy/lerobot
+git -C policy/lerobot checkout 64b23178d5348609c266250d3e1f511eba4c33ff
+python -m pip install 'torch==2.7.1' 'torchvision==0.22.1' 'numpy==2.2.5' -e 'policy/lerobot[diffusers-dep]'
+python -m pip install -e "$ROBOCASA_MEM_ROOT"
+python -m pip check
+python -c 'from lerobot.policies.factory import make_pre_post_processors; from lerobot.policies.act.modeling_act import ACTPolicy; from lerobot.policies.diffusion.modeling_diffusion import DiffusionPolicy; print("ACT and DP imports OK")'
 ```
 
-For ACT or Diffusion Policy, the server selects the backend from the
-checkpoint's `config.json`:
+If Git cloning times out, replace the clone and checkout commands above with
+this download of the same pinned official source, then continue with the pip
+installation commands:
+
+```sh
+curl -fL --connect-timeout 15 --max-time 90 --retry 1 -o policy/lerobot-64b23178.tar.gz https://codeload.github.com/huggingface/lerobot/tar.gz/64b23178d5348609c266250d3e1f511eba4c33ff
+mkdir -p policy/lerobot
+tar -xzf policy/lerobot-64b23178.tar.gz -C policy/lerobot --strip-components=1
+```
+
+On 2026-10-26, this shared environment passed fresh installation, dependency and
+import checks, and CUDA forward passes for both ACT and DP using trained WA-01
+checkpoints and synthetic observations. Simulation smoke validation is described
+in [Validation and release status](#validation-and-release-status).
+The first model load may download ResNet18 backbone weights into `TORCH_HOME`.
+The project runtime's LeRobot 0.3.3 dependency lacks `make_pre_post_processors`;
+run the LeRobot policy server in the policy environment.
+
+Choose one of the examples below for the model being evaluated. Each example
+uses port 8000 and a WA-01 checkpoint. Keep the selected server running while
+Terminal A evaluates the matching suite.
+
+### ACT example
+
+In the policy environment, replace the checkpoint path with your ACT model:
 
 ```sh
 membench-serve-lerobot \
-  --checkpoint /path/to/pretrained_model \
+  --checkpoint /path/to/act-wa01/checkpoints/040000/pretrained_model \
   --device cuda \
   --port 8000
 ```
 
-Use a compatible LeRobot checkpoint with the benchmark state/action and camera
-metadata. `membench_policy.json` supplies the simulation state schema and any
-required camera mapping; the server checks the checkpoint contract on loading.
+In Terminal A, use `--suite act:wa01`.
 
-For Pi0.5, replace `YOUR_OPENPI_CONFIG` with the configuration registered in
-your OpenPI installation for that checkpoint:
+### DP example
+
+In the policy environment with Diffusion dependencies installed, replace the
+checkpoint path with your DP model:
 
 ```sh
+membench-serve-lerobot \
+  --checkpoint /path/to/dp-wa01/checkpoints/040000/pretrained_model \
+  --device cuda \
+  --port 8000
+```
+
+In Terminal A, use `--suite diffusion:wa01`. The server selects ACT or DP from
+the checkpoint's `config.json`.
+
+Both LeRobot checkpoint directories must include `config.json`, model weights, saved
+preprocessor/postprocessor configurations and statistics, and the benchmark
+metadata in `membench_policy.json`. That metadata supplies the simulation state
+schema and required camera mapping; the server checks the contract on loading.
+
+### Pi0.5 example
+
+In Terminal B, activate a policy environment containing the compatible OpenPI
+implementation. Replace `YOUR_OPENPI_CONFIG` with the registered configuration
+for your WA-01 checkpoint:
+
+```sh
+export ROBOCASA_MEM_ROOT=/absolute/path/to/RoboCasa-Mem
+source "$ROBOCASA_MEM_ROOT/policy/openpi/.venv/bin/activate"
+python -m pip install -e "$ROBOCASA_MEM_ROOT"
 membench-serve-openpi \
   --config YOUR_OPENPI_CONFIG \
-  --checkpoint /path/to/checkpoint \
+  --checkpoint /path/to/pi05-wa01/checkpoint \
   --image-size 224 \
   --seed-by-episode \
   --port 8000
 ```
 
-Both examples listen on `127.0.0.1`. Use `--host` when running the server on
+In Terminal A, use `--suite pi05:wa01`. Model packages, task-specific OpenPI
+configurations, and checkpoints are supplied separately. The LeRobot installation
+above does not install OpenPI.
+
+All examples listen on `127.0.0.1`. Use `--host` when running the server on
 another machine, and use that machine's address in the evaluation endpoint.
-Run either command with `--help` for additional options.
+Run the corresponding server command with `--help` for additional options.
 
 Custom servers must implement the benchmark's `membench-policy/v2` protocol
 with the simulation runtime profile: 37 state values, 13 action values,
@@ -166,33 +258,37 @@ and 20 Hz control. See the
 [protocol definitions](bench/policy/protocol/contracts.py) and
 [simulation data contract](bench/runtime/data_contract.py).
 
-## Run an evaluation
+## Run an evaluation (Terminal A)
 
-Return to the simulation terminal with its environment activated. First check
-the selected suite against the running model server:
+Return to Terminal A and activate the project runtime environment, `.venv`. The following
+example connects to the ACT WA-01 server started above. First check the suite
+against the running model server:
 
 ```sh
+cd /absolute/path/to/RoboCasa-Mem
+source .venv/bin/activate
 membench-eval \
   --endpoint ws://localhost:8000 \
-  --suite pi05:wx01 \
+  --suite act:wa01 \
   --preflight-only
 ```
 
 Preflight validates the task, suite, and remote policy contract without creating
-a simulator environment. It does not verify asset restoration or rendering.
+a simulated task instance. It does not verify asset restoration or rendering.
 Then run the full 50-seed suite:
 
 ```sh
 membench-eval \
   --endpoint ws://localhost:8000 \
-  --suite pi05:wx01 \
+  --suite act:wa01 \
   --output-root ./outputs/eval \
-  --run-id wx01-pi05
+  --run-id wa01-act-round1
 ```
 
-For another model or task, choose its matching suite, such as `act:wa01` or
-`diffusion:ts03`, and use a distinct run ID. A YAML file path is also accepted
-by `--suite` for custom experiments.
+For another model or task, load its matching checkpoint in Terminal B and
+choose the corresponding suite in Terminal A, such as `pi05:wx01` or
+`diffusion:ts03`. Use a distinct run ID. A YAML file path is also accepted by
+`--suite` for custom experiments.
 
 The recorded suites preserve each model family's execution settings:
 
@@ -202,9 +298,10 @@ The recorded suites preserve each model family's execution settings:
 | `act` | Use the recorded truncation interval for each task |
 | `diffusion` | Request one action at a time (`r1`); retain the server's 47-action queue and update observations on each request |
 
-Keep the suite settings when comparing against recorded experiments. The 27
-suite files preserve their recorded bytes and hashes; for example, ACT WA-01
-uses a 5000-step budget.
+WA-01 uses an explicit 2000-step budget for ACT, DP, and Pi0.5, with a matching
+2000-step task horizon. Historical ACT and DP WA-01 runs used 5000 steps; their
+recorded results are not directly comparable to the new budget. The other eight
+tasks retain their existing per-family budgets and replanning intervals.
 
 WX-01 begins with a physically held sponge. Included initialization transcripts
 cover all 50 seeds and replace reset-time planning. Setup steps precede policy
@@ -213,7 +310,8 @@ simulator-state mismatch causes an error; MPlib is not needed for evaluation.
 
 ## Results and resuming
 
-The example above writes to `outputs/eval/wx01-pi05/`. Its
+Run result commands in Terminal A. The example above writes to
+`outputs/eval/wa01-act-round1/`. Its
 `run_manifest.json` records the suite, seeds, model contract, and runtime
 identity; `summary.json` aggregates committed episode artifacts, including
 task success and stage results. Videos are saved when enabled by the suite.
@@ -225,7 +323,7 @@ episodes. Use a new run ID for a different configuration or model.
 To rebuild and verify a summary from an existing run:
 
 ```sh
-membench-summarize ./outputs/eval/wx01-pi05
+membench-summarize ./outputs/eval/wa01-act-round1
 ```
 
 The evaluation and summary commands exit with code `0` when results satisfy
@@ -234,16 +332,33 @@ contain task failures; completeness does not mean every episode succeeded.
 
 ## Validation and release status
 
+On 2026-10-25, a fresh Python environment with an independent local release-source
+snapshot passed all 450 simulation checks (nine tasks, seeds 1050–1099), including
+three hold-action steps, three-camera rendering, stage reports, and artifacts.
+This was an editable source installation; it did not test real-model inference
+or replace installed-wheel acceptance. On 2026-10-26, the shared policy environment
+separately passed dependency and import checks and ACT/DP CUDA inference with
+trained WA-01 checkpoints and synthetic observations. An ACT WA-01 smoke run on
+seed 1050 then completed 2000 simulation steps and 40 model requests without
+runtime errors, with 2000 actions, three 2000-frame videos, and a complete stage
+report. It passed the sugar-added stage but did not complete the task within the
+budget. This validates one execution path, not full benchmark accuracy; DP model
+simulation episodes remain unverified.
+
 The previous wheel passed an installation check in an independent Python
 environment with pinned simulator sources and all 3035 restored assets. It
 covered all 450 official task/seed inputs (nine tasks × 50 seeds), including
 initialization, rendering, and three hold-action steps per case. This used the
 same host and GPU driver; model inference and full model rollouts were not rerun.
 
-The current package removes real-robot integration and changes policy runtime
-files. Its built wheel passed 47 software regression checks, including a local
-WebSocket evaluation flow, and checks of the OpenPI simulation interface and
-all 27 suite selectors. The 450-case installed-wheel acceptance must be repeated
+The current package removes real-robot integration, changes policy runtime
+files, reorganizes the evaluation configurations, and sets the WA-01 budget to
+2000 steps. An earlier wheel after real-robot removal passed 47 software
+regression checks, including a local WebSocket evaluation flow and checks of the
+OpenPI simulation interface and all 27 suite selectors. The reorganized release
+passed all 27 selectors and resolution of 450 episode input identities; its wheel
+and source distribution each contain exactly the 27 official evaluation suites.
+The 450-case installed-wheel acceptance must be repeated
 for the current package. Final source freezing and public asset delivery are
 also pending. See [`release_candidate.json`](release_candidate.json).
 

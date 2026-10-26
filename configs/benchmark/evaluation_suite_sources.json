@@ -1,6 +1,6 @@
 {
-  "schema_version": "membench.evaluation_suite_sources/v1",
-  "description": "Verified copies of suites used by the latest recorded 50-seed runs for the nine release tasks; provenance inventory, not a regenerated benchmark release lock. Effective budgets are copied from run manifests.",
+  "schema_version": "membench.evaluation_suite_sources/v2",
+  "description": "Official release evaluation suites: nine tasks for each of ACT, Diffusion Policy, and Pi0.5. WA-01 uses 2000 steps for every family. Historical configurations are maintained separately outside the release.",
   "task_order": [
     "wx01",
     "wa01",
@@ -12,371 +12,93 @@
     "tm01",
     "tm02"
   ],
-  "created_files": [
-    "configs/eval/diffusion/tm01_r1_v1.yaml",
-    "configs/eval/diffusion/tm02_r1_v1.yaml",
-    "configs/eval/diffusion/ts02_r1_v1.yaml",
-    "configs/eval/diffusion/ts03_r1_v1.yaml",
-    "configs/eval/diffusion/wa01_r1_v1.yaml",
-    "configs/eval/diffusion/wa05_r1_v1.yaml",
-    "configs/eval/diffusion/wr01_r1_v1.yaml",
-    "configs/eval/diffusion/wr08_r1_v1.yaml",
-    "configs/eval/diffusion/wx01_r1_v1.yaml",
-    "configs/eval/legacy_suites/wa01_gr00t_r40_v1.yaml",
-    "configs/eval/legacy_suites/wa05_pi05_r40_t2000_v1.yaml",
-    "configs/eval/legacy_suites/wr01_pi05_r40_t2600_v1.yaml",
-    "configs/eval/legacy_suites/wr08_gr00t_r40_v1.yaml",
-    "configs/eval/suites/tm01_pi05_r40_v1.yaml",
-    "configs/eval/suites/tm02_pi05_r40_v1.yaml",
-    "configs/eval/suites/ts02_pi05_r40_v1.yaml",
-    "configs/eval/suites/ts03_pi05_r40_v1.yaml",
-    "configs/eval/suites/wx01_pi05_r40_t1200_v1.yaml"
-  ],
-  "already_present_files": [
-    "configs/eval/suites/tm01_v1.yaml",
-    "configs/eval/suites/tm02_v1.yaml",
-    "configs/eval/suites/ts02_v1.yaml",
-    "configs/eval/suites/ts03_v1.yaml",
-    "configs/eval/suites/wa01_v1.yaml",
-    "configs/eval/suites/wa05_v1.yaml",
-    "configs/eval/suites/wr01_v1.yaml",
-    "configs/eval/suites/wr08_v1.yaml",
-    "configs/eval/suites/wx01_v1.yaml"
-  ],
   "entries": [
     {
-      "family": "pi05",
-      "task_id": "WX-01",
-      "suite_file": "configs/eval/suites/wx01_pi05_r40_t1200_v1.yaml",
-      "source_suite_file": "/home/chensihang/membench/configs/eval/suites/wx01_pi05_r40_t1200_v1.yaml",
-      "file_sha256": "710c92126c2aba49f5bfe23d5f0581cbdfda2d9a4a3be259e242e257f8bd96a2",
-      "normalized_suite_hash": "sha256:67a4d186a4a2e3f456a24a23fbb84fda777d91f37747a6bbd03ea270fcc27ed7",
-      "run_id": "wx01-pi05-s19999-r40-t1200-seedrng-v1",
-      "source_run_manifest": "/home/chensihang/membench/outputs/eval/wx01-pi05-s19999-r40-t1200-seedrng-v1/run_manifest.json",
-      "source_created_at": "2026-09-24T05:49:16.426581+00:00",
+      "family": "act",
+      "task_id": "TM01",
+      "suite_file": "configs/eval/act/tm01.yaml",
+      "file_sha256": "b931a77911a829006e71fb8fc31e9e6496874fd92f22e642d15b4204be00080c",
+      "normalized_suite_hash": "sha256:0f2504600cbc1f2893e10737dd0ac6129eadbe9a9826f7534b142f07a3953d8d",
       "effective_rollout": {
         "action_repeat": 1,
         "ignore_done": true,
-        "max_steps": 1200,
-        "replan_steps": 40,
+        "max_steps": 3200,
+        "replan_steps": 50,
         "stop_on_success": true
-      },
-      "configured_rollout": {
-        "max_steps": 1200,
-        "replan_steps": 40,
-        "action_repeat": 1,
-        "stop_on_success": true,
-        "ignore_done": true
       },
       "seeds": {
         "start": 1050,
         "stop": 1100
       },
-      "source_result_publishable": true,
       "execution_semantics": {
-        "client_requests_after_actions": 40,
-        "server_returned_action_horizon": 50
+        "client_requests_after_actions": 50,
+        "server_returned_action_horizon": 100,
+        "server_prediction_method": "predict_action_chunk"
       }
     },
     {
-      "family": "pi05",
-      "task_id": "WA-01",
-      "suite_file": "configs/eval/legacy_suites/wa01_gr00t_r40_v1.yaml",
-      "source_suite_file": "/home/chensihang/membench/configs/eval/legacy_suites/wa01_gr00t_r40_v1.yaml",
-      "file_sha256": "b1ec51359a7223169f928754703ba3eb55e1d2931e1c11b6740667cc9c0ca3fb",
-      "normalized_suite_hash": "sha256:be273428edde185aad436d4ccba9895d82b1d9c0f0eccc07b8c60ce9757615e8",
-      "run_id": "wa01-pi05-25000-r40-stability-a",
-      "source_run_manifest": "/home/chensihang/membench/outputs/eval/wa01-pi05-25000-r40-stability-a/run_manifest.json",
-      "source_created_at": "2026-09-18T09:56:15.860605+00:00",
+      "family": "act",
+      "task_id": "TM02",
+      "suite_file": "configs/eval/act/tm02.yaml",
+      "file_sha256": "1d48ed4010e040f4de4005892abb2ccd83f6fe4d509efa677fc171915dc68534",
+      "normalized_suite_hash": "sha256:5b6211753e23b0c2ad2bb4a3e40915441de18406872f537564b2b47cf628a0ad",
       "effective_rollout": {
         "action_repeat": 1,
         "ignore_done": true,
-        "max_steps": 2000,
-        "replan_steps": 40,
+        "max_steps": 3600,
+        "replan_steps": 50,
         "stop_on_success": true
-      },
-      "configured_rollout": {
-        "max_steps": 2000,
-        "replan_steps": 40,
-        "action_repeat": 1,
-        "stop_on_success": true,
-        "ignore_done": true
       },
       "seeds": {
         "start": 1050,
         "stop": 1100
       },
-      "source_result_publishable": true,
       "execution_semantics": {
-        "client_requests_after_actions": 40,
-        "server_returned_action_horizon": 50
+        "client_requests_after_actions": 50,
+        "server_returned_action_horizon": 100,
+        "server_prediction_method": "predict_action_chunk"
       }
     },
     {
-      "family": "pi05",
-      "task_id": "WA-05",
-      "suite_file": "configs/eval/legacy_suites/wa05_pi05_r40_t2000_v1.yaml",
-      "source_suite_file": "/home/chensihang/membench/configs/eval/legacy_suites/wa05_pi05_r40_t2000_v1.yaml",
-      "file_sha256": "92016f285df5a6cd928801f0a6ecbbb89152d303366dd25e2dc948ceb0a07594",
-      "normalized_suite_hash": "sha256:1c26b64047d552dbb7d2282feb5ef9ee0889d89fa84ac6644f47566d24ca2d39",
-      "run_id": "wa05-pi05-3view-full-stride10-s20000-r40-t2000-seedrng-v1",
-      "source_run_manifest": "/home/chensihang/membench/outputs/eval/wa05-pi05-3view-full-stride10-s20000-r40-t2000-seedrng-v1/run_manifest.json",
-      "source_created_at": "2026-09-21T07:39:00.432082+00:00",
-      "effective_rollout": {
-        "action_repeat": 1,
-        "ignore_done": true,
-        "max_steps": 2000,
-        "replan_steps": 40,
-        "stop_on_success": true
-      },
-      "configured_rollout": {
-        "max_steps": 2000,
-        "replan_steps": 40,
-        "action_repeat": 1,
-        "stop_on_success": true,
-        "ignore_done": true
-      },
-      "seeds": {
-        "start": 1050,
-        "stop": 1100
-      },
-      "source_result_publishable": true,
-      "execution_semantics": {
-        "client_requests_after_actions": 40,
-        "server_returned_action_horizon": 50
-      }
-    },
-    {
-      "family": "pi05",
-      "task_id": "WR-01",
-      "suite_file": "configs/eval/legacy_suites/wr01_pi05_r40_t2600_v1.yaml",
-      "source_suite_file": "/home/chensihang/membench/configs/eval/legacy_suites/wr01_pi05_r40_t2600_v1.yaml",
-      "file_sha256": "b726bfc38359e21d3bef360a7d25abb55ad9c24ca7e8d6ec06bb68056bb7c278",
-      "normalized_suite_hash": "sha256:349cfaf564ed0cae1042620e4382a3cdff2a249198b6570765285047b90ac7be",
-      "run_id": "wr01-pi05-3view-full-stride10-s20000-r40-t2600-seedrng-v1",
-      "source_run_manifest": "/home/chensihang/membench/outputs/eval/wr01-pi05-3view-full-stride10-s20000-r40-t2600-seedrng-v1/run_manifest.json",
-      "source_created_at": "2026-09-19T06:37:15.213233+00:00",
-      "effective_rollout": {
-        "action_repeat": 1,
-        "ignore_done": true,
-        "max_steps": 2600,
-        "replan_steps": 40,
-        "stop_on_success": true
-      },
-      "configured_rollout": {
-        "max_steps": 2600,
-        "replan_steps": 40,
-        "action_repeat": 1,
-        "stop_on_success": true,
-        "ignore_done": true
-      },
-      "seeds": {
-        "start": 1050,
-        "stop": 1100
-      },
-      "source_result_publishable": true,
-      "execution_semantics": {
-        "client_requests_after_actions": 40,
-        "server_returned_action_horizon": 50
-      }
-    },
-    {
-      "family": "pi05",
-      "task_id": "WR-08",
-      "suite_file": "configs/eval/legacy_suites/wr08_gr00t_r40_v1.yaml",
-      "source_suite_file": "/home/chensihang/membench/configs/eval/legacy_suites/wr08_gr00t_r40_v1.yaml",
-      "file_sha256": "8df5bc582d4265fd29d5ca68ccd4af5ff84a673cf3263efeeb7379483e7a3cb6",
-      "normalized_suite_hash": "sha256:88caa9ee6b8096c64f7fb84eeb3608505c1c8cc85baf67835e2f225b8e1be9cc",
-      "run_id": "wr08-pi05-3view-full-stride10-s30000-r40-seedrng-v1",
-      "source_run_manifest": "/home/chensihang/membench/outputs/eval/wr08-pi05-3view-full-stride10-s30000-r40-seedrng-v1/run_manifest.json",
-      "source_created_at": "2026-09-21T03:51:08.489047+00:00",
-      "effective_rollout": {
-        "action_repeat": 1,
-        "ignore_done": true,
-        "max_steps": 2000,
-        "replan_steps": 40,
-        "stop_on_success": true
-      },
-      "configured_rollout": {
-        "max_steps": 2000,
-        "replan_steps": 40,
-        "action_repeat": 1,
-        "stop_on_success": true,
-        "ignore_done": true
-      },
-      "seeds": {
-        "start": 1050,
-        "stop": 1100
-      },
-      "source_result_publishable": true,
-      "execution_semantics": {
-        "client_requests_after_actions": 40,
-        "server_returned_action_horizon": 50
-      }
-    },
-    {
-      "family": "pi05",
+      "family": "act",
       "task_id": "TS02",
-      "suite_file": "configs/eval/suites/ts02_pi05_r40_v1.yaml",
-      "source_suite_file": "/home/chensihang/membench/configs/eval/suites/ts02_pi05_r40_v1.yaml",
-      "file_sha256": "68fb2555f115f327024ce3f5b785381a639624d63f150dd1ca9226ab5b60121e",
-      "normalized_suite_hash": "sha256:f0db5b2472bc1a384b6cd843a1f596c59c634ed5f81f2fbd15f2a9a1185a05b1",
-      "run_id": "ts02-pi05-3view-full-stride10-s20000-r40-seedrng-v1",
-      "source_run_manifest": "/home/chensihang/membench/outputs/eval/ts02-pi05-3view-full-stride10-s20000-r40-seedrng-v1/run_manifest.json",
-      "source_created_at": "2026-09-21T11:06:41.259749+00:00",
+      "suite_file": "configs/eval/act/ts02.yaml",
+      "file_sha256": "181f768edd656b6cde14e8e58478fcb62c50168a2de4c10d92a5c1f1f7f5b55b",
+      "normalized_suite_hash": "sha256:18382495d0d41665b6205c5d6be9b579be54eec5c854c241ed50dbbdec60f794",
       "effective_rollout": {
         "action_repeat": 1,
         "ignore_done": true,
         "max_steps": 2800,
-        "replan_steps": 40,
+        "replan_steps": 50,
         "stop_on_success": true
-      },
-      "configured_rollout": {
-        "replan_steps": 40,
-        "action_repeat": 1,
-        "stop_on_success": true,
-        "ignore_done": true
       },
       "seeds": {
         "start": 1050,
         "stop": 1100
       },
-      "source_result_publishable": true,
       "execution_semantics": {
-        "client_requests_after_actions": 40,
-        "server_returned_action_horizon": 50
-      }
-    },
-    {
-      "family": "pi05",
-      "task_id": "TS03",
-      "suite_file": "configs/eval/suites/ts03_pi05_r40_v1.yaml",
-      "source_suite_file": "/home/chensihang/membench/configs/eval/suites/ts03_pi05_r40_v1.yaml",
-      "file_sha256": "dab63027a90c6b7990a6f20e085a8ce1830d6256e0558dcc6393d2646ea81038",
-      "normalized_suite_hash": "sha256:c2b8ca1fcf473ea9c7c5788ce22aac3c7d899592821b3acb8656a10143b580b6",
-      "run_id": "ts03-pi05-20000-r40-50seeds-v1",
-      "source_run_manifest": "/home/chensihang/membench/outputs/eval/ts03-pi05-20000-r40-50seeds-v1/run_manifest.json",
-      "source_created_at": "2026-09-21T08:33:34.832491+00:00",
-      "effective_rollout": {
-        "action_repeat": 1,
-        "ignore_done": true,
-        "max_steps": 1800,
-        "replan_steps": 40,
-        "stop_on_success": true
-      },
-      "configured_rollout": {
-        "max_steps": 1800,
-        "replan_steps": 40,
-        "action_repeat": 1,
-        "stop_on_success": true,
-        "ignore_done": true
-      },
-      "seeds": {
-        "start": 1050,
-        "stop": 1100
-      },
-      "source_result_publishable": false,
-      "execution_semantics": {
-        "client_requests_after_actions": 40,
-        "server_returned_action_horizon": 50
-      }
-    },
-    {
-      "family": "pi05",
-      "task_id": "TM01",
-      "suite_file": "configs/eval/suites/tm01_pi05_r40_v1.yaml",
-      "source_suite_file": "/home/chensihang/membench/configs/eval/suites/tm01_pi05_r40_v1.yaml",
-      "file_sha256": "bce8ec98cb55fc8235c5b034c84dc52efd2621319f38e21b267e10562c2e45d4",
-      "normalized_suite_hash": "sha256:95f98a2a30c62e1c5aa41e1c0cd55fdd5a04d325c59001e74e9d6ed8ed4dc51b",
-      "run_id": "tm01-pi05-3view-full-stride10-s30000-r40-seedrng-v1",
-      "source_run_manifest": "/home/chensihang/membench/outputs/eval/tm01-pi05-3view-full-stride10-s30000-r40-seedrng-v1/run_manifest.json",
-      "source_created_at": "2026-09-22T09:57:23.728161+00:00",
-      "effective_rollout": {
-        "action_repeat": 1,
-        "ignore_done": true,
-        "max_steps": 3200,
-        "replan_steps": 40,
-        "stop_on_success": true
-      },
-      "configured_rollout": {
-        "max_steps": 3200,
-        "replan_steps": 40,
-        "action_repeat": 1,
-        "stop_on_success": true,
-        "ignore_done": true
-      },
-      "seeds": {
-        "start": 1050,
-        "stop": 1100
-      },
-      "source_result_publishable": true,
-      "execution_semantics": {
-        "client_requests_after_actions": 40,
-        "server_returned_action_horizon": 50
-      }
-    },
-    {
-      "family": "pi05",
-      "task_id": "TM02",
-      "suite_file": "configs/eval/suites/tm02_pi05_r40_v1.yaml",
-      "source_suite_file": "/home/chensihang/membench/configs/eval/suites/tm02_pi05_r40_v1.yaml",
-      "file_sha256": "9663ca8d1f7894910ec73ba93bbaa0c2ae3a193681561bde809a406551b3a306",
-      "normalized_suite_hash": "sha256:46960fcca20e125af4229645bbfdbae10ecacc6f6909c8bf0caf8b746fe6765f",
-      "run_id": "tm02-pi05-3view-full-stride10-s30000-r40-seedrng-v2",
-      "source_run_manifest": "/home/chensihang/membench/outputs/eval/tm02-pi05-3view-full-stride10-s30000-r40-seedrng-v2/run_manifest.json",
-      "source_created_at": "2026-09-24T05:11:31.612936+00:00",
-      "effective_rollout": {
-        "action_repeat": 1,
-        "ignore_done": true,
-        "max_steps": 3600,
-        "replan_steps": 40,
-        "stop_on_success": true
-      },
-      "configured_rollout": {
-        "max_steps": 3600,
-        "replan_steps": 40,
-        "action_repeat": 1,
-        "stop_on_success": true,
-        "ignore_done": true
-      },
-      "seeds": {
-        "start": 1050,
-        "stop": 1100
-      },
-      "source_result_publishable": true,
-      "execution_semantics": {
-        "client_requests_after_actions": 40,
-        "server_returned_action_horizon": 50
+        "client_requests_after_actions": 50,
+        "server_returned_action_horizon": 100,
+        "server_prediction_method": "predict_action_chunk"
       }
     },
     {
       "family": "act",
-      "task_id": "WX-01",
-      "suite_file": "configs/eval/suites/wx01_v1.yaml",
-      "source_suite_file": "/home/chensihang/membench/configs/eval/suites/wx01_v1.yaml",
-      "file_sha256": "b0fe29f3673db0c149b1cc196fc061efbacbe07da5c4228f6095105f9288c126",
-      "normalized_suite_hash": "sha256:5bf2cfa4dfe4b3543a8f273362262032a38764f535c47888ee064de70ed4664c",
-      "run_id": "act-wx01-40000",
-      "source_run_manifest": "/home/chensihang/membench/outputs/eval/act-wx01-40000/run_manifest.json",
-      "source_created_at": "2026-09-19T09:58:23.271981+00:00",
+      "task_id": "TS03",
+      "suite_file": "configs/eval/act/ts03.yaml",
+      "file_sha256": "35b8ff18a7cddde003aac2d95dcb008cfd8ecd50a7c45a6e2adf2e01218d5e1b",
+      "normalized_suite_hash": "sha256:b48b7a7740e5fd75423a9024e4ee123f97c50ce7ea36efe907837f4abe1e4721",
       "effective_rollout": {
         "action_repeat": 1,
         "ignore_done": true,
-        "max_steps": 3200,
+        "max_steps": 1800,
         "replan_steps": 50,
         "stop_on_success": true
-      },
-      "configured_rollout": {
-        "replan_steps": 50,
-        "action_repeat": 1,
-        "stop_on_success": true,
-        "ignore_done": true
       },
       "seeds": {
         "start": 1050,
         "stop": 1100
       },
-      "source_result_publishable": true,
       "execution_semantics": {
         "client_requests_after_actions": 50,
         "server_returned_action_horizon": 100,
@@ -386,31 +108,20 @@
     {
       "family": "act",
       "task_id": "WA-01",
-      "suite_file": "configs/eval/suites/wa01_v1.yaml",
-      "source_suite_file": "/home/chensihang/membench/configs/eval/suites/wa01_v1.yaml",
-      "file_sha256": "e96f27413e172e058cd47eb667dfd36bd2e98a41f3667eedd7b6ce018237254c",
-      "normalized_suite_hash": "sha256:182f3f36ac9897fdb3bf1add0f2f5b9ed7065b4b8dfa7f1a72c3b5bd75b4705d",
-      "run_id": "act-wa01-40000",
-      "source_run_manifest": "/home/chensihang/membench/outputs/eval/act-wa01-40000/run_manifest.json",
-      "source_created_at": "2026-09-19T08:53:04.802910+00:00",
+      "suite_file": "configs/eval/act/wa01.yaml",
+      "file_sha256": "db72c18d1944f82c059f1dbbfff58030fd635e2b1c64c351bbd7d6952eb791ad",
+      "normalized_suite_hash": "sha256:7e63ea03216504b53574dc0ae7c17d8df77853566dbdaae00e7d2182c0d7e500",
       "effective_rollout": {
         "action_repeat": 1,
         "ignore_done": true,
-        "max_steps": 5000,
+        "max_steps": 2000,
         "replan_steps": 50,
         "stop_on_success": true
-      },
-      "configured_rollout": {
-        "replan_steps": 50,
-        "action_repeat": 1,
-        "stop_on_success": true,
-        "ignore_done": true
       },
       "seeds": {
         "start": 1050,
         "stop": 1100
       },
-      "source_result_publishable": true,
       "execution_semantics": {
         "client_requests_after_actions": 50,
         "server_returned_action_horizon": 100,
@@ -420,13 +131,9 @@
     {
       "family": "act",
       "task_id": "WA-05",
-      "suite_file": "configs/eval/suites/wa05_v1.yaml",
-      "source_suite_file": "/home/chensihang/membench/configs/eval/suites/wa05_v1.yaml",
-      "file_sha256": "6b7791bd332e997fc16ebcd8c6b54cdb036c942810130491e104e7b9c66471dc",
-      "normalized_suite_hash": "sha256:dc3aeb8bc7084c58bbd23a909a0b2cc32aec5020399e202ff5d6b0bec8006445",
-      "run_id": "act-wa05-40000",
-      "source_run_manifest": "/home/chensihang/membench/outputs/eval/act-wa05-40000/run_manifest.json",
-      "source_created_at": "2026-09-19T08:53:04.871634+00:00",
+      "suite_file": "configs/eval/act/wa05.yaml",
+      "file_sha256": "370514b30fc1394b00f88f016878841bb4ca573f85e1c4749804ba975a4b5106",
+      "normalized_suite_hash": "sha256:99b4d1c79b75676a0deb53b6d2c5c837ac47d9dc37a7fc115352455a8daa3b98",
       "effective_rollout": {
         "action_repeat": 1,
         "ignore_done": true,
@@ -434,18 +141,10 @@
         "replan_steps": 20,
         "stop_on_success": true
       },
-      "configured_rollout": {
-        "max_steps": 1600,
-        "replan_steps": 20,
-        "action_repeat": 1,
-        "stop_on_success": true,
-        "ignore_done": true
-      },
       "seeds": {
         "start": 1050,
         "stop": 1100
       },
-      "source_result_publishable": true,
       "execution_semantics": {
         "client_requests_after_actions": 20,
         "server_returned_action_horizon": 100,
@@ -455,13 +154,9 @@
     {
       "family": "act",
       "task_id": "WR-01",
-      "suite_file": "configs/eval/suites/wr01_v1.yaml",
-      "source_suite_file": "/home/chensihang/membench/configs/eval/suites/wr01_v1.yaml",
-      "file_sha256": "7c455fc0c0a9075d93c96c8ff37094eae72731593bd46aa592774604d3a276cc",
-      "normalized_suite_hash": "sha256:724fd2f40968820514d59cdf4e556b26f4ae46b3b5ebc986a2326e71441676d2",
-      "run_id": "act-wr01-40000",
-      "source_run_manifest": "/home/chensihang/membench/outputs/eval/act-wr01-40000/run_manifest.json",
-      "source_created_at": "2026-09-19T08:53:03.727065+00:00",
+      "suite_file": "configs/eval/act/wr01.yaml",
+      "file_sha256": "05bd7beaecc51ccdf7928b470ef9be828de85adea602a28f11e82200026eb2fb",
+      "normalized_suite_hash": "sha256:8786d0fc9ce5e73881666b507f28b6c69de69e613a0f94231e857332a447cfdd",
       "effective_rollout": {
         "action_repeat": 1,
         "ignore_done": true,
@@ -469,18 +164,10 @@
         "replan_steps": 40,
         "stop_on_success": true
       },
-      "configured_rollout": {
-        "replan_steps": 40,
-        "max_steps": 2600,
-        "action_repeat": 1,
-        "stop_on_success": true,
-        "ignore_done": true
-      },
       "seeds": {
         "start": 1050,
         "stop": 1100
       },
-      "source_result_publishable": true,
       "execution_semantics": {
         "client_requests_after_actions": 40,
         "server_returned_action_horizon": 100,
@@ -490,13 +177,9 @@
     {
       "family": "act",
       "task_id": "WR-08",
-      "suite_file": "configs/eval/suites/wr08_v1.yaml",
-      "source_suite_file": "/home/chensihang/membench/configs/eval/suites/wr08_v1.yaml",
-      "file_sha256": "eedac6ce691d482e91435e1c870db49a2a958cb8a7b83a578997f624e5a15f70",
-      "normalized_suite_hash": "sha256:60edeeeb6b5f90a62966b8f171db5b4e5c4e2538d51af8ffb96a73f14fe3808e",
-      "run_id": "act-wr08-40000",
-      "source_run_manifest": "/home/chensihang/membench/outputs/eval/act-wr08-40000/run_manifest.json",
-      "source_created_at": "2026-09-19T08:53:04.769738+00:00",
+      "suite_file": "configs/eval/act/wr08.yaml",
+      "file_sha256": "0a9706afc6694f9e9d1e102a42ad0ab2d60bf2814095cc949aece69933956e2d",
+      "normalized_suite_hash": "sha256:76af8bec07f0c24dd373177dd8e4071f4e285a553449befa38427896c6a69773",
       "effective_rollout": {
         "action_repeat": 1,
         "ignore_done": true,
@@ -504,17 +187,10 @@
         "replan_steps": 50,
         "stop_on_success": true
       },
-      "configured_rollout": {
-        "replan_steps": 50,
-        "action_repeat": 1,
-        "stop_on_success": true,
-        "ignore_done": true
-      },
       "seeds": {
         "start": 1050,
         "stop": 1100
       },
-      "source_result_publishable": true,
       "execution_semantics": {
         "client_requests_after_actions": 50,
         "server_returned_action_horizon": 100,
@@ -523,83 +199,10 @@
     },
     {
       "family": "act",
-      "task_id": "TS02",
-      "suite_file": "configs/eval/suites/ts02_v1.yaml",
-      "source_suite_file": "/home/chensihang/membench/configs/eval/suites/ts02_v1.yaml",
-      "file_sha256": "b9c64b3c3b46a58271ae537d3d6b44ae347bbf8f33824dd86bf8c3abad5f228e",
-      "normalized_suite_hash": "sha256:f6bd737c58efc2ac255b9891c0ff6655cce7b635658d1db206fc6ebd4facfcaf",
-      "run_id": "act-ts02-40000",
-      "source_run_manifest": "/home/chensihang/membench/outputs/eval/act-ts02-40000/run_manifest.json",
-      "source_created_at": "2026-09-19T08:53:04.764460+00:00",
-      "effective_rollout": {
-        "action_repeat": 1,
-        "ignore_done": true,
-        "max_steps": 2800,
-        "replan_steps": 50,
-        "stop_on_success": true
-      },
-      "configured_rollout": {
-        "replan_steps": 50,
-        "action_repeat": 1,
-        "stop_on_success": true,
-        "ignore_done": true
-      },
-      "seeds": {
-        "start": 1050,
-        "stop": 1100
-      },
-      "source_result_publishable": true,
-      "execution_semantics": {
-        "client_requests_after_actions": 50,
-        "server_returned_action_horizon": 100,
-        "server_prediction_method": "predict_action_chunk"
-      }
-    },
-    {
-      "family": "act",
-      "task_id": "TS03",
-      "suite_file": "configs/eval/suites/ts03_v1.yaml",
-      "source_suite_file": "/home/chensihang/membench/configs/eval/suites/ts03_v1.yaml",
-      "file_sha256": "ebb23bd9f0496985596d5b4021d518cd86d64d5af32fa86c7bb2add39a813c69",
-      "normalized_suite_hash": "sha256:3e57b419076d2591b19d412b7d2aa848509c9b6c14e415ba5902f138238f0e1e",
-      "run_id": "act-ts03-40000",
-      "source_run_manifest": "/home/chensihang/membench/outputs/eval/act-ts03-40000/run_manifest.json",
-      "source_created_at": "2026-09-19T08:53:04.835952+00:00",
-      "effective_rollout": {
-        "action_repeat": 1,
-        "ignore_done": true,
-        "max_steps": 1800,
-        "replan_steps": 50,
-        "stop_on_success": true
-      },
-      "configured_rollout": {
-        "max_steps": 1800,
-        "replan_steps": 50,
-        "action_repeat": 1,
-        "stop_on_success": true,
-        "ignore_done": true
-      },
-      "seeds": {
-        "start": 1050,
-        "stop": 1100
-      },
-      "source_result_publishable": true,
-      "execution_semantics": {
-        "client_requests_after_actions": 50,
-        "server_returned_action_horizon": 100,
-        "server_prediction_method": "predict_action_chunk"
-      }
-    },
-    {
-      "family": "act",
-      "task_id": "TM01",
-      "suite_file": "configs/eval/suites/tm01_v1.yaml",
-      "source_suite_file": "/home/chensihang/membench/configs/eval/suites/tm01_v1.yaml",
-      "file_sha256": "ad779deee5e6c5f4c07b3c456ee1c122578b9edf984ec5cb80cce227e8648bcd",
-      "normalized_suite_hash": "sha256:668744b54a4eead45572cd132ea471237f84cf1c8cb7b298b475680d974e657a",
-      "run_id": "act-tm01-40000",
-      "source_run_manifest": "/home/chensihang/membench/outputs/eval/act-tm01-40000/run_manifest.json",
-      "source_created_at": "2026-09-22T09:54:36.607795+00:00",
+      "task_id": "WX-01",
+      "suite_file": "configs/eval/act/wx01.yaml",
+      "file_sha256": "fc1a4881f6156158d44a7d3ac43decb62c3218abace83dd3afc37824c506656f",
+      "normalized_suite_hash": "sha256:b2631cc865224ba7353be0ac22a4e27b11b934c21c9a04d6601a2e1e4c551665",
       "effective_rollout": {
         "action_repeat": 1,
         "ignore_done": true,
@@ -607,51 +210,10 @@
         "replan_steps": 50,
         "stop_on_success": true
       },
-      "configured_rollout": {
-        "replan_steps": 50,
-        "action_repeat": 1,
-        "stop_on_success": true,
-        "ignore_done": true
-      },
       "seeds": {
         "start": 1050,
         "stop": 1100
       },
-      "source_result_publishable": true,
-      "execution_semantics": {
-        "client_requests_after_actions": 50,
-        "server_returned_action_horizon": 100,
-        "server_prediction_method": "predict_action_chunk"
-      }
-    },
-    {
-      "family": "act",
-      "task_id": "TM02",
-      "suite_file": "configs/eval/suites/tm02_v1.yaml",
-      "source_suite_file": "/home/chensihang/membench/configs/eval/suites/tm02_v1.yaml",
-      "file_sha256": "0ee1b608a66c78891e97649826cb26636ee59a8ce175c9105cf7d5a567e03a28",
-      "normalized_suite_hash": "sha256:f3c417cc28d78170b7aa5defe61a0d11cfe296113570f6f4dcb4c267042a60f3",
-      "run_id": "act-tm02-40000",
-      "source_run_manifest": "/home/chensihang/membench/outputs/eval/act-tm02-40000/run_manifest.json",
-      "source_created_at": "2026-09-19T08:53:03.778550+00:00",
-      "effective_rollout": {
-        "action_repeat": 1,
-        "ignore_done": true,
-        "max_steps": 3600,
-        "replan_steps": 50,
-        "stop_on_success": true
-      },
-      "configured_rollout": {
-        "replan_steps": 50,
-        "action_repeat": 1,
-        "stop_on_success": true,
-        "ignore_done": true
-      },
-      "seeds": {
-        "start": 1050,
-        "stop": 1100
-      },
-      "source_result_publishable": true,
       "execution_semantics": {
         "client_requests_after_actions": 50,
         "server_returned_action_horizon": 100,
@@ -660,33 +222,102 @@
     },
     {
       "family": "diffusion",
-      "task_id": "WX-01",
-      "suite_file": "configs/eval/diffusion/wx01_r1_v1.yaml",
-      "source_suite_file": "/home/chensihang/membench/configs/eval/diffusion/wx01_r1_v1.yaml",
-      "file_sha256": "34492cfa181eaf01e3d55ada3fd86f8671802a561d5683099cd1d65fce1937d0",
-      "normalized_suite_hash": "sha256:8d00ed88bf7095b24fdc91a3a56acf0971938b55771bb2ac4581548fc726b2d7",
-      "run_id": "diffusion-wx01-40000-r1-seedrng-v1",
-      "source_run_manifest": "/home/chensihang/membench/outputs/eval/diffusion-wx01-40000-r1-seedrng-v1/run_manifest.json",
-      "source_created_at": "2026-09-20T10:09:23.991262+00:00",
+      "task_id": "TM01",
+      "suite_file": "configs/eval/diffusion/tm01.yaml",
+      "file_sha256": "25ea6e5ac9ffe4013630d8d6b3e212b39d7dc23671ab0188b4fd9a0f198d0236",
+      "normalized_suite_hash": "sha256:8844f7587cc694363ce150a7ef3ca640ac73cdd96270732a5f61e7bf4f18e527",
       "effective_rollout": {
         "action_repeat": 1,
         "ignore_done": true,
-        "max_steps": 1200,
+        "max_steps": 3200,
         "replan_steps": 1,
         "stop_on_success": true
-      },
-      "configured_rollout": {
-        "max_steps": 1200,
-        "replan_steps": 1,
-        "action_repeat": 1,
-        "stop_on_success": true,
-        "ignore_done": true
       },
       "seeds": {
         "start": 1050,
         "stop": 1100
       },
-      "source_result_publishable": true,
+      "execution_semantics": {
+        "client_requests_after_actions": 1,
+        "server_returned_action_horizon": 1,
+        "server_prediction_method": "select_action",
+        "model_prediction_when": "native action cache is empty",
+        "n_obs_steps": 2,
+        "model_horizon": 48,
+        "native_action_cache_size": 47
+      }
+    },
+    {
+      "family": "diffusion",
+      "task_id": "TM02",
+      "suite_file": "configs/eval/diffusion/tm02.yaml",
+      "file_sha256": "87be4652db2debe7859a436581b49fb5269ac33b7edea5b1bb71ceb214eea50d",
+      "normalized_suite_hash": "sha256:3f7530407f73f5bd7061a0b0dcad1e1a5dacd526cfb28e9be79dff8c86e29d28",
+      "effective_rollout": {
+        "action_repeat": 1,
+        "ignore_done": true,
+        "max_steps": 3600,
+        "replan_steps": 1,
+        "stop_on_success": true
+      },
+      "seeds": {
+        "start": 1050,
+        "stop": 1100
+      },
+      "execution_semantics": {
+        "client_requests_after_actions": 1,
+        "server_returned_action_horizon": 1,
+        "server_prediction_method": "select_action",
+        "model_prediction_when": "native action cache is empty",
+        "n_obs_steps": 2,
+        "model_horizon": 48,
+        "native_action_cache_size": 47
+      }
+    },
+    {
+      "family": "diffusion",
+      "task_id": "TS02",
+      "suite_file": "configs/eval/diffusion/ts02.yaml",
+      "file_sha256": "44871f03fef140345a9e4871fb68829efb362ebe892f5f3289c41f3c2770d166",
+      "normalized_suite_hash": "sha256:1194587d3229f0cb2ba09cb196c679c644ebfae993e21788ae48e4e4b3d6f9a5",
+      "effective_rollout": {
+        "action_repeat": 1,
+        "ignore_done": true,
+        "max_steps": 2800,
+        "replan_steps": 1,
+        "stop_on_success": true
+      },
+      "seeds": {
+        "start": 1050,
+        "stop": 1100
+      },
+      "execution_semantics": {
+        "client_requests_after_actions": 1,
+        "server_returned_action_horizon": 1,
+        "server_prediction_method": "select_action",
+        "model_prediction_when": "native action cache is empty",
+        "n_obs_steps": 2,
+        "model_horizon": 48,
+        "native_action_cache_size": 47
+      }
+    },
+    {
+      "family": "diffusion",
+      "task_id": "TS03",
+      "suite_file": "configs/eval/diffusion/ts03.yaml",
+      "file_sha256": "4e0e25621eb0d7aea654313e9eefc56350c47a598e30922d7ffcf7de9d726c0f",
+      "normalized_suite_hash": "sha256:fde49e3f5539bdd23d8619892fe0f7f84965f47e3871e6a73add3504786c8140",
+      "effective_rollout": {
+        "action_repeat": 1,
+        "ignore_done": true,
+        "max_steps": 1800,
+        "replan_steps": 1,
+        "stop_on_success": true
+      },
+      "seeds": {
+        "start": 1050,
+        "stop": 1100
+      },
       "execution_semantics": {
         "client_requests_after_actions": 1,
         "server_returned_action_horizon": 1,
@@ -700,31 +331,20 @@
     {
       "family": "diffusion",
       "task_id": "WA-01",
-      "suite_file": "configs/eval/diffusion/wa01_r1_v1.yaml",
-      "source_suite_file": "/home/chensihang/membench/configs/eval/diffusion/wa01_r1_v1.yaml",
-      "file_sha256": "b52a2926935445e727b3fbd9c60d1bc29f9dc69515f4e4f15161c9c79dac68bf",
-      "normalized_suite_hash": "sha256:bb4f359b059f5a9ff5ecdc8ca6c30585345b83e52c21a3ba01a5e0a7e08beede",
-      "run_id": "diffusion-wa01-40000-r1-seedrng-v1",
-      "source_run_manifest": "/home/chensihang/membench/outputs/eval/diffusion-wa01-40000-r1-seedrng-v1/run_manifest.json",
-      "source_created_at": "2026-09-20T05:19:18.063500+00:00",
+      "suite_file": "configs/eval/diffusion/wa01.yaml",
+      "file_sha256": "2ced4046c041f17cbc42f848370c01abd18cd9aebd45c8123e3026e69243983b",
+      "normalized_suite_hash": "sha256:1ed4ead21c2bda9483c5095736de5152b4d175ded3dde596cf94ce403dadf09d",
       "effective_rollout": {
         "action_repeat": 1,
         "ignore_done": true,
-        "max_steps": 5000,
+        "max_steps": 2000,
         "replan_steps": 1,
         "stop_on_success": true
-      },
-      "configured_rollout": {
-        "replan_steps": 1,
-        "action_repeat": 1,
-        "stop_on_success": true,
-        "ignore_done": true
       },
       "seeds": {
         "start": 1050,
         "stop": 1100
       },
-      "source_result_publishable": true,
       "execution_semantics": {
         "client_requests_after_actions": 1,
         "server_returned_action_horizon": 1,
@@ -738,13 +358,9 @@
     {
       "family": "diffusion",
       "task_id": "WA-05",
-      "suite_file": "configs/eval/diffusion/wa05_r1_v1.yaml",
-      "source_suite_file": "/home/chensihang/membench/configs/eval/diffusion/wa05_r1_v1.yaml",
-      "file_sha256": "64cf6e5f04549ed6396b49292951616e86fba679491c4517f23519c31377933e",
-      "normalized_suite_hash": "sha256:a2b7eea0884517627cc388a0e481d61f3c2e9fbd6db32b970da50fe05ec01570",
-      "run_id": "diffusion-wa05-40000-r1-seedrng-v1",
-      "source_run_manifest": "/home/chensihang/membench/outputs/eval/diffusion-wa05-40000-r1-seedrng-v1/run_manifest.json",
-      "source_created_at": "2026-09-20T05:19:18.091326+00:00",
+      "suite_file": "configs/eval/diffusion/wa05.yaml",
+      "file_sha256": "31e8ca2b5d2abafbd7308e3034699996041d28d589f545cf8bb55d3357ecf303",
+      "normalized_suite_hash": "sha256:ba5917b7d8d3944e64ac16e310b29f284fe42e01821589bac1f76fcb2f181136",
       "effective_rollout": {
         "action_repeat": 1,
         "ignore_done": true,
@@ -752,18 +368,10 @@
         "replan_steps": 1,
         "stop_on_success": true
       },
-      "configured_rollout": {
-        "max_steps": 1600,
-        "replan_steps": 1,
-        "action_repeat": 1,
-        "stop_on_success": true,
-        "ignore_done": true
-      },
       "seeds": {
         "start": 1050,
         "stop": 1100
       },
-      "source_result_publishable": true,
       "execution_semantics": {
         "client_requests_after_actions": 1,
         "server_returned_action_horizon": 1,
@@ -777,13 +385,9 @@
     {
       "family": "diffusion",
       "task_id": "WR-01",
-      "suite_file": "configs/eval/diffusion/wr01_r1_v1.yaml",
-      "source_suite_file": "/home/chensihang/membench/configs/eval/diffusion/wr01_r1_v1.yaml",
-      "file_sha256": "5acf25090df6d1e4965af33a4f806aa55d97f10ff46611615fb18f9000fe6e99",
-      "normalized_suite_hash": "sha256:f054161065610710be789281e7955b10bdb53fd46c91ace7b1b416c5bf6364d1",
-      "run_id": "diffusion-wr01-40000-r1-seedrng-v1",
-      "source_run_manifest": "/home/chensihang/membench/outputs/eval/diffusion-wr01-40000-r1-seedrng-v1/run_manifest.json",
-      "source_created_at": "2026-09-20T05:19:18.035887+00:00",
+      "suite_file": "configs/eval/diffusion/wr01.yaml",
+      "file_sha256": "12ed2dc98915b338023183cb4f1b9c81476947a78443cf82098d099f6df88bdd",
+      "normalized_suite_hash": "sha256:a6a389a815185206ce044975b299f59b7f3b0fa98cae9a1c5792912cd6318051",
       "effective_rollout": {
         "action_repeat": 1,
         "ignore_done": true,
@@ -791,18 +395,10 @@
         "replan_steps": 1,
         "stop_on_success": true
       },
-      "configured_rollout": {
-        "max_steps": 2600,
-        "replan_steps": 1,
-        "action_repeat": 1,
-        "stop_on_success": true,
-        "ignore_done": true
-      },
       "seeds": {
         "start": 1050,
         "stop": 1100
       },
-      "source_result_publishable": true,
       "execution_semantics": {
         "client_requests_after_actions": 1,
         "server_returned_action_horizon": 1,
@@ -816,13 +412,9 @@
     {
       "family": "diffusion",
       "task_id": "WR-08",
-      "suite_file": "configs/eval/diffusion/wr08_r1_v1.yaml",
-      "source_suite_file": "/home/chensihang/membench/configs/eval/diffusion/wr08_r1_v1.yaml",
-      "file_sha256": "12f4a7fa9a36a4e6f7de524aa6a18325039b85ce72edf15263be8bf884f85b67",
-      "normalized_suite_hash": "sha256:93bfe8540b132034fc2dd37f87c079d6792c66a7cf808764b3500a37ac0792ce",
-      "run_id": "diffusion-wr08-40000-r1-seedrng-v1",
-      "source_run_manifest": "/home/chensihang/membench/outputs/eval/diffusion-wr08-40000-r1-seedrng-v1/run_manifest.json",
-      "source_created_at": "2026-09-20T05:19:18.032570+00:00",
+      "suite_file": "configs/eval/diffusion/wr08.yaml",
+      "file_sha256": "68237bb005f05cefaa95372c770d539b57394e9f74e423a596c95d743f8f04d7",
+      "normalized_suite_hash": "sha256:f68e18fb3a659b8870207eda4bc12e490978695adbc10dfc549ac499121c6283",
       "effective_rollout": {
         "action_repeat": 1,
         "ignore_done": true,
@@ -830,17 +422,10 @@
         "replan_steps": 1,
         "stop_on_success": true
       },
-      "configured_rollout": {
-        "replan_steps": 1,
-        "action_repeat": 1,
-        "stop_on_success": true,
-        "ignore_done": true
-      },
       "seeds": {
         "start": 1050,
         "stop": 1100
       },
-      "source_result_publishable": true,
       "execution_semantics": {
         "client_requests_after_actions": 1,
         "server_returned_action_horizon": 1,
@@ -853,32 +438,21 @@
     },
     {
       "family": "diffusion",
-      "task_id": "TS02",
-      "suite_file": "configs/eval/diffusion/ts02_r1_v1.yaml",
-      "source_suite_file": "/home/chensihang/membench/configs/eval/diffusion/ts02_r1_v1.yaml",
-      "file_sha256": "d5b12606d18709fcda4301754246295bbbed1e1fb993e9a9cf65314b9150f021",
-      "normalized_suite_hash": "sha256:c8e9056564975c955c729a2ff4dee240bc201a76b93c2f33223b56468f226433",
-      "run_id": "diffusion-ts02-40000-r1-seedrng-v1",
-      "source_run_manifest": "/home/chensihang/membench/outputs/eval/diffusion-ts02-40000-r1-seedrng-v1/run_manifest.json",
-      "source_created_at": "2026-09-20T05:19:18.039109+00:00",
+      "task_id": "WX-01",
+      "suite_file": "configs/eval/diffusion/wx01.yaml",
+      "file_sha256": "9236ecc64cf495304e577468e1c5e32804e6e60ff78d23627f00706f53d47cb6",
+      "normalized_suite_hash": "sha256:8ae464ca562dbec0a42a22f5b374e543b35fa500a174856706d6637a2bd32174",
       "effective_rollout": {
         "action_repeat": 1,
         "ignore_done": true,
-        "max_steps": 2800,
+        "max_steps": 1200,
         "replan_steps": 1,
         "stop_on_success": true
-      },
-      "configured_rollout": {
-        "replan_steps": 1,
-        "action_repeat": 1,
-        "stop_on_success": true,
-        "ignore_done": true
       },
       "seeds": {
         "start": 1050,
         "stop": 1100
       },
-      "source_result_publishable": true,
       "execution_semantics": {
         "client_requests_after_actions": 1,
         "server_returned_action_horizon": 1,
@@ -890,128 +464,209 @@
       }
     },
     {
-      "family": "diffusion",
-      "task_id": "TS03",
-      "suite_file": "configs/eval/diffusion/ts03_r1_v1.yaml",
-      "source_suite_file": "/home/chensihang/membench/configs/eval/diffusion/ts03_r1_v1.yaml",
-      "file_sha256": "e40fd64c628bed7d6dd6c98f2b8731d7b608382d3132a0d94721cf9dc8655e4d",
-      "normalized_suite_hash": "sha256:9d7b1bc43139131314cee5400f5aeba3d3f288d1996010a84174978e216aaa93",
-      "run_id": "diffusion-ts03-40000-r1-seedrng-v1",
-      "source_run_manifest": "/home/chensihang/membench/outputs/eval/diffusion-ts03-40000-r1-seedrng-v1/run_manifest.json",
-      "source_created_at": "2026-09-20T05:19:18.086232+00:00",
-      "effective_rollout": {
-        "action_repeat": 1,
-        "ignore_done": true,
-        "max_steps": 1800,
-        "replan_steps": 1,
-        "stop_on_success": true
-      },
-      "configured_rollout": {
-        "max_steps": 1800,
-        "replan_steps": 1,
-        "action_repeat": 1,
-        "stop_on_success": true,
-        "ignore_done": true
-      },
-      "seeds": {
-        "start": 1050,
-        "stop": 1100
-      },
-      "source_result_publishable": true,
-      "execution_semantics": {
-        "client_requests_after_actions": 1,
-        "server_returned_action_horizon": 1,
-        "server_prediction_method": "select_action",
-        "model_prediction_when": "native action cache is empty",
-        "n_obs_steps": 2,
-        "model_horizon": 48,
-        "native_action_cache_size": 47
-      }
-    },
-    {
-      "family": "diffusion",
+      "family": "pi05",
       "task_id": "TM01",
-      "suite_file": "configs/eval/diffusion/tm01_r1_v1.yaml",
-      "source_suite_file": "/home/chensihang/membench/configs/eval/diffusion/tm01_r1_v1.yaml",
-      "file_sha256": "d0368f180b5211c871e454516a616df60119b0e3070cc01592b80a91d9546b04",
-      "normalized_suite_hash": "sha256:80958fc374589612e1f6412bc6276690d07016f7ec276559f6e9ed222a237f30",
-      "run_id": "diffusion-tm01-40000-r1-seedrng-v1",
-      "source_run_manifest": "/home/chensihang/membench/outputs/eval/diffusion-tm01-40000-r1-seedrng-v1/run_manifest.json",
-      "source_created_at": "2026-09-22T09:55:57.579541+00:00",
+      "suite_file": "configs/eval/pi05/tm01.yaml",
+      "file_sha256": "455d0f4223b5485b4bf59f5c1d17a7d5fa467dab7a652d6e166c054212aace41",
+      "normalized_suite_hash": "sha256:1ea7c456ab0d4615e1c1430cd47d8c312cbc27981d194184144c4766c2d2ccce",
       "effective_rollout": {
         "action_repeat": 1,
         "ignore_done": true,
         "max_steps": 3200,
-        "replan_steps": 1,
+        "replan_steps": 40,
         "stop_on_success": true
-      },
-      "configured_rollout": {
-        "replan_steps": 1,
-        "action_repeat": 1,
-        "stop_on_success": true,
-        "ignore_done": true
       },
       "seeds": {
         "start": 1050,
         "stop": 1100
       },
-      "source_result_publishable": true,
       "execution_semantics": {
-        "client_requests_after_actions": 1,
-        "server_returned_action_horizon": 1,
-        "server_prediction_method": "select_action",
-        "model_prediction_when": "native action cache is empty",
-        "n_obs_steps": 2,
-        "model_horizon": 48,
-        "native_action_cache_size": 47
+        "client_requests_after_actions": 40,
+        "server_returned_action_horizon": 50
       }
     },
     {
-      "family": "diffusion",
+      "family": "pi05",
       "task_id": "TM02",
-      "suite_file": "configs/eval/diffusion/tm02_r1_v1.yaml",
-      "source_suite_file": "/home/chensihang/membench/configs/eval/diffusion/tm02_r1_v1.yaml",
-      "file_sha256": "47e56f15c3bf6cc93baeeff3bb8c552f759e7d379be7cd870c59b09d0d6b2a8d",
-      "normalized_suite_hash": "sha256:d85e395204ffbbdcc70434d07953aea5064caefa035c1eef1417d0b7f00092b7",
-      "run_id": "diffusion-tm02-40000-r1-seedrng-v1",
-      "source_run_manifest": "/home/chensihang/membench/outputs/eval/diffusion-tm02-40000-r1-seedrng-v1/run_manifest.json",
-      "source_created_at": "2026-09-20T05:19:18.069569+00:00",
+      "suite_file": "configs/eval/pi05/tm02.yaml",
+      "file_sha256": "208f86933203ec704e7bf5d4e5e1abb72eb6c9da521fdb0ca1aab164f38142e8",
+      "normalized_suite_hash": "sha256:55021424667d91a28c720aee542957b9933329839a63fb61c06dc1b16c1e50fe",
       "effective_rollout": {
         "action_repeat": 1,
         "ignore_done": true,
         "max_steps": 3600,
-        "replan_steps": 1,
+        "replan_steps": 40,
         "stop_on_success": true
-      },
-      "configured_rollout": {
-        "replan_steps": 1,
-        "action_repeat": 1,
-        "stop_on_success": true,
-        "ignore_done": true
       },
       "seeds": {
         "start": 1050,
         "stop": 1100
       },
-      "source_result_publishable": true,
       "execution_semantics": {
-        "client_requests_after_actions": 1,
-        "server_returned_action_horizon": 1,
-        "server_prediction_method": "select_action",
-        "model_prediction_when": "native action cache is empty",
-        "n_obs_steps": 2,
-        "model_horizon": 48,
-        "native_action_cache_size": 47
+        "client_requests_after_actions": 40,
+        "server_returned_action_horizon": 50
+      }
+    },
+    {
+      "family": "pi05",
+      "task_id": "TS02",
+      "suite_file": "configs/eval/pi05/ts02.yaml",
+      "file_sha256": "1d3be358b3b3fc9ed08d6c6d35612f0ac8f9db003a8efb616eac84817c0cc584",
+      "normalized_suite_hash": "sha256:fda7ac494c8872f98534d84956cb0e548f96bac87b15cbef810c1bb6a457d98f",
+      "effective_rollout": {
+        "action_repeat": 1,
+        "ignore_done": true,
+        "max_steps": 2800,
+        "replan_steps": 40,
+        "stop_on_success": true
+      },
+      "seeds": {
+        "start": 1050,
+        "stop": 1100
+      },
+      "execution_semantics": {
+        "client_requests_after_actions": 40,
+        "server_returned_action_horizon": 50
+      }
+    },
+    {
+      "family": "pi05",
+      "task_id": "TS03",
+      "suite_file": "configs/eval/pi05/ts03.yaml",
+      "file_sha256": "89027e6dc8d4bac22f8b49566ea77234f51bf0b2b26e9d621287f7bccbd94d16",
+      "normalized_suite_hash": "sha256:8eb89249753fc4e0e6b01d0d798ee8689d05da54524f8f83bc3166f4f09794fb",
+      "effective_rollout": {
+        "action_repeat": 1,
+        "ignore_done": true,
+        "max_steps": 1800,
+        "replan_steps": 40,
+        "stop_on_success": true
+      },
+      "seeds": {
+        "start": 1050,
+        "stop": 1100
+      },
+      "execution_semantics": {
+        "client_requests_after_actions": 40,
+        "server_returned_action_horizon": 50
+      }
+    },
+    {
+      "family": "pi05",
+      "task_id": "WA-01",
+      "suite_file": "configs/eval/pi05/wa01.yaml",
+      "file_sha256": "b16ee30c0e566b65db3bd98214d9d59da46352f64fa41b43b725682cc42710f5",
+      "normalized_suite_hash": "sha256:88a62042fb067c670f7c5fecba1f0e9f4065324b0b906772a5dc203ce49b3f40",
+      "effective_rollout": {
+        "action_repeat": 1,
+        "ignore_done": true,
+        "max_steps": 2000,
+        "replan_steps": 40,
+        "stop_on_success": true
+      },
+      "seeds": {
+        "start": 1050,
+        "stop": 1100
+      },
+      "execution_semantics": {
+        "client_requests_after_actions": 40,
+        "server_returned_action_horizon": 50
+      }
+    },
+    {
+      "family": "pi05",
+      "task_id": "WA-05",
+      "suite_file": "configs/eval/pi05/wa05.yaml",
+      "file_sha256": "f148494a2e74e3b151965fd14e8cb90427d561bdd33c12bac8a526dc8693118f",
+      "normalized_suite_hash": "sha256:448e0db58ac084e90dde50f776f766936799dc20141360d3273b78fb0c40b1a5",
+      "effective_rollout": {
+        "action_repeat": 1,
+        "ignore_done": true,
+        "max_steps": 2000,
+        "replan_steps": 40,
+        "stop_on_success": true
+      },
+      "seeds": {
+        "start": 1050,
+        "stop": 1100
+      },
+      "execution_semantics": {
+        "client_requests_after_actions": 40,
+        "server_returned_action_horizon": 50
+      }
+    },
+    {
+      "family": "pi05",
+      "task_id": "WR-01",
+      "suite_file": "configs/eval/pi05/wr01.yaml",
+      "file_sha256": "3170af8e0ad4b4e53baaa5b577d1e71fa48157e7dabad77b0409d34c4f314acc",
+      "normalized_suite_hash": "sha256:a1d33033ac6e1b511b818309a4b0a943ca949b14cbb713031f3c4581290dbe5b",
+      "effective_rollout": {
+        "action_repeat": 1,
+        "ignore_done": true,
+        "max_steps": 2600,
+        "replan_steps": 40,
+        "stop_on_success": true
+      },
+      "seeds": {
+        "start": 1050,
+        "stop": 1100
+      },
+      "execution_semantics": {
+        "client_requests_after_actions": 40,
+        "server_returned_action_horizon": 50
+      }
+    },
+    {
+      "family": "pi05",
+      "task_id": "WR-08",
+      "suite_file": "configs/eval/pi05/wr08.yaml",
+      "file_sha256": "1c6fc15576432944b392d42245d6fba65defab956cc2c1a718efc25d2007e1eb",
+      "normalized_suite_hash": "sha256:a2a198f118b10a6bc5af509c246bfa9037cf681bee3d5d54eb1742615c9f279e",
+      "effective_rollout": {
+        "action_repeat": 1,
+        "ignore_done": true,
+        "max_steps": 2000,
+        "replan_steps": 40,
+        "stop_on_success": true
+      },
+      "seeds": {
+        "start": 1050,
+        "stop": 1100
+      },
+      "execution_semantics": {
+        "client_requests_after_actions": 40,
+        "server_returned_action_horizon": 50
+      }
+    },
+    {
+      "family": "pi05",
+      "task_id": "WX-01",
+      "suite_file": "configs/eval/pi05/wx01.yaml",
+      "file_sha256": "c90eb255f3fe9e1e0ee0c6b4c769df7770da4100b1540c310b74b92fe6bb4692",
+      "normalized_suite_hash": "sha256:74d225a4936723f9eb4bc919992df9598b5da32832ccfc76b197131a8f27e279",
+      "effective_rollout": {
+        "action_repeat": 1,
+        "ignore_done": true,
+        "max_steps": 1200,
+        "replan_steps": 40,
+        "stop_on_success": true
+      },
+      "seeds": {
+        "start": 1050,
+        "stop": 1100
+      },
+      "execution_semantics": {
+        "client_requests_after_actions": 40,
+        "server_returned_action_horizon": 50
       }
     }
   ],
   "verification": {
-    "loader": "bench.evaluation.suite.load_eval_suite from the current checkout",
+    "loader": "bench.evaluation.suite.load_eval_suite",
     "suite_count": 27,
-    "source_bytes_identical": true,
-    "normalized_hashes_match_recorded_runs": true,
-    "resolved_rollout_parameters_match_recorded_runs": true,
-    "seeds_match_recorded_runs": true,
-    "simulation_rerun": false
+    "seeds_per_suite": 50,
+    "simulation_rerun": false,
+    "historical_bytes_preserved": false
   }
 }

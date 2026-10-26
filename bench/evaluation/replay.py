@@ -300,7 +300,7 @@ def canonical_task_id(value: str) -> str:
 
 def task_suite_path(task_id: str) -> Path:
     name = canonical_task_id(task_id).replace("-", "").lower()
-    return ROOT / "configs" / "eval" / "suites" / f"{name}_v1.yaml"
+    return ROOT / "configs" / "eval" / "act" / f"{name}.yaml"
 
 
 def load_source_suite(manifest: Mapping[str, Any], task_id: str) -> EvalSuiteConfig:
@@ -310,7 +310,6 @@ def load_source_suite(manifest: Mapping[str, Any], task_id: str) -> EvalSuiteCon
     if raw_path:
         path = Path(str(raw_path)).expanduser()
         candidates.append(path if path.is_absolute() else ROOT / path)
-        candidates.append(ROOT / "configs" / "eval" / "legacy_suites" / path.name)
     candidates.append(task_suite_path(task_id))
     for candidate in candidates:
         if candidate.is_file():
