@@ -2,7 +2,7 @@ name: Deploy project page
 
 on:
   push:
-    branches: [main, feature/project-site]
+    branches: [main]
     paths:
       - 'site/**'
       - '.github/workflows/pages.yml'
@@ -19,6 +19,7 @@ concurrency:
 
 jobs:
   deploy:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
