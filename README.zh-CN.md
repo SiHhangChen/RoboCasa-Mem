@@ -6,7 +6,12 @@ RoboCasa-Mem 基于 RoboCasa 提供九个需要记忆能力的移动操作任务
 
 每个已记录的评测配置覆盖 50 个随机种子（1050–1099），评测会保存各任务和模型的逐回合结果、阶段报告及汇总。本仓库包含仿真评测代码和配置；仿真器源码、资产、模型实现及检查点需要单独安装或获取。
 
-**发布状态：** 当前版本为 `0.1.0rc1`，仿真资产压缩包尚无公开下载地址。移除真机集成后，当前安装包仍需重新完成 wheel 安装验收，详见[验证与发布状态](#验证与发布状态)。
+ModelScope 下载地址：
+
+- [仿真资产](https://modelscope.cn/datasets/ouhebai/RoboCasa-Mem/tree/master/sim-asset)
+- [数据集](https://modelscope.cn/datasets/ouhebai/RoboCasa-Mem/tree/master/data)
+
+**发布状态：** 当前版本为 `0.1.0rc1`。移除真机集成后，当前安装包仍需重新完成 wheel 安装验收，详见[验证与发布状态](#验证与发布状态)。
 
 ## 任务
 
@@ -70,7 +75,7 @@ python -m pip install -e '.[video]'
 
 ### 3. 恢复仿真资产
 
-运行仿真前，需要单独获取 `membench-sim-assets.tar.gz`。**目前尚无公开下载链接。** 指定的资产压缩包包含 3035 个文件，大小为 270484609 字节（约 258 MiB），SHA-256 为：
+运行仿真前，请从 [ModelScope 仿真资产目录](https://modelscope.cn/datasets/ouhebai/RoboCasa-Mem/tree/master/sim-asset) 下载 `membench-sim-assets.tar.gz`。指定的资产压缩包包含 3035 个文件，大小为 270484609 字节（约 258 MiB），SHA-256 为：
 
 ```text
 140176b06cf220f6d11440fe3cede54cca7577edf13473d62fb210bd03ca68e3
@@ -240,7 +245,7 @@ membench-summarize ./outputs/eval/wa01-act-round1
 
 此前的 wheel 已在独立 Python 环境中完成安装验证，使用指定版本的仿真器源码，并恢复了全部 3035 个资产文件。验证覆盖全部 450 个正式任务与种子组合（九个任务，每个任务 50 个种子），每个组合执行初始化、渲染和三步保持动作。该验证使用同一台主机及 GPU 驱动，没有重新执行模型推理或完整的模型评测轨迹。
 
-当前安装包移除了真机集成、调整了策略运行文件、整理了评测配置，并将 WA-01 预算统一为 2000 步。此前移除真机代码后的 wheel 已通过 47 项软件回归检查，包括本机 WebSocket 评测流程，以及 OpenPI 仿真接口和全部 27 个评测配置选择器的检查。本次整理后的版本已通过全部 27 个入口和 450 个回合输入身份的解析检查，wheel 与源码包也均确认只包含 27 份正式评测配置。当前安装包仍需重新执行 450 项 wheel 安装验收；最终源码版本冻结及资产公开交付也尚未完成。具体状态见 [`release_candidate.json`](release_candidate.json)。
+当前安装包移除了真机集成、调整了策略运行文件、整理了评测配置，并将 WA-01 预算统一为 2000 步。此前移除真机代码后的 wheel 已通过 47 项软件回归检查，包括本机 WebSocket 评测流程，以及 OpenPI 仿真接口和全部 27 个评测配置选择器的检查。本次整理后的版本已通过全部 27 个入口和 450 个回合输入身份的解析检查，wheel 与源码包也均确认只包含 27 份正式评测配置。当前安装包仍需重新执行 450 项 wheel 安装验收；最终源码版本冻结也尚未完成。具体状态见 [`release_candidate.json`](release_candidate.json)。
 
 历史 TS03 Pi0.5 的种子 1056 曾将阶段报告保存在空 JSON 字段名下。经过验证的修复已恢复 `report_stages`，全部 50 份历史阶段报告均完整，总体成功率仍为 14/50（28%）。修正后的汇总和修复来源记录见[历史修复归档](https://github.com/SiHhangChen/RoboCasa-Mem/tree/e020312e8146c646c9013d35e9a7fc3523f0cdc1/docs/historical_result_repairs/ts03_pi05_r40)。
 

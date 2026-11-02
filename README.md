@@ -12,8 +12,12 @@ This repository contains the simulation evaluation code and configurations;
 simulator sources, assets, model implementations, and checkpoints are installed
 separately.
 
-**Release status:** this is version `0.1.0rc1`. The simulator asset archive has
-no public download URL yet. The current package also needs installed-wheel
+Downloads on ModelScope:
+
+- [Simulator assets](https://modelscope.cn/datasets/ouhebai/RoboCasa-Mem/tree/master/sim-asset)
+- [Dataset](https://modelscope.cn/datasets/ouhebai/RoboCasa-Mem/tree/master/data)
+
+**Release status:** this is version `0.1.0rc1`. The current package needs installed-wheel
 acceptance after the removal of real-robot integration; see
 [Validation and release status](#validation-and-release-status).
 
@@ -102,8 +106,9 @@ MuJoCo and NumPy versions matter for initialization replay equivalence.
 
 ### 3. Restore simulator assets
 
-Obtain `membench-sim-assets.tar.gz` separately before running simulation.
-**A public download link is not available yet.** The pinned archive contains
+Download `membench-sim-assets.tar.gz` from the
+[ModelScope simulator assets directory](https://modelscope.cn/datasets/ouhebai/RoboCasa-Mem/tree/master/sim-asset)
+before running simulation. The pinned archive contains
 3035 files and is 270484609 bytes (about 258 MiB). Its SHA-256 is:
 
 ```text
@@ -359,8 +364,8 @@ OpenPI simulation interface and all 27 suite selectors. The reorganized release
 passed all 27 selectors and resolution of 450 episode input identities; its wheel
 and source distribution each contain exactly the 27 official evaluation suites.
 The 450-case installed-wheel acceptance must be repeated
-for the current package. Final source freezing and public asset delivery are
-also pending. See [`release_candidate.json`](release_candidate.json).
+for the current package. Final source freezing is also pending.
+See [`release_candidate.json`](release_candidate.json).
 
 Historical TS03 Pi0.5 seed 1056 stored a stage report under an empty JSON field
 name. A verified correction restored `report_stages`; all 50 historical stage
