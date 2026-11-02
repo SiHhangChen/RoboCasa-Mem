@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="RoboCasa-Mem benchmarks environment and process memory in long-horizon mobile manipulation, with nine tasks, 1,800 demonstrations, and the HMAP baseline.">
+  <title>RoboCasa-Mem — Memory in Mobile Manipulation</title>
+  <link rel="icon" href="assets/images/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <script src="assets/js/main.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header">
+    <div class="nav-shell">
+      <a class="wordmark" href="#overview" aria-label="RoboCasa-Mem home">
+        <span class="wordmark-mark" aria-hidden="true">R</span>
+        <span>RoboCasa-Mem</span>
+      </a>
+      <nav aria-label="Main navigation">
+        <a href="#overview">Home</a>
+        <a href="#tasks">Tasks</a>
+        <a href="#method">Method</a>
+        <a href="#results">Results</a>
+        <a href="#real-robot">Real Robot</a>
+        <a href="#citation">Citation</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main-content">
+    <section id="overview" class="hero section-anchor" aria-labelledby="paper-title">
+      <div class="container hero-inner">
+        <h1 id="paper-title"><span class="project-name">RoboCasa-Mem</span><span class="paper-subtitle">Benchmarking Environment and Process Memory<br class="title-break"> in Long-Horizon Mobile Manipulation</span></h1>
+        <p class="authors">
+          <a href="https://openreview.net/profile?id=~Sihang_Chen3" rel="noopener noreferrer">Sihang Chen</a>
+          <a href="https://openreview.net/profile?id=~Chen_Ye14" rel="noopener noreferrer">Chen Ye</a>
+          <a href="https://openreview.net/profile?id=~Wei_Chen112" rel="noopener noreferrer">Wei Chen</a>
+          <a href="https://openreview.net/profile?id=~Xiaohan_Lei1" rel="noopener noreferrer">Xiaohan Lei</a>
+          <a href="https://openreview.net/profile?id=~Zhipeng_Tang3" rel="noopener noreferrer">Zhipeng Tang</a>
+          <a href="https://openreview.net/profile?id=~Sha_Zhang1" rel="noopener noreferrer">Sha Zhang</a>
+          <a href="https://openreview.net/profile?id=~yuan_zhang65" rel="noopener noreferrer">Yuan Zhang</a>
+          <a href="https://openreview.net/profile?id=~Zixuan_Chen3" rel="noopener noreferrer">Zixuan Chen</a>
+          <a href="https://openreview.net/profile?id=~Jiajun_Deng1" rel="noopener noreferrer">Jiajun Deng</a>
+          <a href="https://openreview.net/profile?id=~Houqiang_Li1" rel="noopener noreferrer">Houqiang Li</a>
+          <a href="https://openreview.net/profile?id=~Yanyong_Zhang2" rel="noopener noreferrer">Yanyong Zhang</a>
+        </p>
+        <p class="affiliations">University of Science and Technology of China (USTC)</p>
+        <div class="hero-actions">
+          <button class="button button-secondary" type="button" disabled aria-label="Paper (coming soon)" title="Paper coming soon"><svg class="icon" aria-hidden="true"><use href="assets/icons/lucide.svg#file-text"></use></svg>Paper</button>
+          <a class="button button-primary" href="https://github.com/SiHhangChen/RoboCasa-Mem" rel="noopener noreferrer"><svg class="icon" aria-hidden="true"><use href="assets/icons/lucide.svg#code-xml"></use></svg>Code</a>
+          <a class="button button-secondary" href="https://modelscope.cn/datasets/ouhebai/RoboCasa-Mem" rel="noopener noreferrer"><svg class="icon" aria-hidden="true"><use href="assets/icons/lucide.svg#database"></use></svg>Dataset</a>
+          <button class="button button-secondary" type="button" disabled aria-label="Models (coming soon)" title="Models coming soon"><svg class="icon" aria-hidden="true"><use href="assets/icons/lucide.svg#box"></use></svg>Models</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="tasks" class="section section-tinted section-anchor" aria-labelledby="tasks-title">
+      <div class="container">
+        <div class="section-heading section-heading-row">
+          <div>
+            <h2 id="tasks-title">Nine tasks, five memory types</h2>
+          </div>
+        </div>
+        <div class="suite-tabs" role="tablist" aria-label="Task memory suite" hidden>
+          <button id="environment-tab" type="button" role="tab" aria-selected="true" aria-controls="environment-suite" data-suite-tab="environment">Environment Memory <span>5</span></button>
+          <button id="process-tab" type="button" role="tab" aria-selected="false" aria-controls="process-suite" data-suite-tab="process">Process Memory <span>4</span></button>
+        </div>
+        <div id="environment-suite" class="task-suite" role="tabpanel" aria-labelledby="environment-tab" data-suite-panel="environment">
+          <div class="task-tabs" role="tablist" aria-label="Environment Memory tasks" hidden>
+            <button id="put-back-cup-tab" type="button" role="tab" aria-selected="true" aria-controls="put-back-cup-panel" data-task-tab="PutBackCup">PutBackCup</button>
+            <button id="sweet-cup-tab" type="button" role="tab" aria-selected="false" aria-controls="sweet-cup-panel" data-task-tab="SweetCup" tabindex="-1">SweetCup</button>
+            <button id="temp-report-tab" type="button" role="tab" aria-selected="false" aria-controls="temp-report-panel" data-task-tab="TempReport" tabindex="-1">TempReport</button>
+            <button id="can-recall-tab" type="button" role="tab" aria-selected="false" aria-controls="can-recall-panel" data-task-tab="CanRecall" tabindex="-1">CanRecall</button>
+            <button id="milk-match-tab" type="button" role="tab" aria-selected="false" aria-controls="milk-match-panel" data-task-tab="MilkMatch" tabindex="-1">MilkMatch</button>
+          </div>
+          <div class="task-grid">
+            <article id="put-back-cup-panel" class="task-example" role="tabpanel" aria-labelledby="put-back-cup-tab" data-suite="environment" data-task="PutBackCup">
+              <figure>
+                <video controls muted playsinline preload="none" width="1920" height="360" poster="assets/images/tasks/put-back-cup-multiview.webp" data-task="PutBackCup" aria-label="PutBackCup synchronized left, right, and wrist views of a successful expert demonstration at 4 times real time">
+                  <source src="assets/videos/put-back-cup-multiview.mp4" type="video/mp4">
+                </video>
+                <div class="camera-labels" aria-hidden="true"><span>Left external</span><span>Right external</span><span>Wrist camera</span></div>
+                <figcaption>
+                  <div class="task-heading">
+                    <h3>PutBackCup</h3>
+                    <p class="challenge">Spatial · Location recall</p>
+                  </div>
+                  <p>Observe the cup’s original spot, move it aside to clean, then return it to the previously cleaned location.</p>
+                </figcaption>
+              </figure>
+            </article>
+            <article id="sweet-cup-panel" class="task-example" role="tabpanel" aria-labelledby="sweet-cup-tab" data-suite="environment" data-task="SweetCup">
+              <figure>
+                <video controls muted playsinline preload="none" width="1920" height="360" poster="assets/images/tasks/sweet-cup-multiview.webp" data-task="SweetCup" aria-label="SweetCup synchronized left, right, and wrist views of a successful expert demonstration at 4 times real time">
+                  <source src="assets/videos/sweet-cup-multiview.mp4" type="video/mp4">
+                </video>
+                <div class="camera-labels" aria-hidden="true"><span>Left external</span><span>Right external</span><span>Wrist camera</span></div>
+                <figcaption>
+                  <div class="task-heading">
+                    <h3>SweetCup</h3>
+                    <p class="challenge">Attribute · Hidden attribute</p>
+                  </div>
+                  <p>Prepare one sweetened and one unsweetened coffee, then select the sweetened cup after the sugar is no longer visible.</p>
+                </figcaption>
+              </figure>
+            </article>
+            <article id="temp-report-panel" class="task-example" role="tabpanel" aria-labelledby="temp-report-tab" data-suite="environment" data-task="TempReport">
+              <figure>
+                <video controls muted playsinline preload="none" width="1920" height="360" poster="assets/images/tasks/temp-report-multiview.webp" data-task="TempReport" aria-label="TempReport synchronized left, right, and wrist views of a successful expert demonstration at 4 times real time">
+                  <source src="assets/videos/temp-report-multiview.mp4" type="video/mp4">
+                </video>
+                <div class="camera-labels" aria-hidden="true"><span>Left external</span><span>Right external</span><span>Wrist camera</span></div>
+                <figcaption>
+                  <div class="task-heading">
+                    <h3>TempReport</h3>
+                    <p class="challenge">Attribute · Attribute recall</p>
+                  </div>
+                  <p>Recall whether hot or cold water was dispensed, then press the matching button.</p>
+                </figcaption>
+              </figure>
+            </article>
+            <article id="can-recall-panel" class="task-example" role="tabpanel" aria-labelledby="can-recall-tab" data-suite="environment" data-task="CanRecall">
+              <figure>
+                <video controls muted playsinline preload="none" width="1920" height="360" poster="assets/images/tasks/can-recall-multiview.webp" data-task="CanRecall" aria-label="CanRecall synchronized left, right, and wrist views of a successful expert demonstration at 4 times real time">
+                  <source src="assets/videos/can-recall-multiview.mp4" type="video/mp4">
+                </video>
+                <div class="camera-labels" aria-hidden="true"><span>Left external</span><span>Right external</span><span>Wrist camera</span></div>
+                <figcaption>
+                  <div class="task-heading">
+                    <h3>CanRecall</h3>
+                    <p class="challenge">Relational · Object–container binding</p>
+                  </div>
+                  <p>After closing the cabinets, recall the requested items’ locations, retrieve them, and transport them to the stovetop.</p>
+                </figcaption>
+              </figure>
+            </article>
+            <article id="milk-match-panel" class="task-example" role="tabpanel" aria-labelledby="milk-match-tab" data-suite="environment" data-task="MilkMatch">
+              <figure>
+                <video controls muted playsinline preload="none" width="1920" height="360" poster="assets/images/tasks/milk-match-multiview.webp" data-task="MilkMatch" aria-label="MilkMatch synchronized left, right, and wrist views of a successful expert demonstration at 4 times real time">
+                  <source src="assets/videos/milk-match-multiview.mp4" type="video/mp4">
+                </video>
+                <div class="camera-labels" aria-hidden="true"><span>Left external</span><span>Right external</span><span>Wrist camera</span></div>
+                <figcaption>
+                  <div class="task-heading">
+                    <h3>MilkMatch</h3>
+                    <p class="challenge">Relational · Source–target binding</p>
+                  </div>
+                  <p>Transport milk boxes in two trips, placing each on the plate matching its source tray’s color.</p>
+                </figcaption>
+              </figure>
+            </article>
+          </div>
+        </div>
+
+        <div id="process-suite" class="task-suite" role="tabpanel" aria-labelledby="process-tab" data-suite-panel="process">
+          <div class="task-tabs" role="tablist" aria-label="Process Memory tasks" hidden>
+            <button id="drawer-search-tab" type="button" role="tab" aria-selected="true" aria-controls="drawer-search-panel" data-task-tab="DrawerSearch">DrawerSearch</button>
+            <button id="sugar-count-tab" type="button" role="tab" aria-selected="false" aria-controls="sugar-count-panel" data-task-tab="SugarCount" tabindex="-1">SugarCount</button>
+            <button id="heat-and-inspect-tab" type="button" role="tab" aria-selected="false" aria-controls="heat-and-inspect-panel" data-task-tab="HeatAndInspect" tabindex="-1">HeatAndInspect</button>
+            <button id="fill-and-retrieve-tab" type="button" role="tab" aria-selected="false" aria-controls="fill-and-retrieve-panel" data-task-tab="FillAndRetrieve" tabindex="-1">FillAndRetrieve</button>
+          </div>
+          <div class="task-grid">
+            <article id="drawer-search-panel" class="task-example" role="tabpanel" aria-labelledby="drawer-search-tab" data-suite="process" data-task="DrawerSearch">
+              <figure>
+                <video controls muted playsinline preload="none" width="1920" height="360" poster="assets/images/tasks/drawer-search-multiview.webp" data-task="DrawerSearch" aria-label="DrawerSearch synchronized left, right, and wrist views of a successful expert demonstration at 4 times real time">
+                  <source src="assets/videos/drawer-search-multiview.mp4" type="video/mp4">
+                </video>
+                <div class="camera-labels" aria-hidden="true"><span>Left external</span><span>Right external</span><span>Wrist camera</span></div>
+                <figcaption>
+                  <div class="task-heading">
+                    <h3>DrawerSearch</h3>
+                    <p class="challenge">Single-task Progress · Search progress</p>
+                  </div>
+                  <p>Count the drawers checked while searching for the red cube, then press the answer button that many times.</p>
+                </figcaption>
+              </figure>
+            </article>
+            <article id="sugar-count-panel" class="task-example" role="tabpanel" aria-labelledby="sugar-count-tab" data-suite="process" data-task="SugarCount">
+              <figure>
+                <video controls muted playsinline preload="none" width="1920" height="360" poster="assets/images/tasks/sugar-count-multiview.webp" data-task="SugarCount" aria-label="SugarCount synchronized left, right, and wrist views of a successful expert demonstration at 4 times real time">
+                  <source src="assets/videos/sugar-count-multiview.mp4" type="video/mp4">
+                </video>
+                <div class="camera-labels" aria-hidden="true"><span>Left external</span><span>Right external</span><span>Wrist camera</span></div>
+                <figcaption>
+                  <div class="task-heading">
+                    <h3>SugarCount</h3>
+                    <p class="challenge">Single-task Progress · Action counting</p>
+                  </div>
+                  <p>Add the requested number of sugar cubes to the hot chocolate, tracking successful additions before pressing completion.</p>
+                </figcaption>
+              </figure>
+            </article>
+            <article id="heat-and-inspect-panel" class="task-example" role="tabpanel" aria-labelledby="heat-and-inspect-tab" data-suite="process" data-task="HeatAndInspect">
+              <figure>
+                <video controls muted playsinline preload="none" width="1920" height="360" poster="assets/images/tasks/heat-and-inspect-multiview.webp" data-task="HeatAndInspect" aria-label="HeatAndInspect synchronized left, right, and wrist views of a successful expert demonstration at 4 times real time">
+                  <source src="assets/videos/heat-and-inspect-multiview.mp4" type="video/mp4">
+                </video>
+                <div class="camera-labels" aria-hidden="true"><span>Left external</span><span>Right external</span><span>Wrist camera</span></div>
+                <figcaption>
+                  <div class="task-heading">
+                    <h3>HeatAndInspect</h3>
+                    <p class="challenge">Multi-task Scheduling · Pending obligation</p>
+                  </div>
+                  <p>Inspect drawers while heating a pan, then return to turn off the stove and submit both completed task threads.</p>
+                </figcaption>
+              </figure>
+            </article>
+            <article id="fill-and-retrieve-panel" class="task-example" role="tabpanel" aria-labelledby="fill-and-retrieve-tab" data-suite="process" data-task="FillAndRetrieve">
+              <figure>
+                <video controls muted playsinline preload="none" width="1920" height="360" poster="assets/images/tasks/fill-and-retrieve-multiview.webp" data-task="FillAndRetrieve" aria-label="FillAndRetrieve synchronized left, right, and wrist views of a successful expert demonstration at 4 times real time">
+                  <source src="assets/videos/fill-and-retrieve-multiview.mp4" type="video/mp4">
+                </video>
+                <div class="camera-labels" aria-hidden="true"><span>Left external</span><span>Right external</span><span>Wrist camera</span></div>
+                <figcaption>
+                  <div class="task-heading">
+                    <h3>FillAndRetrieve</h3>
+                    <p class="challenge">Multi-task Scheduling · Pending obligation</p>
+                  </div>
+                  <p>Retrieve a can while dispensing water, then return to turn off the faucet and complete both tasks.</p>
+                </figcaption>
+              </figure>
+            </article>
+          </div>
+        </div>
+
+        <div id="task-player" class="task-player" role="group" aria-label="Task demonstration playback" hidden>
+          <button id="task-play" class="icon-button" type="button" aria-label="Play demonstration" title="Play"><svg class="icon" data-play-icon aria-hidden="true"><use href="assets/icons/lucide.svg#play"></use></svg><svg class="icon" data-pause-icon aria-hidden="true" hidden><use href="assets/icons/lucide.svg#pause"></use></svg></button>
+          <span id="task-elapsed" class="player-time">0:00</span>
+          <input id="task-seek" type="range" min="0" max="100" step="0.1" value="0" aria-label="Demonstration progress" disabled>
+          <span id="task-duration" class="player-time">--:--</span>
+          <button id="task-fullscreen" class="icon-button" type="button" aria-label="View demonstration fullscreen" title="Fullscreen"><svg class="icon" aria-hidden="true"><use href="assets/icons/lucide.svg#maximize-2"></use></svg></button>
+          <span id="task-player-status" class="sr-only" role="status"></span>
+        </div>
+
+        <div id="workflow-descriptions">
+            <p class="workflow-step"><strong>PutBackCup:</strong> Observe the cup’s original spot, move it aside, clean the area, and return the cup to the remembered spot.</p>
+            <p class="workflow-step"><strong>SweetCup:</strong> Add sugar to one of two coffee cups, let it dissolve out of sight, and select that same sweetened cup rather than the unsweetened one.</p>
+            <p class="workflow-step"><strong>TempReport:</strong> Dispense hot or cold water, remember which temperature was dispensed, and press the matching temperature button.</p>
+            <p class="workflow-step"><strong>CanRecall:</strong> Observe the requested items’ cabinet locations, close the cabinets, retrieve the items from those remembered locations, and transport them to the stovetop.</p>
+            <p class="workflow-step"><strong>MilkMatch:</strong> Observe each milk box’s source tray color, transport the boxes in two trips, and place each box on the plate matching its source tray.</p>
+            <p class="workflow-step"><strong>DrawerSearch:</strong> Check drawers while searching for the red cube, count the drawers checked, and press the answer button that many times.</p>
+            <p class="workflow-step"><strong>SugarCount:</strong> Add the requested number of sugar cubes to the hot chocolate, track successful additions, and press completion after reaching the requested count.</p>
+            <p class="workflow-step"><strong>HeatAndInspect:</strong> Heat the pan while inspecting the drawers, return to turn off the stove, and submit both completed task threads.</p>
+            <p class="workflow-step"><strong>FillAndRetrieve:</strong> Dispense water while retrieving the can, return to turn off the faucet, and complete both task threads.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="benchmark" class="section section-anchor" aria-labelledby="benchmark-title">
+      <div class="container">
+        <div class="section-heading">
+          <h2 id="benchmark-title">Evaluate memory at the decision, not by task length</h2>
+        </div>
+        <figure class="figure benchmark-figure">
+          <a class="figure-link" href="assets/images/benchmark-overview.webp" data-figure-title="Benchmark overview" aria-label="Enlarge benchmark overview" title="Enlarge figure">
+            <img src="assets/images/benchmark-overview.webp" alt="RoboCasa-Mem benchmark overview showing a history-dependent cup-selection example, five memory categories, demonstration construction, and semantic evaluation." width="2880" height="1921" loading="lazy">
+            <span class="figure-expand" aria-hidden="true"><svg class="icon"><use href="assets/icons/lucide.svg#maximize-2"></use></svg></span>
+          </a>
+        </figure>
+        <div class="memory-grid">
+          <article class="memory-panel environment-panel">
+            <p class="panel-label">Environment Memory</p>
+            <h3>What happened in the world?</h3>
+            <p>Task-relevant physical information that cannot be reliably recovered from the current view.</p>
+            <ul class="memory-list">
+              <li><strong>Spatial</strong><span>Earlier object locations</span></li>
+              <li><strong>Attribute</strong><span>Object properties and hidden state changes</span></li>
+              <li><strong>Relational</strong><span>Associations between entities</span></li>
+            </ul>
+          </article>
+          <article class="memory-panel process-panel">
+            <p class="panel-label">Process Memory</p>
+            <h3>What remains to be done?</h3>
+            <p>Execution state needed to choose subsequent actions and resume unfinished activities.</p>
+            <ul class="memory-list">
+              <li><strong>Single-task Progress</strong><span>Completed actions, search progress, and counts</span></li>
+              <li><strong>Multi-task Scheduling</strong><span>Pending actions across interleaved tasks</span></li>
+            </ul>
+          </article>
+        </div>
+        <div class="evaluation-strip">
+          <div>
+            <p class="panel-label">Behavior-Conditioned Evaluation</p>
+            <h3>Constraints follow the robot’s own behavior</h3>
+            <p>For tasks with multiple valid paths, later semantic constraints derive from earlier actions rather than a fixed target. In SweetCup, either cup may receive sugar; success requires selecting that same cup after the sugar dissolves.</p>
+          </div>
+          <dl class="metric-definitions">
+            <div><dt>SR</dt><dd>Task Success Rate: complete-task success.</dd></div>
+            <div><dt>SCR</dt><dd>Stage Completion Rate: average success across predefined stages.</dd></div>
+          </dl>
+        </div>
+      </div>
+    </section>
+
+    <section id="method" class="section section-anchor" aria-labelledby="method-title">
+      <div class="container">
+        <div class="section-heading">
+          <h2 id="method-title">Hierarchical Memory-Augmented Policy</h2>
+          <p>HMAP separates history-dependent symbolic planning from low-level 3D-aware control. The planner supplies an executable subgoal; the controller retrieves current geometric features conditioned on that subgoal.</p>
+        </div>
+        <figure class="figure method-figure">
+          <a class="figure-link" href="assets/images/hmap-overview.webp" data-figure-title="Hierarchical Memory-Augmented Policy" aria-label="Enlarge HMAP architecture" title="Enlarge figure">
+            <img src="assets/images/hmap-overview.webp" alt="HMAP architecture with a Qwen3-VL high-level Entity and Process Memory Planner and a pi0.5 low-level controller using frozen VGGT-Omega geometry, cross-attention, and action modulation." width="2398" height="1573" loading="lazy">
+            <span class="figure-expand" aria-hidden="true"><svg class="icon"><use href="assets/icons/lucide.svg#maximize-2"></use></svg></span>
+          </a>
+        </figure>
+        <div class="method-steps">
+          <article>
+            <span class="step-label">High level</span>
+            <h3>Entity + Process Memory Planner</h3>
+            <p><strong>Qwen3-VL-4B-Instruct</strong> updates sparse Entity Memory and Process Memory from the instruction, previous memories, and current and earlier observations. It emits only the active language subgoal to the controller.</p>
+          </article>
+          <article>
+            <span class="step-label">Low level</span>
+            <h3>Subgoal-guided 3D-aware control</h3>
+            <p>Built on <strong>π0.5</strong>, the controller keeps multi-view tokens from <strong>frozen VGGT-Ω</strong> separate. It uses task-conditioned queries to retrieve relevant geometry through <strong>cross-attention</strong>; learned <strong>scale and shift</strong> transformations modulate action-expert layers.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="results" class="section section-tinted section-anchor" aria-labelledby="results-title">
+      <div class="container">
+        <div class="section-heading">
+          <h2 id="results-title">Gains concentrate in hidden-attribute recall</h2>
+          <p>Simulation uses 50 held-out scene seeds per task. Tables report SR and SCR on a 0–1 scale; Avg. is the macro-average over all nine tasks.</p>
+        </div>
+        <p class="result-lead">HMAP improves average SR from <strong>16.2% to 24.2%</strong> and Avg SCR from <strong>0.41 to 0.47</strong>, with gains concentrated in hidden-attribute recall.</p>
+
+        <div class="table-block">
+          <div class="table-heading"><h3>Environment Memory</h3></div>
+          <div class="table-scroll" tabindex="0" role="region" aria-label="Environment Memory results table">
+            <table id="environment-results">
+              <thead>
+                <tr><th scope="col" rowspan="2">Model</th><th scope="col" colspan="2">PutBackCup</th><th scope="col" colspan="2">SweetCup</th><th scope="col" colspan="2">TempReport</th><th scope="col" colspan="2">CanRecall</th><th scope="col" colspan="2">MilkMatch</th></tr>
+                <tr><th scope="col">SR</th><th scope="col">SCR</th><th scope="col">SR</th><th scope="col">SCR</th><th scope="col">SR</th><th scope="col">SCR</th><th scope="col">SR</th><th scope="col">SCR</th><th scope="col">SR</th><th scope="col">SCR</th></tr>
+              </thead>
+              <tbody>
+                <tr><th scope="row">ACT</th><td>0.00</td><td>0.48</td><td>0.00</td><td>0.07</td><td>0.00</td><td>0.09</td><td>0.00</td><td>0.09</td><td>0.00</td><td>0.03</td></tr>
+                <tr><th scope="row">DP</th><td>0.00</td><td>0.20</td><td>0.00</td><td>0.04</td><td>0.08</td><td>0.21</td><td>0.00</td><td>0.05</td><td>0.00</td><td>0.05</td></tr>
+                <tr><th scope="row">π0.5</th><td>0.68</td><td>0.85</td><td>0.04</td><td>0.27</td><td>0.22</td><td>0.57</td><td>0.00</td><td>0.24</td><td>0.12</td><td>0.47</td></tr>
+                <tr><th scope="row">MemER-style</th><td>0.10</td><td>0.22</td><td>0.00</td><td>0.21</td><td>0.00</td><td>0.58</td><td>0.00</td><td>0.21</td><td>0.00</td><td>0.19</td></tr>
+                <tr class="hmap-row"><th scope="row">HMAP (Ours)</th><td>0.70</td><td>0.79</td><td>0.10</td><td>0.46</td><td>0.86</td><td>0.93</td><td>0.00</td><td>0.26</td><td>0.16</td><td>0.47</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="table-block">
+          <div class="table-heading"><h3>Process Memory + Overall Average</h3></div>
+          <div class="table-scroll" tabindex="0" role="region" aria-label="Process Memory and overall results table">
+            <table id="process-results">
+              <thead>
+                <tr><th scope="col" rowspan="2">Model</th><th scope="col" colspan="2">DrawerSearch</th><th scope="col" colspan="2">SugarCount</th><th scope="col" colspan="2">HeatAndInspect</th><th scope="col" colspan="2">FillAndRetrieve</th><th scope="col" colspan="2">Avg.</th></tr>
+                <tr><th scope="col">SR</th><th scope="col">SCR</th><th scope="col">SR</th><th scope="col">SCR</th><th scope="col">SR</th><th scope="col">SCR</th><th scope="col">SR</th><th scope="col">SCR</th><th scope="col">SR</th><th scope="col">SCR</th></tr>
+              </thead>
+              <tbody>
+                <tr><th scope="row">ACT</th><td>0.00</td><td>0.08</td><td>0.04</td><td>0.07</td><td>0.00</td><td>0.25</td><td>0.00</td><td>0.26</td><td>0.00</td><td>0.16</td></tr>
+                <tr><th scope="row">DP</th><td>0.00</td><td>0.08</td><td>0.14</td><td>0.19</td><td>0.00</td><td>0.23</td><td>0.00</td><td>0.18</td><td>0.02</td><td>0.14</td></tr>
+                <tr><th scope="row">π0.5</th><td>0.12</td><td>0.32</td><td>0.28</td><td>0.23</td><td>0.00</td><td>0.32</td><td>0.00</td><td>0.39</td><td>0.16</td><td>0.41</td></tr>
+                <tr><th scope="row">MemER-style</th><td>0.00</td><td>0.25</td><td>0.08</td><td>0.10</td><td>0.00</td><td>0.32</td><td>0.00</td><td>0.20</td><td>0.02</td><td>0.25</td></tr>
+                <tr class="hmap-row"><th scope="row">HMAP (Ours)</th><td>0.08</td><td>0.31</td><td>0.28</td><td>0.20</td><td>0.00</td><td>0.50</td><td>0.00</td><td>0.34</td><td>0.24</td><td>0.47</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="findings">
+          <h3>Research findings</h3>
+          <details open>
+            <summary>Where does explicit memory help most?</summary>
+            <p>The clearest gain is on TempReport, where SR rises from 0.22 to 0.86. Conditional temperature-recall success rises from 0.41 to 0.90; SweetCup conditional recall rises from 0.22 to 0.45. This supports a targeted benefit for retrieving earlier environment states, not a uniform improvement across manipulation.</p>
+          </details>
+          <details>
+            <summary>What remains difficult for Process Memory?</summary>
+            <p>HMAP and π0.5 perform similarly on Single-Task Progress. On HeatAndInspect, HMAP improves SCR from 0.32 to 0.50 but not final success; FillAndRetrieve also remains unsolved. Across the evaluated policies, no method completes either multi-task scheduling task.</p>
+          </details>
+          <details>
+            <summary>How should the results be interpreted?</summary>
+            <p>SCR localizes progress but does not fully separate memory errors from execution errors. Evaluation is primarily in simulation, the taxonomy is not exhaustive, and demonstrations contain only successful expert trajectories.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <section id="real-robot" class="section section-anchor" aria-labelledby="real-title">
+      <div class="container">
+        <div class="section-heading section-heading-row">
+          <div><h2 id="real-title">AgileX Cobot Magic Object Transport</h2></div>
+          <p>The robot picks from a colored source container, turns toward the opposite workspace, and selects the matching target after the source leaves the camera view.</p>
+        </div>
+        <figure class="figure real-figure">
+          <a class="figure-link" href="assets/images/real-robot.webp" data-figure-title="AgileX Cobot Magic Object Transport" aria-label="Enlarge real robot experiment" title="Enlarge figure">
+            <img src="assets/images/real-robot.webp" alt="AgileX Cobot Magic Object Transport sequence showing observation, picking, moving, target observation, and placement from wrist and external views." width="2400" height="1350" loading="lazy">
+            <span class="figure-expand" aria-hidden="true"><svg class="icon"><use href="assets/icons/lucide.svg#maximize-2"></use></svg></span>
+          </a>
+        </figure>
+      </div>
+    </section>
+
+    <section id="citation" class="section citation-section section-anchor" aria-labelledby="citation-title">
+      <div class="container citation-layout">
+        <div>
+          <h2 id="citation-title">Citation</h2>
+          <a class="text-link" href="cite.bib" download>Download BibTeX</a>
+        </div>
+        <div class="citation-box">
+          <div class="citation-toolbar"><span>BibTeX</span><button id="copy-citation" type="button" data-copy-target="citation-bibtex" hidden><svg class="icon" aria-hidden="true"><use href="assets/icons/lucide.svg#copy"></use></svg><span data-copy-label>Copy</span></button></div>
+          <pre id="citation-bibtex">@misc{robocasa_mem,
+  author = {Chen, Sihang and Ye, Chen and Chen, Wei and Lei, Xiaohan and
+            Tang, Zhipeng and Zhang, Sha and Zhang, Yuan and Chen, Zixuan and
+            Deng, Jiajun and Li, Houqiang and Zhang, Yanyong},
+  title = {RoboCasa-Mem: Benchmarking Environment and Process Memory in Long-Horizon Mobile Manipulation}
+}</pre>
+          <p id="copy-status" class="copy-status" role="status" aria-live="polite"></p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="figure-viewer" class="figure-viewer" aria-labelledby="figure-viewer-title">
+    <div class="viewer-toolbar">
+      <h2 id="figure-viewer-title">Figure</h2>
+      <div class="viewer-actions">
+        <button id="figure-zoom" class="icon-button" type="button" aria-label="View figure at original size" aria-pressed="false" title="Original size"><svg class="icon" aria-hidden="true"><use href="assets/icons/lucide.svg#zoom-in"></use></svg></button>
+        <a id="figure-original" class="icon-button" target="_blank" rel="noopener noreferrer" aria-label="Open original image" title="Open original image"><svg class="icon" aria-hidden="true"><use href="assets/icons/lucide.svg#external-link"></use></svg></a>
+        <button id="figure-close" class="icon-button" type="button" aria-label="Close figure" title="Close"><svg class="icon" aria-hidden="true"><use href="assets/icons/lucide.svg#x"></use></svg></button>
+      </div>
+    </div>
+    <div class="viewer-canvas"></div>
+  </dialog>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p><strong>RoboCasa-Mem</strong></p>
+      <p>Code · MIT License</p>
+    </div>
+  </footer>
+</body>
+</html>
