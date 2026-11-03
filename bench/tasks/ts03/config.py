@@ -5,6 +5,7 @@ from math import isfinite
 from pathlib import Path
 from typing import Any
 import yaml
+from bench.task_ids import normalize_task_id
 from bench.tasks.ts03.domain.contracts import ActionConfig, InitialStateConfig, RobotBaseConfig, RobotBaseMode, RunContext, TASK_ID, TaskConfig
 from bench.tasks.ts03.domain.episode import normalize_target_sugar_count, normalize_total_sugar_count, resolve_profile_selection
 from bench.tasks.ts03.domain.geometry import SUGAR_RELEASE_REGION_NAMES, SUGAR_RELEASE_REGIONS_XY, sugar_release_offset_is_inside
@@ -22,8 +23,9 @@ def load_task_config(path: str | Path=DEFAULT_TASK_CONFIG_FILE) -> TaskConfig:
         raise ValueError('TS03 config requires schema_version=1')
     task = dict(_mapping(payload, 'task', config_path))
     _reject_unknown(task, {'id', 'display_name', 'description', 'success_conditions'}, 'task fields')
-    if str(task.get('id')) != TASK_ID:
+    if normalize_task_id(str(task.get('id'))) != TASK_ID:
         raise ValueError(f'TS03 config must declare task.id={TASK_ID!r}')
+    task['id'] = TASK_ID
     scene = dict(_mapping(payload, 'scene', config_path))
     _reject_unknown(scene, {'env_name', 'fixed_scene', 'layout_id', 'style_id', 'scene_seed', 'sugar_plate_name', 'receptacle_name', 'sugar_cube_scale', 'sugar_plate_scale', 'sugar_plate_reference_offset', 'sugar_plate_placement_size', 'sugar_burner_id', 'saucepan_xml', 'sugar_cube_xml', 'sugar_plate_xml', 'liquid_rgba'}, 'scene fields')
     episode = dict(_mapping(payload, 'episode', config_path))

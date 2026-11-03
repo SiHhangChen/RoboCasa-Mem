@@ -116,7 +116,7 @@ def _failed(state: TS02EvalResult) -> bool:
 
 
 STAGE_EVALUATION = StageEvaluationIntegration(
-    task_id="TS02",
+    task_id="TS-02",
     target_stage_ids=TARGET_STAGE_ORDER,
     capture_stage_ids=CAPTURE_STAGE_ORDER,
     prefix_stage_by_target=_PREFIX_STAGE_BY_TARGET,

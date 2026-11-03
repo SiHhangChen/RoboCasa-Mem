@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 
-TASK_ID = "TM01"
+TASK_ID = "TM-01"
 ENV_NAME = "TM01BoilWaterAndInspectTwoDrawers"
 AXIS = "TQ-M"
 CANONICAL_PROMPT = (

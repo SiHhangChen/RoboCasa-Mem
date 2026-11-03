@@ -1,8 +1,8 @@
-# TM02 scene/semantic configuration. Task-specific motion calibration is explicit.
+# TM-02 scene/semantic configuration. Task-specific motion calibration is explicit.
 schema_version: 1
 
 task:
-  id: TM02
+  id: TM-02
   display_name: Fill Pot and Retrieve Can
   description: Fill a sink-side pot while retrieving a can, then finish both threads.
   canonical_prompt: >-
@@ -71,7 +71,7 @@ episode:
   max_horizon: 3600
 
 initial_state:
-  robot_base_source: TM02.manual_base_path
+  robot_base_source: TM-02.manual_base_path
   robot_base_sample_index: 0
   faucet_mode: off
   water_temperature: cold

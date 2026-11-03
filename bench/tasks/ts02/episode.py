@@ -13,10 +13,10 @@ from bench.tasks.ts02.prompts import resolve_prompt_spec
 
 def resolve_episode(request: EpisodeRequest | None = None, **kwargs: Any) -> ResolvedEpisode:
     if request is None:
-        request = EpisodeRequest(task_id="TS02", **kwargs)
+        request = EpisodeRequest(task_id="TS-02", **kwargs)
     return resolve_canonical_episode(
         request,
-        task_id="TS02",
+        task_id="TS-02",
         task_version="1.1.0",
         default_task_config_file=DEFAULT_TASK_CONFIG_FILE,
         load_task_config=load_task_config,

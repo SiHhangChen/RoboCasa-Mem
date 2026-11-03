@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 import re
 
+from bench.task_ids import normalize_task_id
+
 
 _STAGE_ID = re.compile(r"^[a-z][a-z0-9_]*$")
 
@@ -64,21 +66,21 @@ def _profile(
 
 
 TM01_REPORT_PROFILE_V1 = _profile(
-    "TM01",
+    "TM-01",
     "burner_on",
     "one_drawer_inspected",
     "both_threads_completed",
     "success",
 )
 TM02_REPORT_PROFILE_V1 = _profile(
-    "TM02",
+    "TM-02",
     "faucet_on",
     "pot_filled_and_can_retrieved",
     "both_threads_completed",
     "success",
 )
 TM01_REPORT_PROFILE = _profile(
-    "TM01",
+    "TM-01",
     "burner_on",
     "one_drawer_inspected",
     "one_thread_completed",
@@ -87,7 +89,7 @@ TM01_REPORT_PROFILE = _profile(
     version=2,
 )
 TM02_REPORT_PROFILE = _profile(
-    "TM02",
+    "TM-02",
     "faucet_on",
     "pot_filled_and_can_retrieved",
     "one_thread_completed",
@@ -104,7 +106,7 @@ TS01_REPORT_PROFILE = _profile(
     conditional=("sugar_2", "sugar_3"),
 )
 TS02_REPORT_PROFILE = _profile(
-    "TS02",
+    "TS-02",
     "one_drawer_checked",
     "target_found",
     "search_stopped_after_target",
@@ -113,7 +115,7 @@ TS02_REPORT_PROFILE = _profile(
     success_stage_id="correct_press_count",
 )
 TS03_REPORT_PROFILE = _profile(
-    "TS03",
+    "TS-03",
     "sugar_1",
     "sugar_2",
     "sugar_3",
@@ -235,7 +237,7 @@ WX02_REPORT_PROFILE = _profile(
 )
 
 
-REPORT_STAGE_PROFILES = tuple(p for p in (TM01_REPORT_PROFILE, TM02_REPORT_PROFILE, TS01_REPORT_PROFILE, TS02_REPORT_PROFILE, TS03_REPORT_PROFILE, TS04_REPORT_PROFILE, WA01_REPORT_PROFILE, WA02_REPORT_PROFILE, WA03_REPORT_PROFILE, WA05_REPORT_PROFILE, WA06_REPORT_PROFILE, WR01_REPORT_PROFILE, WR03_REPORT_PROFILE, WR05_REPORT_PROFILE, WR06_REPORT_PROFILE, WR07_REPORT_PROFILE, WR08_REPORT_PROFILE, WX01_REPORT_PROFILE, WX02_REPORT_PROFILE) if p.task_id in ('WX-01', 'WA-01', 'WA-05', 'WR-01', 'WR-08', 'TS02', 'TS03', 'TM01', 'TM02'))
+REPORT_STAGE_PROFILES = tuple(p for p in (TM01_REPORT_PROFILE, TM02_REPORT_PROFILE, TS01_REPORT_PROFILE, TS02_REPORT_PROFILE, TS03_REPORT_PROFILE, TS04_REPORT_PROFILE, WA01_REPORT_PROFILE, WA02_REPORT_PROFILE, WA03_REPORT_PROFILE, WA05_REPORT_PROFILE, WA06_REPORT_PROFILE, WR01_REPORT_PROFILE, WR03_REPORT_PROFILE, WR05_REPORT_PROFILE, WR06_REPORT_PROFILE, WR07_REPORT_PROFILE, WR08_REPORT_PROFILE, WX01_REPORT_PROFILE, WX02_REPORT_PROFILE) if p.task_id in ('WX-01', 'WA-01', 'WA-05', 'WR-01', 'WR-08', 'TS-02', 'TS-03', 'TM-01', 'TM-02'))
 
 _PROFILES_BY_TASK = {profile.task_id: profile for profile in REPORT_STAGE_PROFILES}
 # Historical reports remain readable only under their explicit profile id.
@@ -259,17 +261,23 @@ def get_report_stage_profile(
     """Resolve the current default or an explicitly requested historical profile."""
 
     try:
-        profile = _PROFILES_BY_TASK[str(task_id)]
+        profile = _PROFILES_BY_TASK[normalize_task_id(str(task_id))]
     except KeyError as exc:
         raise KeyError(f"task {task_id!r} has no benchmark report profile") from exc
     if profile_id is not None:
-        selected = _PROFILES_BY_ID.get(str(profile_id))
+        selected = _PROFILES_BY_ID.get(normalize_report_profile_id(str(profile_id)))
         if selected is None or selected.task_id != profile.task_id:
             raise KeyError(
                 f"task {task_id!r} does not use report profile {profile_id!r}"
             )
         return selected
     return profile
+
+
+def normalize_report_profile_id(profile_id: str) -> str:
+    """Accept legacy ID punctuation without changing a profile's version."""
+    task_id, separator, version = profile_id.partition("/")
+    return normalize_task_id(task_id) + separator + version
 
 
 __all__ = [
@@ -297,4 +305,5 @@ __all__ = [
     "WX01_REPORT_PROFILE",
     "WX02_REPORT_PROFILE",
     "get_report_stage_profile",
+    "normalize_report_profile_id",
 ]

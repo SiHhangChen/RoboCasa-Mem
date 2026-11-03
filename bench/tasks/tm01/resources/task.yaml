@@ -1,7 +1,7 @@
 schema_version: 1
 
 task:
-  id: TM01
+  id: TM-01
   display_name: Boil Water and Inspect Two Drawers
   description: Turn on the stove, inspect two drawers, turn it off, and submit.
   canonical_prompt: >-
@@ -127,13 +127,13 @@ resources:
   stove_knob_pinch_off_pose: calibration/stove_knob/pinch_off.json
   stove_knob_pinch_on_pose: calibration/stove_knob/pinch_on.json
   manual_base_path: navigation/manual_base_path_layout39_style24_seed0.json
-  # TM01 owns this task-local handle-relative hook calibration.
+  # TM-01 owns this task-local handle-relative hook calibration.
   drawer_grasp_pose: calibration/cabinet_slot_1_hook_pose.json
 
 navigation:
   manual_base_path_enabled: true
   manual_base_path_start_index: 0
-  # Drawer contact uses TM01's task-owned calibrated terminal accuracy. The shared
+  # Drawer contact uses TM-01's task-owned calibrated terminal accuracy. The shared
   # defaults (9 cm / 0.10 rad) are sufficient for coarse transit, but can leave
   # the fingers on the cabinet face instead of centered on the handle after a
   # drawer-to-drawer lateral move.

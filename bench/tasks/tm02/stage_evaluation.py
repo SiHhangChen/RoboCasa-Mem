@@ -196,7 +196,7 @@ def _failed(state: TM02EvalResult) -> bool:
 
 
 STAGE_EVALUATION = StageEvaluationIntegration(
-    task_id="TM02",
+    task_id="TM-02",
     target_stage_ids=STAGE_ORDER,
     capture_stage_ids=STAGE_ORDER,
     prefix_stage_by_target={
@@ -213,7 +213,7 @@ STAGE_EVALUATION = StageEvaluationIntegration(
 )
 
 LEGACY_STAGE_EVALUATION = StageEvaluationIntegration(
-    task_id="TM02",
+    task_id="TM-02",
     target_stage_ids=LEGACY_STAGE_ORDER,
     capture_stage_ids=LEGACY_STAGE_ORDER,
     prefix_stage_by_target={
@@ -229,7 +229,7 @@ LEGACY_STAGE_EVALUATION = StageEvaluationIntegration(
 )
 
 B1_DIAGNOSTIC_STAGE_EVALUATION = StageEvaluationIntegration(
-    task_id="TM02",
+    task_id="TM-02",
     target_stage_ids=B1_DIAGNOSTIC_STAGE_ORDER,
     capture_stage_ids=B1_DIAGNOSTIC_STAGE_ORDER,
     prefix_stage_by_target={

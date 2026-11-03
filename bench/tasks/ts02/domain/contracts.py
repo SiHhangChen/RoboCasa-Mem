@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 
-TASK_ID = "TS02"
+TASK_ID = "TS-02"
 ENV_NAME = "TS02InspectThreeCabinets"
 AXIS = "TQ-S"
 TARGET_OBJECT_NAME = "red_cube"

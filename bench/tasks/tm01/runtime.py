@@ -114,7 +114,7 @@ def _release_facts(
 
 
 _ADAPTER = TaskRuntimeAdapter(
-    task_id="TM01",
+    task_id="TM-01",
     load_task_config=load_task_config,
     resolve_task_options=resolve_task_options,
     scene=standard_scene(resolve_scene_config, uses_seed=False),

@@ -2,9 +2,9 @@
   "schema_version": "membench.release_identity/v1",
   "version": "0.1.0rc1",
   "source_revision": "b891bdf35fbe7b8390ea6cc663a870fb9ea7820c",
-  "implementation_sha256": "5417deda1527bf604d79effbab080e58d446e3b460c372186ab684552ca6470a",
-  "suite_inventory_sha256": "cce6159abdd49de9cc18f0b065a46351d1c895b79e01d30d9bc8886eef117138",
-  "input_lock_sha256": "f2713fbaa7b1c6ccbc5e9b14623e130a356bf954697790a052b24e87b1de6486",
+  "implementation_sha256": "32fe887a789726a8759d1f1d4dbae7ac12d9c6a67d9a42ecca53f10df7d36453",
+  "suite_inventory_sha256": "110e9ce8e15def455464a3c52e809156755354e4ac52cb9f0ab5a323b2db1e76",
+  "input_lock_sha256": "d9c06bb05bb9d6bbc633c750d0d1c35b6644444950256cacf91565b635b6006e",
   "wx01_setup_manifest_sha256": "fb95c738c1b00823816a7575e0ef91f905de5b4ab6b621d57298c56ac89c735b",
   "simulator_environment_sha256": "5547254186411ee8ca8c57ffaab992c761de1d41d5e6008cad79f4cbb913db95",
   "simulator_assets_sha256": "611091c98c78bf66e75cdae2cd470f864c26cc9275cbdda6d814d15ce48d786e"

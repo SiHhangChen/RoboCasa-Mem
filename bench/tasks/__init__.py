@@ -53,10 +53,10 @@ _builtin_task_plugin('WA-01', aliases=('WA01', 'WA_01'), env_name='WA01SortSugar
 _builtin_task_plugin('WA-05', aliases=('WA05', 'WA_05'), env_name='WA05FillOneCupAndMatchTemperatureButton'),
 _builtin_task_plugin('WR-01', aliases=('WR01', 'WR_01'), env_name='WR01RetrieveRememberedCan'),
 _builtin_task_plugin('WR-08', aliases=('WR08', 'WR_08'), env_name='WR08MatchMilkCartonsToColoredSugarPlates'),
-_builtin_task_plugin('TS02', aliases=('TS-02', 'TS_02'), env_name='TS02InspectThreeCabinets'),
-_builtin_task_plugin('TS03', aliases=('TS-03', 'TS_03'), env_name='TS03HierarchicalAddKSugarToHotChocolate'),
-_builtin_task_plugin('TM01', aliases=('TM-01', 'TM_01'), env_name='TM01BoilWaterAndInspectTwoDrawers'),
-_builtin_task_plugin('TM02', aliases=('TM-02', 'TM_02'), env_name='TM02FillPotAndRetrieveCan'),)
+_builtin_task_plugin('TS-02', aliases=('TS02', 'TS_02'), env_name='TS02InspectThreeCabinets'),
+_builtin_task_plugin('TS-03', aliases=('TS03', 'TS_03'), env_name='TS03HierarchicalAddKSugarToHotChocolate'),
+_builtin_task_plugin('TM-01', aliases=('TM01', 'TM_01'), env_name='TM01BoilWaterAndInspectTwoDrawers'),
+_builtin_task_plugin('TM-02', aliases=('TM02', 'TM_02'), env_name='TM02FillPotAndRetrieveCan'),)
 
 
 def register_builtin_task_plugins() -> tuple[TaskPlugin, ...]:
@@ -65,9 +65,9 @@ def register_builtin_task_plugins() -> tuple[TaskPlugin, ...]:
 
 
 def get_builtin_task_plugin(canonical_id: str) -> TaskPlugin:
-    """Return a builtin descriptor by exact canonical id."""
+    """Return a builtin descriptor, accepting historical ID spellings."""
     register_builtin_task_plugins()
-    plugin = get_task_plugin(canonical_id)
+    plugin = resolve_task_plugin(canonical_id)
     if plugin not in BUILTIN_TASK_PLUGINS:
         raise KeyError(f"task plugin {canonical_id!r} is not a builtin")
     return plugin

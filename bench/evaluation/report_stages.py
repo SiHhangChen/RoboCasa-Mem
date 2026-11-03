@@ -11,7 +11,8 @@ from collections.abc import Mapping
 import re
 from typing import Any
 
-from bench.evaluation.report_profiles import get_report_stage_profile
+from bench.evaluation.report_profiles import get_report_stage_profile, normalize_report_profile_id
+from bench.task_ids import normalize_task_id
 
 
 REPORT_STAGES_SCHEMA = "membench.report_stages/v1"
@@ -47,16 +48,16 @@ def validate_report_stages(
             f"{payload.get('schema_version')!r}"
         )
 
-    task_id = _nonempty_string(payload.get("task_id"), "report_stages.task_id")
-    profile_id = _nonempty_string(
+    task_id = normalize_task_id(_nonempty_string(payload.get("task_id"), "report_stages.task_id"))
+    profile_id = normalize_report_profile_id(_nonempty_string(
         payload.get("profile_id"), "report_stages.profile_id"
-    )
-    if expected_task_id is not None and task_id != str(expected_task_id):
+    ))
+    if expected_task_id is not None and task_id != normalize_task_id(str(expected_task_id)):
         raise ValueError(
             f"report_stages task mismatch: expected {expected_task_id!r}, "
             f"got {task_id!r}"
         )
-    if expected_profile_id is not None and profile_id != str(expected_profile_id):
+    if expected_profile_id is not None and profile_id != normalize_report_profile_id(str(expected_profile_id)):
         raise ValueError(
             f"report_stages profile mismatch: expected {expected_profile_id!r}, "
             f"got {profile_id!r}"

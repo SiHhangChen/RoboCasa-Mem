@@ -15,17 +15,19 @@ ModelScope 下载地址：
 
 ## 任务
 
-| 任务  | 描述                         | 评测配置后缀 |
-| ----- | ---------------------------- | ------------ |
-| WX-01 | 将物体放回原位               | `wx01`     |
-| WA-01 | 将加糖和未加糖的咖啡分类     | `wa01`     |
-| WA-05 | 装满一个杯子并匹配温度按钮   | `wa05`     |
-| WR-01 | 取回记忆中的罐子             | `wr01`     |
-| WR-08 | 将牛奶盒与对应颜色的糖盘匹配 | `wr08`     |
-| TS02  | 检查三个柜子                 | `ts02`     |
-| TS03  | 向热巧克力中加入指定量的糖   | `ts03`     |
-| TM01  | 烧水并检查两个抽屉           | `tm01`     |
-| TM02  | 将锅装满并取回罐子           | `tm02`     |
+| 任务名称 | 任务代号 | 描述 | 评测配置后缀 |
+| --- | --- | --- | --- |
+| PutBackCup | WX-01 | 将物体放回原位 | `wx01` |
+| SweetCup | WA-01 | 将加糖和未加糖的咖啡分类 | `wa01` |
+| TempReport | WA-05 | 装满一个杯子并匹配温度按钮 | `wa05` |
+| CanRecall | WR-01 | 取回记忆中的罐子 | `wr01` |
+| MilkMatch | WR-08 | 将牛奶盒与对应颜色的糖盘匹配 | `wr08` |
+| DrawerSearch | TS-02 | 检查三个柜子 | `ts02` |
+| SugarCount | TS-03 | 向热巧克力中加入指定量的糖 | `ts03` |
+| HeatAndInspect | TM-01 | 烧水并检查两个抽屉 | `tm01` |
+| FillAndRetrieve | TM-02 | 将锅装满并取回罐子 | `tm02` |
+
+任务代号统一使用连字符，例如 `WX-01`、`TS-02`。输入和历史结果读取仍兼容 `TS02` 等旧写法。评测配置后缀、文件名和 Python 包名使用 `ts02` 等紧凑小写形式。
 
 通过 `<模型系列>:<任务后缀>` 选择评测配置，例如 `pi05:wx01`、`act:wa01` 或 `diffusion:ts03`。发布范围仅包含三个模型系列各九个任务，共 27 份正式评测配置，分别放在 `configs/eval/act/`、`configs/eval/diffusion/`、`configs/eval/pi05/`，统一使用 `wa01.yaml` 等任务名。完整映射见 [`evaluation_suite_sources.json`](configs/benchmark/evaluation_suite_sources.json)。
 
@@ -201,7 +203,11 @@ membench-eval \
   --preflight-only
 ```
 
-预检查会验证任务、评测配置和远程策略接口，不会创建仿真任务实例，也不会验证资产恢复或渲染。随后运行完整的 50 个种子评测：
+预检查会验证任务、评测配置和远程策略接口，不会创建仿真任务实例，也不会验证资产恢复或渲染。
+
+### 单轮评测：一个任务、一个模型、50 个 seeds
+
+一轮会用同一个检查点执行该任务的全部 50 个环境 seeds（1050–1099）。`membench-eval` 是 [scripts/eval/run_remote.py](scripts/eval/run_remote.py) 的配置选择入口。保持终端 B 中的模型服务运行，在终端 A 执行：
 
 ```sh
 membench-eval \
@@ -225,6 +231,29 @@ WA-01 的 ACT、DP、Pi0.5 正式配置均显式使用 2000 步预算，任务�
 
 WX-01 初始化时，机器人已实际握住海绵。仓库提供覆盖全部 50 个种子的初始化动作记录，用于替代重置阶段的规划。初始化动作在模型控制前执行，不占用评测步数预算。记录缺失或仿真状态不匹配会报错，评测不需要 MPlib。
 
+### 五轮评测：重复同一组 50 个 seeds
+
+正式比较时，每个模型的每个任务执行五轮，检查点、评测配置和环境 seeds 保持一致。每轮使用不同的 `run-id`，因此每任务保存 250 次 episode 运行，但只有 50 个不同环境 seeds；九任务合计 2250 次运行。
+
+下面的命令在终端 A 顺序执行 ACT WA-01 的五轮评测，终端 B 始终保持对应检查点的服务运行。每次评测会重新创建任务实例，并在每个 episode 开始时重置 policy 状态。任一轮运行或完整性校验失败，循环就会停止：
+
+```sh
+(
+  set -e
+  for eval_round in 1 2 3 4 5; do
+    membench-eval \
+      --endpoint ws://localhost:8000 \
+      --suite act:wa01 \
+      --output-root ./outputs/eval \
+      --run-id "wa01-act-round${eval_round}"
+  done
+)
+```
+
+结果分别保存在 `outputs/eval/wa01-act-round1/` 至 `wa01-act-round5/`。若某轮已有同名结果，默认断点续跑；要开展一组全新的五轮实验，应统一更换运行 ID 前缀。其他模型和任务需同时更换终端 B 的检查点、循环中的 `--suite` 和运行 ID 前缀，例如 DP WA-01 使用 `diffusion:wa01` 和 `wa01-dp-round${eval_round}`。
+
+这里的五轮衡量固定测试集上的重复运行波动。DP 默认启用按 episode seed 固定随机数；前述 Pi0.5 服务示例也显式启用 `--seed-by-episode`。因此，相同 seed 在不同轮次也使用相同的策略采样 seed，五轮不代表五组独立策略采样，各轮成绩可能完全相同，标准差可能为零。
+
 ## 结果与断点续跑
 
 结果处理命令在终端 A 执行。上述示例将结果写入 `outputs/eval/wa01-act-round1/`。其中，`run_manifest.json` 记录评测配置、种子、模型接口约定和运行环境标识；`summary.json` 汇总已写入的有效回合产物，包括任务成功情况和阶段结果。评测配置启用视频时，还会保存视频。
@@ -237,6 +266,45 @@ WX-01 初始化时，机器人已实际握住海绵。仓库提供覆盖全部 5
 membench-summarize ./outputs/eval/wa01-act-round1
 ```
 
+### 单轮 SCR 与阶段结果
+
+使用项目运行环境，计算单个任务一轮完整 50-seed 评测的论文 SCR：
+
+```sh
+python scripts/eval/compute_scr.py ./outputs/eval/wa01-act-round1
+```
+
+该脚本通用于 ACT、DP、Pi0.5 及其他生成标准评测产物的 policy，模型和检查点信息从 `run_manifest.json` 自动读取。每次输入一个运行目录，其中必须有运行清单，以及全部 50 个 seed 的 `episodes/seed_*/result.json`、动作文件和请求指标文件；seed 集合必须与清单中的 50 个不同 seed 完全一致。缺少回合、存在 error/cancelled、缺少阶段报告或阶段版本不兼容时，返回退出码 `2`。
+
+脚本默认在 `<运行目录>/scr/` 输出 `scr.json`、`stages.csv`、`episode_stages.csv` 和 `SCR.md`，也可用 `--output-dir PATH` 指定输出目录。它根据逐回合判定重新计算指标，不修改原始产物或 `summary.json`。SCR 为各阶段“通过数 / 适用回合数”的等权平均；SugarCount 各阶段分别使用适用分母，MilkMatch 只计论文六阶段，排除额外的 `success`。CanRecall 的前两阶段为“关闭任意第一扇门、两扇门均关上”，不限定上下柜顺序。若某个阶段没有适用回合，SCR 无定义，脚本会明确报错。
+
+### 五轮 SCR 的均值与标准差
+
+五轮全部完成后，在终端 A 执行以下命令，按顺序传入五个原始评测目录：
+
+```sh
+python scripts/eval/summarize_rounds.py \
+  ./outputs/eval/wa01-act-round1 \
+  ./outputs/eval/wa01-act-round2 \
+  ./outputs/eval/wa01-act-round3 \
+  ./outputs/eval/wa01-act-round4 \
+  ./outputs/eval/wa01-act-round5 \
+  --output-dir ./outputs/eval/wa01-act-five-rounds
+```
+
+汇总脚本会调用单轮 SCR 计算逻辑，重新读取五轮原始结果；不需要预先生成五份 `scr.json`，也不会使用可能过期的缓存成绩。五轮必须来自不同的运行目录和运行 ID，使用相同的任务、模型信息、检查点、评测配置、代码版本、步数设置、seeds 及阶段适用性；其中任何一轮不完整或配置不一致都会报错。
+
+对每轮先独立计算 `SCR_r = 各阶段（通过数 / 适用回合数）的等权平均`，再计算：
+
+```text
+mean = (SCR_1 + SCR_2 + SCR_3 + SCR_4 + SCR_5) / 5
+std  = sqrt(Σ_r (SCR_r - mean)² / 4)
+```
+
+这里是五轮成绩的样本标准差（`ddof=1`）。最终成功率 SR 和各阶段通过率使用相同的五轮汇总方式。结果写入指定目录的 `summary.json` 和 `SUMMARY.md`，包含五轮原值、均值和样本标准差。JSON 中比率范围为 0–1；Markdown 中均值显示为百分数，标准差显示为百分点。
+
+每个任务分别执行上述流程。九任务总体 SCR 为每轮九个任务 SCR 的等权平均，再对五个总体值计算均值和样本标准差。
+
 当结果满足完整性和产物校验要求时，评测及汇总命令返回退出码 `0`，否则返回 `2`。有效运行可以包含任务失败的回合，结果完整不代表每个回合都成功。
 
 ## 验证与发布状态
@@ -247,7 +315,7 @@ membench-summarize ./outputs/eval/wa01-act-round1
 
 当前安装包移除了真机集成、调整了策略运行文件、整理了评测配置，并将 WA-01 预算统一为 2000 步。此前移除真机代码后的 wheel 已通过 47 项软件回归检查，包括本机 WebSocket 评测流程，以及 OpenPI 仿真接口和全部 27 个评测配置选择器的检查。本次整理后的版本已通过全部 27 个入口和 450 个回合输入身份的解析检查，wheel 与源码包也均确认只包含 27 份正式评测配置。当前安装包仍需重新执行 450 项 wheel 安装验收；最终源码版本冻结也尚未完成。具体状态见 [`release_candidate.json`](release_candidate.json)。
 
-历史 TS03 Pi0.5 的种子 1056 曾将阶段报告保存在空 JSON 字段名下。经过验证的修复已恢复 `report_stages`，全部 50 份历史阶段报告均完整，总体成功率仍为 14/50（28%）。修正后的汇总和修复来源记录见[历史修复归档](https://github.com/SiHhangChen/RoboCasa-Mem/tree/e020312e8146c646c9013d35e9a7fc3523f0cdc1/docs/historical_result_repairs/ts03_pi05_r40)。
+历史 TS-03 Pi0.5 的种子 1056 曾将阶段报告保存在空 JSON 字段名下。经过验证的修复已恢复 `report_stages`，全部 50 份历史阶段报告均完整，总体成功率仍为 14/50（28%）。修正后的汇总和修复来源记录见[历史修复归档](https://github.com/SiHhangChen/RoboCasa-Mem/tree/e020312e8146c646c9013d35e9a7fc3523f0cdc1/docs/historical_result_repairs/ts03_pi05_r40)。
 
 维护文档、验证材料、发布维护脚本、测试及真机代码均不包含在发布目录和分发包中。历史验证材料保存在[文档归档](https://github.com/SiHhangChen/RoboCasa-Mem/tree/e020312e8146c646c9013d35e9a7fc3523f0cdc1/docs)中。发布元数据中的 `docs/` 路径指向该归档版本或本地维护文件；验证材料校验和候选版本整理工具需要这些文件，正常评测不需要。测试源码保存在 Git 提交 `953b8ef` 中。
 

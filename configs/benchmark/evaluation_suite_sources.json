@@ -15,10 +15,10 @@
   "entries": [
     {
       "family": "act",
-      "task_id": "TM01",
+      "task_id": "TM-01",
       "suite_file": "configs/eval/act/tm01.yaml",
-      "file_sha256": "b931a77911a829006e71fb8fc31e9e6496874fd92f22e642d15b4204be00080c",
-      "normalized_suite_hash": "sha256:0f2504600cbc1f2893e10737dd0ac6129eadbe9a9826f7534b142f07a3953d8d",
+      "file_sha256": "da9d73e10170214ae8540e0112a1be3f7dd41eca5b8afd60f68005dd9f5e35ed",
+      "normalized_suite_hash": "sha256:a7f8f5e123cfe7638610a6d90f33c64dda8e3e21a5fdb5390fa4808806a1233c",
       "effective_rollout": {
         "action_repeat": 1,
         "ignore_done": true,
@@ -38,10 +38,10 @@
     },
     {
       "family": "act",
-      "task_id": "TM02",
+      "task_id": "TM-02",
       "suite_file": "configs/eval/act/tm02.yaml",
-      "file_sha256": "1d48ed4010e040f4de4005892abb2ccd83f6fe4d509efa677fc171915dc68534",
-      "normalized_suite_hash": "sha256:5b6211753e23b0c2ad2bb4a3e40915441de18406872f537564b2b47cf628a0ad",
+      "file_sha256": "86d3024f35d090db0b8e304986c78fbee26ff6ae1d71b9dca67fe56d1bc80017",
+      "normalized_suite_hash": "sha256:4c3b0c4d85c60374bcf0b18f8383edb15eabc739abf5969ac7528225325a995b",
       "effective_rollout": {
         "action_repeat": 1,
         "ignore_done": true,
@@ -61,10 +61,10 @@
     },
     {
       "family": "act",
-      "task_id": "TS02",
+      "task_id": "TS-02",
       "suite_file": "configs/eval/act/ts02.yaml",
-      "file_sha256": "181f768edd656b6cde14e8e58478fcb62c50168a2de4c10d92a5c1f1f7f5b55b",
-      "normalized_suite_hash": "sha256:18382495d0d41665b6205c5d6be9b579be54eec5c854c241ed50dbbdec60f794",
+      "file_sha256": "35806e6fb1fd18f271f6ca2fca1e5f94570c4397c394722f36c6b934e65047d1",
+      "normalized_suite_hash": "sha256:3371944560d3b6da53593fbd2b9dbc58207f18f7c870301c50cc03180e1f632d",
       "effective_rollout": {
         "action_repeat": 1,
         "ignore_done": true,
@@ -84,10 +84,10 @@
     },
     {
       "family": "act",
-      "task_id": "TS03",
+      "task_id": "TS-03",
       "suite_file": "configs/eval/act/ts03.yaml",
-      "file_sha256": "35b8ff18a7cddde003aac2d95dcb008cfd8ecd50a7c45a6e2adf2e01218d5e1b",
-      "normalized_suite_hash": "sha256:b48b7a7740e5fd75423a9024e4ee123f97c50ce7ea36efe907837f4abe1e4721",
+      "file_sha256": "fef18751c9f165f46d1ac6bc18e7714d4f8da099bc343ca3aca0717e8dec2989",
+      "normalized_suite_hash": "sha256:c27f187e56bd9b77c18d2876e3d7e2b3376cc3f63445f4ebfe9c1e634ba68540",
       "effective_rollout": {
         "action_repeat": 1,
         "ignore_done": true,
@@ -222,10 +222,10 @@
     },
     {
       "family": "diffusion",
-      "task_id": "TM01",
+      "task_id": "TM-01",
       "suite_file": "configs/eval/diffusion/tm01.yaml",
-      "file_sha256": "25ea6e5ac9ffe4013630d8d6b3e212b39d7dc23671ab0188b4fd9a0f198d0236",
-      "normalized_suite_hash": "sha256:8844f7587cc694363ce150a7ef3ca640ac73cdd96270732a5f61e7bf4f18e527",
+      "file_sha256": "6288fca0a988593800c7322bac82aea6e4095f1777f9d54b1e982125b9fcaa41",
+      "normalized_suite_hash": "sha256:f2a92c40a8a2d4173d6e588da2ed883c7a330a05c53ce31e8bd0da9b2636a09a",
       "effective_rollout": {
         "action_repeat": 1,
         "ignore_done": true,
@@ -249,10 +249,10 @@
     },
     {
       "family": "diffusion",
-      "task_id": "TM02",
+      "task_id": "TM-02",
       "suite_file": "configs/eval/diffusion/tm02.yaml",
-      "file_sha256": "87be4652db2debe7859a436581b49fb5269ac33b7edea5b1bb71ceb214eea50d",
-      "normalized_suite_hash": "sha256:3f7530407f73f5bd7061a0b0dcad1e1a5dacd526cfb28e9be79dff8c86e29d28",
+      "file_sha256": "5b87aaa20a92d39a64063a3232c6b450bcc787b693f94f429162d9aceb636e6a",
+      "normalized_suite_hash": "sha256:9a5fb3613b6248d105367bb8d436aa2495dbfea90823148a7f807911c986dacb",
       "effective_rollout": {
         "action_repeat": 1,
         "ignore_done": true,
@@ -276,10 +276,10 @@
     },
     {
       "family": "diffusion",
-      "task_id": "TS02",
+      "task_id": "TS-02",
       "suite_file": "configs/eval/diffusion/ts02.yaml",
-      "file_sha256": "44871f03fef140345a9e4871fb68829efb362ebe892f5f3289c41f3c2770d166",
-      "normalized_suite_hash": "sha256:1194587d3229f0cb2ba09cb196c679c644ebfae993e21788ae48e4e4b3d6f9a5",
+      "file_sha256": "4a7ab3c8fcfae5d1fd2892edc288a7e0cf4b87c91b31fc6c4be605cf03ffe6dc",
+      "normalized_suite_hash": "sha256:4e6d359154637a63b0d964b8c86f5955b4069a779cfa8b6773ce82c1d96d04d5",
       "effective_rollout": {
         "action_repeat": 1,
         "ignore_done": true,
@@ -303,10 +303,10 @@
     },
     {
       "family": "diffusion",
-      "task_id": "TS03",
+      "task_id": "TS-03",
       "suite_file": "configs/eval/diffusion/ts03.yaml",
-      "file_sha256": "4e0e25621eb0d7aea654313e9eefc56350c47a598e30922d7ffcf7de9d726c0f",
-      "normalized_suite_hash": "sha256:fde49e3f5539bdd23d8619892fe0f7f84965f47e3871e6a73add3504786c8140",
+      "file_sha256": "1e88d970e8ae3adbc31c7f26ffe47766f6008c4624d1299c7014646ed60fb62c",
+      "normalized_suite_hash": "sha256:ed29ff42886a3d081ef4576004ded8cbcc6d8002ee240b4e04363762b692814a",
       "effective_rollout": {
         "action_repeat": 1,
         "ignore_done": true,
@@ -465,10 +465,10 @@
     },
     {
       "family": "pi05",
-      "task_id": "TM01",
+      "task_id": "TM-01",
       "suite_file": "configs/eval/pi05/tm01.yaml",
-      "file_sha256": "455d0f4223b5485b4bf59f5c1d17a7d5fa467dab7a652d6e166c054212aace41",
-      "normalized_suite_hash": "sha256:1ea7c456ab0d4615e1c1430cd47d8c312cbc27981d194184144c4766c2d2ccce",
+      "file_sha256": "657b127938d69331d556948e2d27c38ac842690aa5be7b6bd3464e0f47733d70",
+      "normalized_suite_hash": "sha256:041395090198fb78093584d78639536f1ae689ef68adf0d2473c6be0a55b8624",
       "effective_rollout": {
         "action_repeat": 1,
         "ignore_done": true,
@@ -487,10 +487,10 @@
     },
     {
       "family": "pi05",
-      "task_id": "TM02",
+      "task_id": "TM-02",
       "suite_file": "configs/eval/pi05/tm02.yaml",
-      "file_sha256": "208f86933203ec704e7bf5d4e5e1abb72eb6c9da521fdb0ca1aab164f38142e8",
-      "normalized_suite_hash": "sha256:55021424667d91a28c720aee542957b9933329839a63fb61c06dc1b16c1e50fe",
+      "file_sha256": "3441b2a694a48bd4ed7c406ae243efb030fe91c4c5fc571d37244b79251df0ff",
+      "normalized_suite_hash": "sha256:cf991764d2c5ee7f6416fbff0475e02fb58641a641a7eecb65e18cb006dd1520",
       "effective_rollout": {
         "action_repeat": 1,
         "ignore_done": true,
@@ -509,10 +509,10 @@
     },
     {
       "family": "pi05",
-      "task_id": "TS02",
+      "task_id": "TS-02",
       "suite_file": "configs/eval/pi05/ts02.yaml",
-      "file_sha256": "1d3be358b3b3fc9ed08d6c6d35612f0ac8f9db003a8efb616eac84817c0cc584",
-      "normalized_suite_hash": "sha256:fda7ac494c8872f98534d84956cb0e548f96bac87b15cbef810c1bb6a457d98f",
+      "file_sha256": "8f4d60b421c3e7fa2c327d9f69ca64be5cf76aca35ca739e9e739e6bb41b5f30",
+      "normalized_suite_hash": "sha256:cd0fb3d0430e6778925190180d82c91225a13d3306023a6c8e48d5523c8183cc",
       "effective_rollout": {
         "action_repeat": 1,
         "ignore_done": true,
@@ -531,10 +531,10 @@
     },
     {
       "family": "pi05",
-      "task_id": "TS03",
+      "task_id": "TS-03",
       "suite_file": "configs/eval/pi05/ts03.yaml",
-      "file_sha256": "89027e6dc8d4bac22f8b49566ea77234f51bf0b2b26e9d621287f7bccbd94d16",
-      "normalized_suite_hash": "sha256:8eb89249753fc4e0e6b01d0d798ee8689d05da54524f8f83bc3166f4f09794fb",
+      "file_sha256": "0c9c29ec90fbee8cfe34b8b0a7f0509ea6d0705ed76fdfd95c67f7b85eb6dbdc",
+      "normalized_suite_hash": "sha256:79f7ae7ee42ce4ba6879505d25620f7a7dfe66269aa5adc721a5c0db87ef8be5",
       "effective_rollout": {
         "action_repeat": 1,
         "ignore_done": true,

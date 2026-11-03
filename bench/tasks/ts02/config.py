@@ -6,6 +6,7 @@ from math import isfinite
 from pathlib import Path
 from typing import Any
 import yaml
+from bench.task_ids import normalize_task_id
 from bench.tasks.ts02.domain.contracts import ENV_NAME, TASK_ID, ActionConfig, InitialStateConfig, RobotBaseConfig, RobotBaseMode, RunContext, TaskConfig
 from bench.tasks.ts02.domain.episode import normalize_drawer_randomization
 PACKAGE_ROOT = Path(__file__).resolve().parent
@@ -23,8 +24,9 @@ def load_task_config(path: str | Path=DEFAULT_TASK_CONFIG_FILE) -> TaskConfig:
         raise ValueError('TS02 only supports schema_version=1')
     task = dict(_mapping(payload, 'task', config_path))
     _reject_unknown(task, {'id', 'display_name', 'description', 'success_conditions'}, 'task fields')
-    if str(task.get('id')) != TASK_ID:
+    if normalize_task_id(str(task.get('id'))) != TASK_ID:
         raise ValueError(f'TS02 config must declare task.id={TASK_ID!r}')
+    task['id'] = TASK_ID
     scene = dict(_mapping(payload, 'scene', config_path))
     _reject_unknown(scene, {'env_name', 'fixed_scene', 'layout_id', 'style_id', 'scene_seed', 'fixture_names', 'drawer_world_xyzs', 'drawer_world_yaw_deg', 'completion_button_world_xyz', 'open_threshold', 'closed_threshold'}, 'scene fields')
     episode = dict(_mapping(payload, 'episode', config_path))
@@ -160,7 +162,7 @@ def _validate_resources(config: TaskConfig) -> None:
     payload = json.loads(station_path.read_text(encoding='utf-8'))
     if not isinstance(payload, Mapping):
         raise ValueError('TS02 station resource must contain a JSON object')
-    if str(payload.get('task')) != TASK_ID or str(payload.get('env_name')) != ENV_NAME:
+    if normalize_task_id(str(payload.get('task'))) != TASK_ID or str(payload.get('env_name')) != ENV_NAME:
         raise ValueError('TS02 station resource declares the wrong task or environment')
 
 def _mapping(payload: Mapping[str, Any], name: str, path: Path) -> Mapping[str, Any]:

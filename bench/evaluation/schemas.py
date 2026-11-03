@@ -12,6 +12,7 @@ from typing import Any
 import numpy as np
 
 from bench.evaluation.report_stages import validate_report_stages
+from bench.task_ids import normalize_task_id
 
 
 EPISODE_RESULT_SCHEMA = "membench.episode_result/v1"
@@ -33,6 +34,8 @@ def validate_episode_result(
     if not isinstance(payload, Mapping):
         raise ValueError("episode result must be a mapping")
     result = dict(payload)
+    if isinstance(result.get("task_id"), str):
+        result["task_id"] = normalize_task_id(result["task_id"])
     schema = result.get("schema_version")
     if schema not in {None, EPISODE_RESULT_SCHEMA}:
         raise ValueError(f"unsupported episode result schema: {schema!r}")

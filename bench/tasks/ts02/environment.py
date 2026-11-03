@@ -64,7 +64,7 @@ class TS02InspectThreeCabinets(Kitchen):
     COMPLETION_BUTTON_GEOM_NAME = COMPLETION_BUTTON_GEOM_NAME
     COMPLETION_BUTTON_JOINT_NAME = COMPLETION_BUTTON_JOINT_NAME
     TARGET_OBJECT_GEOM_NAME = TARGET_OBJECT_GEOM_NAME
-    TASK_LABEL = "TS02"
+    TASK_LABEL = "TS-02"
     LANG = (
         "Search the three drawers for the red cube. Close every drawer after "
         "looking inside. Once you find the cube and close its drawer, press "

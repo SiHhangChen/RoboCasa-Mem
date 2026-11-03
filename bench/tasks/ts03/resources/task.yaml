@@ -1,9 +1,9 @@
-# TS03 production configuration. Dataset storage flags remain task-owned here;
+# TS-03 production configuration. Dataset storage flags remain task-owned here;
 # output paths and episode selection remain recorder-owned.
 schema_version: 1
 
 task:
-  id: TS03
+  id: TS-03
   display_name: Hierarchical Add K Sugar To Hot Chocolate
   description: Complete one of six separately reported K/N sugar-count profiles, then press the completion button.
   success_conditions:

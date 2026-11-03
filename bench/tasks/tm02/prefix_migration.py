@@ -7,6 +7,7 @@ from dataclasses import replace
 
 from bench.evaluation.expert_prefix import ExpertPrefixArtifact
 from bench.evaluation.report_profiles import TM02_REPORT_PROFILE_V1
+from bench.task_ids import normalize_task_id
 from bench.tasks.tm02.evaluation import (
     REPORT_STAGE_PROFILE_ID,
     STAGE_ORDER,
@@ -23,7 +24,7 @@ def upgrade_v1_prefix(artifact: ExpertPrefixArtifact) -> ExpertPrefixArtifact:
     validation step. Incomplete or differently indexed evidence is rejected.
     """
 
-    if artifact.task_id != "TM02" or artifact.stage_order != TM02_REPORT_PROFILE_V1.stage_ids:
+    if normalize_task_id(artifact.task_id) != "TM-02" or artifact.stage_order != TM02_REPORT_PROFILE_V1.stage_ids:
         raise ValueError("migration requires a TM02 four-stage v1 prefix")
     if not artifact.success or artifact.failure_reason is not None:
         raise ValueError("cannot migrate an unsuccessful expert prefix")

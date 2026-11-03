@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from bench.core.identity import canonical_hash, file_sha256
+from bench.task_ids import normalize_task_id
 from bench.tasks.contracts import EpisodeRequest, ResolvedEpisode
 
 
@@ -40,7 +41,7 @@ def resolve_canonical_episode(
 ) -> ResolvedEpisode:
     """Build one immutable episode without unsupported context or simulator imports."""
 
-    if request.task_id != task_id:
+    if normalize_task_id(request.task_id) != task_id:
         raise ValueError(f"{task_id} resolver cannot resolve task {request.task_id!r}")
     config_path = Path(request.task_config_file or default_task_config_file).expanduser().resolve()
     profile_path = Path(

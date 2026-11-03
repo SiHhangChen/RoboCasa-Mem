@@ -10,7 +10,7 @@ from types import MappingProxyType
 from typing import Any
 
 
-TASK_ID = "TS03"
+TASK_ID = "TS-03"
 TASK_REVISION = "TS03-v2"
 ENV_NAME = "TS03HierarchicalAddKSugarToHotChocolate"
 DISPLAY_NAME = "Hierarchical Add K Sugar To Hot Chocolate"

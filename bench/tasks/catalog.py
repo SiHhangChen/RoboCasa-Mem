@@ -41,14 +41,14 @@ CatalogEntry('WA-01', 'wa01', 'WA01SortSugaredAndUnsugaredCoffee', '2.0.0', 5000
 CatalogEntry('WA-05', 'wa05', 'WA05FillOneCupAndMatchTemperatureButton', '1.0.0', 4000),
 CatalogEntry('WR-01', 'wr01', 'WR01RetrieveRememberedCan', '1.0.0', 15000),
 CatalogEntry('WR-08', 'wr08', 'WR08MatchMilkCartonsToColoredSugarPlates', '2.0.0', 2000),
-CatalogEntry('TS02', 'ts02', 'TS02InspectThreeCabinets', '1.1.0', 2800),
-CatalogEntry('TS03', 'ts03', 'TS03HierarchicalAddKSugarToHotChocolate', '1.0.0', 2800),
-CatalogEntry('TM01', 'tm01', 'TM01BoilWaterAndInspectTwoDrawers', '1.0.0', 3200),
-CatalogEntry('TM02', 'tm02', 'TM02FillPotAndRetrieveCan', '1.0.0', 3600),)
+CatalogEntry('TS-02', 'ts02', 'TS02InspectThreeCabinets', '1.1.0', 2800),
+CatalogEntry('TS-03', 'ts03', 'TS03HierarchicalAddKSugarToHotChocolate', '1.0.0', 2800),
+CatalogEntry('TM-01', 'tm01', 'TM01BoilWaterAndInspectTwoDrawers', '1.0.0', 3200),
+CatalogEntry('TM-02', 'tm02', 'TM02FillPotAndRetrieveCan', '1.0.0', 3600),)
 
 _ALIASES: dict[str, str] = {}
 for _entry in _ENTRIES:
-    for _value in (_entry.task_id, _entry.package, f"{_entry.task_id[:2]}-{_entry.task_id[2:]}"):
+    for _value in (_entry.task_id, _entry.package):
         _ALIASES["".join(ch for ch in _value.casefold() if ch.isalnum())] = _entry.task_id
 
 

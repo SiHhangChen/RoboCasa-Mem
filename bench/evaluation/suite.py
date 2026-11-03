@@ -11,6 +11,8 @@ from typing import Any, Mapping
 
 import yaml
 
+from bench.task_ids import normalize_task_id
+
 
 @dataclass(frozen=True)
 class RolloutConfig:
@@ -92,7 +94,7 @@ def load_eval_suite(path: Path) -> EvalSuiteConfig:
     )
     suite = EvalSuiteConfig(
         suite_version=_string(payload, "suite_version", context="eval suite"),
-        task_id=_string(task, "id", context="task"),
+        task_id=normalize_task_id(_string(task, "id", context="task")),
         env_split=_string(task, "env_split", default="pretrain", context="task"),
         seeds=expand_seeds(payload.get("seeds")),
         rollout=RolloutConfig(

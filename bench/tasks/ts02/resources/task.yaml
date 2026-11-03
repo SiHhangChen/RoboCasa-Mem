@@ -1,8 +1,8 @@
-# TS02 production configuration. Output paths and dataset selection stay CLI-owned.
+# TS-02 production configuration. Output paths and dataset selection stay CLI-owned.
 schema_version: 1
 
 task:
-  id: TS02
+  id: TS-02
   display_name: Find the Red Cube and Report Search Length
   description: Search three drawers for a bright red cube, close every inspected drawer, then press the completion button once per inspected drawer.
   success_conditions:

@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 import yaml
+from bench.task_ids import normalize_task_id
 from bench.tasks.families.drawer_inspection.materials import normalize_drawer_material_candidates
 from bench.tasks.tm01.domain.contracts import CANONICAL_PROMPT, CANONICAL_PROMPT_SHA256, COMPLETION_BUTTON_NAMES, ENV_NAME, TASK_ID, ActionConfig, ObserverConfig, RunContext, TaskConfig
 PACKAGE_ROOT = Path(__file__).resolve().parent
@@ -25,8 +26,9 @@ def load_task_config(path: str | Path=DEFAULT_TASK_CONFIG_FILE) -> TaskConfig:
         raise ValueError('TM01 only supports schema_version=1')
     sections = {name: dict(_mapping(payload, name)) for name in allowed_sections if name != 'schema_version'}
     task = sections['task']
-    if str(task.get('id')) != TASK_ID:
+    if normalize_task_id(str(task.get('id'))) != TASK_ID:
         raise ValueError(f'TM01 config must declare task.id={TASK_ID!r}')
+    task['id'] = TASK_ID
     prompt = str(task.get('canonical_prompt', ''))
     declared_hash = str(task.get('canonical_prompt_sha256', ''))
     actual_hash = hashlib.sha256(prompt.encode('utf-8')).hexdigest()

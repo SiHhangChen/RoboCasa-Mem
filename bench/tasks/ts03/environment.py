@@ -642,7 +642,7 @@ class TS03HierarchicalAddKSugarToHotChocolate(Kitchen):
         from bench.tasks.ts03.domain.contracts import episode_profile_metadata
 
         profile_values = episode_profile_metadata(self)
-        metadata["task_id"] = "TS03"
+        metadata["task_id"] = "TS-03"
         metadata.update(profile_values)
         metadata.setdefault("refs", {}).update(profile_values)
         return metadata

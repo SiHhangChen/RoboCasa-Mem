@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 
-TASK_ID = "TM02"
+TASK_ID = "TM-02"
 ENV_NAME = "TM02FillPotAndRetrieveCan"
 AXIS = "TQ-M"
 CANONICAL_PROMPT = (

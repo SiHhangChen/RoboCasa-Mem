@@ -2,7 +2,7 @@
 
 from bench.tasks.catalog import get_task_definition
 
-TASK = get_task_definition("TS02")
+TASK = get_task_definition("TS-02")
 
 __all__ = ["TASK"]
 

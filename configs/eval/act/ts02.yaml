@@ -1,7 +1,7 @@
-# Official act evaluation for TS02, seeds 1050-1099.
+# Official act evaluation for TS-02, seeds 1050-1099.
 suite_version: ts02_act_v2
 task:
-  id: TS02
+  id: TS-02
   env_split: pretrain
   options:
     task_config_file: bench/tasks/ts02/resources/task.yaml

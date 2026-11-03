@@ -101,7 +101,7 @@ def _initialize(descriptor: Any, env: Any, observation: Mapping[str, Any]):
 
 
 _ADAPTER = TaskRuntimeAdapter(
-    task_id="TS02",
+    task_id="TS-02",
     load_task_config=load_task_config,
     resolve_task_options=resolve_task_options,
     scene=standard_scene(resolve_scene_config),

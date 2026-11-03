@@ -23,17 +23,22 @@ acceptance after the removal of real-robot integration; see
 
 ## Tasks
 
-| Task | Description | Suite suffix |
-| --- | --- | --- |
-| WX-01 | Return an object to its original place | `wx01` |
-| WA-01 | Sort sugared and unsugared coffee | `wa01` |
-| WA-05 | Fill one cup and match its temperature button | `wa05` |
-| WR-01 | Retrieve a remembered can | `wr01` |
-| WR-08 | Match milk cartons to colored sugar plates | `wr08` |
-| TS02 | Inspect three cabinets | `ts02` |
-| TS03 | Add the specified amount of sugar to hot chocolate | `ts03` |
-| TM01 | Boil water and inspect two drawers | `tm01` |
-| TM02 | Fill a pot and retrieve a can | `tm02` |
+| Task name | Task ID | Description | Suite suffix |
+| --- | --- | --- | --- |
+| PutBackCup | WX-01 | Return an object to its original place | `wx01` |
+| SweetCup | WA-01 | Sort sugared and unsugared coffee | `wa01` |
+| TempReport | WA-05 | Fill one cup and match its temperature button | `wa05` |
+| CanRecall | WR-01 | Retrieve a remembered can | `wr01` |
+| MilkMatch | WR-08 | Match milk cartons to colored sugar plates | `wr08` |
+| DrawerSearch | TS-02 | Inspect three cabinets | `ts02` |
+| SugarCount | TS-03 | Add the specified amount of sugar to hot chocolate | `ts03` |
+| HeatAndInspect | TM-01 | Boil water and inspect two drawers | `tm01` |
+| FillAndRetrieve | TM-02 | Fill a pot and retrieve a can | `tm02` |
+
+Task IDs consistently use a hyphen, such as `WX-01` and `TS-02`. Legacy spellings
+such as `TS02` remain accepted on input and when reading historical results.
+Suite suffixes, filenames, and Python package names use compact lowercase forms
+such as `ts02`.
 
 Select a suite using `<family>:<suffix>`, for example `pi05:wx01`, `act:wa01`,
 or `diffusion:ts03`. All three families have configurations for all nine tasks.
@@ -280,7 +285,13 @@ membench-eval \
 
 Preflight validates the task, suite, and remote policy contract without creating
 a simulated task instance. It does not verify asset restoration or rendering.
-Then run the full 50-seed suite:
+
+### One round: one task, one model, 50 seeds
+
+One round evaluates the same checkpoint on all 50 environment seeds (1050–1099)
+for the selected task. `membench-eval` selects a suite and calls
+[scripts/eval/run_remote.py](scripts/eval/run_remote.py). Keep the matching model
+server running in Terminal B and run this in Terminal A:
 
 ```sh
 membench-eval \
@@ -313,6 +324,43 @@ cover all 50 seeds and replace reset-time planning. Setup steps precede policy
 control and do not consume the evaluation budget. A missing transcript or a
 simulator-state mismatch causes an error; MPlib is not needed for evaluation.
 
+### Five rounds: repeat the same 50 seeds
+
+For a formal comparison, evaluate each model/task pair five times, keeping the
+checkpoint, suite, and environment seeds fixed. Give each round a different run
+ID. This produces 250 episode runs per task with 50 unique environment seeds,
+or 2250 episode runs across all nine tasks.
+
+The following command runs five ACT WA-01 rounds sequentially in Terminal A.
+Keep the matching checkpoint's server running in Terminal B. Each evaluation
+creates fresh task instances and resets policy state at the start of each
+episode. The loop stops if a round fails to run or pass its completeness checks:
+
+```sh
+(
+  set -e
+  for eval_round in 1 2 3 4 5; do
+    membench-eval \
+      --endpoint ws://localhost:8000 \
+      --suite act:wa01 \
+      --output-root ./outputs/eval \
+      --run-id "wa01-act-round${eval_round}"
+  done
+)
+```
+
+Results are saved separately in `outputs/eval/wa01-act-round1/` through
+`wa01-act-round5/`. Existing run IDs resume by default; change the run ID prefix
+for a fresh five-round experiment. For another model/task, change the checkpoint
+in Terminal B, the suite, and the run ID prefix together. For example, DP WA-01
+uses `diffusion:wa01` and `wa01-dp-round${eval_round}`.
+
+These rounds measure repeatability on a fixed test set. DP seeds its RNG from
+the episode seed by default, and the Pi0.5 example explicitly enables
+`--seed-by-episode`. The same seed therefore also repeats the policy sampling
+seed across rounds. The five rounds are not five independent policy samples;
+scores can repeat and their standard deviation can be zero.
+
 ## Results and resuming
 
 Run result commands in Terminal A. The example above writes to
@@ -330,6 +378,71 @@ To rebuild and verify a summary from an existing run:
 ```sh
 membench-summarize ./outputs/eval/wa01-act-round1
 ```
+
+### Single-round SCR and stage results
+
+To compute paper SCR for one task's complete 50-seed run, use the same project
+environment. This works with ACT, DP, Pi0.5, or any policy producing the standard
+evaluation artifacts; the policy and checkpoint are read from the run manifest:
+
+```sh
+python scripts/eval/compute_scr.py ./outputs/eval/wa01-act-round1
+```
+
+The input is one run directory containing `run_manifest.json` and all 50
+`episodes/seed_*/result.json` records, with their required action and request
+metric artifacts. Seeds must exactly match the 50 unique seeds in the manifest.
+Incomplete runs, error/cancelled episodes, missing stage reports, and incompatible
+stage profiles are rejected with exit code `2`.
+
+The command writes `scr.json`, `stages.csv`, `episode_stages.csv`, and `SCR.md`
+under `<run_dir>/scr/`; use `--output-dir PATH` to choose another directory.
+It recomputes metrics from episode verdicts without changing the raw artifacts
+or `summary.json`. SCR averages each stage's passed/applicable rate. SugarCount
+uses each stage's own applicable denominator; MilkMatch uses its six paper
+stages, excluding the extra `success` stage. CanRecall's first two stages mean
+closing either first door and then having both doors closed, in either order.
+A stage with zero applicable episodes makes SCR undefined and is rejected.
+
+### Five-round SCR mean and standard deviation
+
+After all five rounds finish, pass their original run directories in order in
+Terminal A:
+
+```sh
+python scripts/eval/summarize_rounds.py \
+  ./outputs/eval/wa01-act-round1 \
+  ./outputs/eval/wa01-act-round2 \
+  ./outputs/eval/wa01-act-round3 \
+  ./outputs/eval/wa01-act-round4 \
+  ./outputs/eval/wa01-act-round5 \
+  --output-dir ./outputs/eval/wa01-act-five-rounds
+```
+
+This calls the single-run scoring logic on the original episode artifacts; it
+does not require precomputed `scr.json` files or trust cached scores. The five
+runs must have distinct directories and run IDs, with the same task, policy
+metadata, checkpoint, suite, code revision, rollout settings, seeds, and stage
+applicability. An incomplete run or incompatible configuration is rejected.
+
+First compute each round's `SCR_r` as the equal mean of its per-stage
+passed/applicable rates, then calculate:
+
+```text
+mean = (SCR_1 + SCR_2 + SCR_3 + SCR_4 + SCR_5) / 5
+std  = sqrt(Σ_r (SCR_r - mean)² / 4)
+```
+
+This is the sample standard deviation across five round scores (`ddof=1`).
+SR and individual stage rates use the same round-level aggregation. The output
+directory receives `summary.json` and `SUMMARY.md`, including the five values,
+their mean, and their sample standard deviation. JSON rates use the 0–1 scale;
+Markdown displays means as percentages and standard deviations in percentage
+points.
+
+Repeat this workflow for each task. Overall nine-task SCR is the equal mean
+of the nine task scores within each round, followed by the mean and sample
+standard deviation of those five overall values.
 
 The evaluation and summary commands exit with code `0` when results satisfy
 the completeness and artifact checks, or `2` when they do not. A valid run may
@@ -367,7 +480,7 @@ The 450-case installed-wheel acceptance must be repeated
 for the current package. Final source freezing is also pending.
 See [`release_candidate.json`](release_candidate.json).
 
-Historical TS03 Pi0.5 seed 1056 stored a stage report under an empty JSON field
+Historical TS-03 Pi0.5 seed 1056 stored a stage report under an empty JSON field
 name. A verified correction restored `report_stages`; all 50 historical stage
 reports are complete, and overall success remains 14/50 (28%). The corrected
 summary and provenance are in the

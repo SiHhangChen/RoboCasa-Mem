@@ -1,7 +1,7 @@
-# Official diffusion evaluation for TM02, seeds 1050-1099.
+# Official diffusion evaluation for TM-02, seeds 1050-1099.
 suite_version: tm02_diffusion_v2
 task:
-  id: TM02
+  id: TM-02
   env_split: pretrain
   options:
     task_config_file: bench/tasks/tm02/resources/task.yaml
