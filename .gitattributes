@@ -1,0 +1,3 @@
+# Website assets are deployed by Pages, not shipped in source release archives.
+/site export-ignore
+/.github/workflows/pages.yml export-ignore

@@ -72,7 +72,7 @@
   "files": {
     ".gitignore": "49fbee1c6da27e98fe9480c2b79c95547b8ef85b1ec07e9ecca946f12a1b9234",
     "LICENSE": "cd8ccdd0a6367df420b50aa75a269b429fb5cbe78fbd7acb9b03c040953e32bd",
-    "MANIFEST.in": "1d316dafeba0a54470a7a1127af024847ccebba0c97185168f5a8c62bab0d530",
+    "MANIFEST.in": "3e7de8709fc2b5331fda68ff6292b11e811448f31ee21bc44fe126d2c7ff4b73",
     "README.md": "c3a8881e7fa6ae00123ab2f9aceba2a392c0f74ce36a52484b6d9d6953c915dc",
     "README.zh-CN.md": "bd118f6573a01b1064061eed1f2b6899720553da7774a96f8ce313efe72179d1",
     "bench/__init__.py": "d15a2cc1a58aa612cf048ee16121986dddcf1d192e67538e03a728f47e3ddc73",
