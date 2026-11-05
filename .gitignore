@@ -69,5 +69,9 @@ pretrain_model/
 /bench/real_robot/
 /scripts/release/
 
+# Project website and its publishing workflow are maintained locally.
+/site/
+/.github/workflows/pages.yml
+
 # Checkpoint weights (large generated artifacts, kept out of git).
 ckpts/
